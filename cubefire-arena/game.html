@@ -158,7 +158,6 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 #stick i{position:absolute;left:46px;top:46px;width:48px;height:48px;border-radius:50%;background:rgba(243,239,228,.4)}
 .tb{position:absolute;pointer-events:auto;border-radius:50%;border:2px solid var(--line);background:rgba(0,0,0,.35);font-weight:700;font-size:12px;letter-spacing:.06em;display:grid;place-items:center;text-transform:uppercase;touch-action:none}
 #tFire{right:30px;bottom:calc(96px + env(safe-area-inset-bottom,0px));width:96px;height:96px;background:rgba(255,79,94,.38);font-size:14px}
-#tFire2{left:calc(42% + 10px);top:42%;width:64px;height:64px;background:rgba(255,79,94,.3)}
 #tJump{right:136px;bottom:calc(64px + env(safe-area-inset-bottom,0px));width:68px;height:68px}
 #tDash{right:142px;bottom:calc(156px + env(safe-area-inset-bottom,0px));width:60px;height:60px;--cd:1;background:conic-gradient(rgba(54,214,195,.5) calc(var(--cd) * 360deg),rgba(0,0,0,.4) 0)}
 #tAim{right:40px;bottom:calc(220px + env(safe-area-inset-bottom,0px));width:60px;height:60px}
@@ -218,7 +217,6 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
   <div id="moveZone"></div>
   <div id="stick"><i id="knob"></i></div>
   <button class="tb" id="tFire" type="button">Fire</button>
-  <button class="tb" id="tFire2" type="button" aria-label="Fire">Fire</button>
   <button class="tb" id="tJump" type="button">Jump</button>
   <button class="tb" id="tAim" type="button">Aim</button>
   <button class="tb" id="tDash" type="button">Dash</button>
@@ -1242,7 +1240,7 @@ if (isTouch) {
   window.addEventListener("pointermove", moveLook);
   window.addEventListener("pointerup", endLook); window.addEventListener("pointercancel", endLook);
 
-  for (const id of ["#tFire", "#tFire2"]) {
+  for (const id of ["#tFire"]) {
     const btn = $(id);
     btn.addEventListener("pointerdown", e => { e.preventDefault(); firing = true; fireQueued = true; startLook(e); try { btn.setPointerCapture(e.pointerId); } catch (err) {} });
     btn.addEventListener("pointermove", moveLook);
