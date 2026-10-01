@@ -720,6 +720,16 @@ let lobbyName = null;
 const remotes = new Map(), heard = new Map();
 function setNet(s) { netState = s; renderStatus(); }
 
+// The single-file build inlines the networking code as a module that announces itself;
+// the hosted build loads it from vendor/.
+function loadP2P() {
+  if (window.__cfaP2P) return Promise.resolve(window.__cfaP2P);
+  if (document.getElementById("cfa-p2p")) return new Promise(res => {
+    const done = () => res(window.__cfaP2P || null);
+    window.addEventListener("cfa-p2p-ready", done, { once: true }); setTimeout(done, 5000);
+  });
+  return import("./vendor/trystero-nostr.min.js");
+}
 async function initNet() {
   try { room = window.claude && window.claude.use ? await window.claude.use("room") : null; } catch (e) { room = null; }
   if (room) {
@@ -728,7 +738,7 @@ async function initNet() {
     await joinLobby("");
     return;
   }
-  try { p2p = await import("./vendor/trystero-nostr.min.js"); } catch (e) { p2p = null; }
+  try { p2p = await loadP2P(); } catch (e) { p2p = null; }
   if (p2p && p2p.joinRoom) {
     netKind = "p2p"; myPeer = p2p.selfId;
     await joinLobby("");
