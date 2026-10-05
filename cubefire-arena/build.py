@@ -5,6 +5,8 @@ published to claude.ai).
 - index.html: standalone page for a static host, loading vendor/ files.
 - cubefire-arena-single-file.html: everything inlined (three.js and the
   peer-to-peer networking code), so the one file runs on any host.
+- server/public/index.html: the single file again, served by the Cloudflare
+  Worker in server/ alongside the multiplayer relay.
 """
 from pathlib import Path
 
@@ -43,3 +45,8 @@ inline = (
 single = head + body.replace(THREE_TAG, inline) + tail
 (here / "cubefire-arena-single-file.html").write_text(single, encoding="utf-8")
 print("wrote", here / "cubefire-arena-single-file.html", f"({len(single.encode()) // 1024} KB)")
+
+public = here / "server" / "public"
+public.mkdir(parents=True, exist_ok=True)
+(public / "index.html").write_text(single, encoding="utf-8")
+print("wrote", public / "index.html")

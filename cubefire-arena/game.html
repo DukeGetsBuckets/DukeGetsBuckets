@@ -239,12 +239,18 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
       </div>
       <div class="field">
         <label for="code">Party code <em>optional</em></label>
-        <input type="text" id="code" maxlength="12" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="Open arena">
+        <input type="text" id="code" maxlength="12" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="Open lobby">
       </div>
     </div>
     <div class="field">
       <span class="lbl-sm" id="colorLbl">Armor color</span>
       <div class="swatches" id="swatches" role="group" aria-labelledby="colorLbl"></div>
+    </div>
+    <div class="set-row">
+      <span class="lbl-sm" id="mapLbl">Map</span>
+      <div class="seg" id="mapPick" role="group" aria-labelledby="mapLbl">
+        <button type="button" data-v="arena">Arena</button><button type="button" data-v="peaks">Peaks</button>
+      </div>
     </div>
     <div class="modes">
       <button class="mode primary" id="playOnline" type="button"><b>Play online</b><span id="onlineSub">Real players only, no bots</span></button>
@@ -304,12 +310,12 @@ document.addEventListener("gesturestart", e => e.preventDefault());
 document.addEventListener("dblclick", e => e.preventDefault());
 
 // ======================================================================
-// Map: 48x48 voxel arena, 8-fold symmetric so every spawn is fair
+// Maps: 48x48 voxel worlds, 8-fold symmetric so every spawn is fair
 // ======================================================================
-const W = 48, D = 48, H = 12;
+const W = 48, D = 48, H = 18;
 const grid = new Uint8Array(W * H * D);
 const idx = (x, y, z) => x + W * (z + D * y);
-const T = { GROUND: 1, STONE: 2, BRICK: 3, WOOD: 4, METAL: 5, TRIM: 6 };
+const T = { GROUND: 1, STONE: 2, BRICK: 3, WOOD: 4, METAL: 5, TRIM: 6, GRASS: 7, DIRT: 8, SNOW: 9, LEAF: 10 };
 function solid(x, y, z) {
   if (y < 0) return 1;
   if (x < 0 || z < 0 || x >= W || z >= D) return 1;
@@ -321,39 +327,35 @@ function sym(x, y, z, t) { setB(x, y, z, t); setB(W - 1 - x, y, z, t); setB(x, y
 function sym8(x, y, z, t) { sym(x, y, z, t); sym(z, y, x, t); }
 function rng32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
-const SPAWN_SEEDS = [[2, 2], [2, 13], [8, 16], [15, 15], [16, 8], [13, 2]];
-function buildMap() {
+// ---- Arena: walled courtyard with a center tower and four brick houses
+function buildArena() {
   for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) setB(x, 0, z, T.GROUND);
   for (let i = 0; i < W; i++) for (let y = 1; y <= 5; y++) {
     const t = y === 5 ? T.TRIM : T.STONE;
     setB(i, y, 0, t); setB(i, y, D - 1, t); setB(0, y, i, t); setB(W - 1, y, i, t);
   }
-  // Brick houses with walkable roofs, one per corner
   for (let x = 4; x <= 10; x++) for (let z = 4; z <= 10; z++) {
     if (x === 4 || x === 10 || z === 4 || z === 10) for (let y = 1; y <= 3; y++) sym8(x, y, z, T.BRICK);
     sym8(x, 4, z, T.METAL);
   }
-  for (let y = 1; y <= 2; y++) { sym8(7, y, 10, 0); sym8(6, y, 10, 0); } // wide doorways facing the middle
-  sym8(4, 2, 7, 0); sym8(6, 2, 4, 0); sym8(8, 2, 4, 0);    // windows
-  sym8(10, 5, 10, T.TRIM); sym8(10, 5, 9, T.TRIM); sym8(9, 5, 10, T.TRIM); // roof cover
-  for (let z = 5; z <= 6; z++) {                            // stairs to the roof
+  for (let y = 1; y <= 2; y++) { sym8(7, y, 10, 0); sym8(6, y, 10, 0); }
+  sym8(4, 2, 7, 0); sym8(6, 2, 4, 0); sym8(8, 2, 4, 0);
+  sym8(10, 5, 10, T.TRIM); sym8(10, 5, 9, T.TRIM); sym8(9, 5, 10, T.TRIM);
+  for (let z = 5; z <= 6; z++) {
     for (let y = 1; y <= 3; y++) sym8(11, y, z, T.WOOD);
     for (let y = 1; y <= 2; y++) sym8(12, y, z, T.WOOD);
     sym8(13, 1, z, T.WOOD);
   }
-  // Center tower: open ground floor, platform at height 5, four staircases
   for (let x = 20; x <= 27; x++) for (let z = 20; z <= 27; z++) setB(x, 4, z, T.METAL);
   for (let y = 1; y <= 3; y++) { sym8(20, y, 20, T.STONE); sym8(20, y, 23, T.STONE); }
   sym8(20, 5, 20, T.TRIM); sym8(20, 5, 21, T.TRIM); sym8(21, 5, 20, T.TRIM);
   for (let y = 1; y <= 3; y++) sym8(23, y, 28, T.STONE);
   for (let y = 1; y <= 2; y++) sym8(23, y, 29, T.STONE);
   sym8(23, 1, 30, T.STONE);
-  // Cover walls
   for (let x = 14; x <= 17; x++) for (let y = 1; y <= 2; y++) sym8(x, y, 12, T.STONE);
   for (let y = 1; y <= 2; y++) { sym8(17, y, 18, T.STONE); sym8(18, y, 17, T.STONE); }
-  // Crates
   const r = rng32(1337);
-  const nearSpawn = (x, z) => SPAWN_SEEDS.some(([a, b]) => Math.abs(a - x) <= 1 && Math.abs(b - z) <= 1);
+  const nearSpawn = (x, z) => MAPS.arena.seeds.some(([a, b]) => Math.abs(a - x) <= 1 && Math.abs(b - z) <= 1);
   for (let i = 0; i < 40; i++) {
     const x = 2 + Math.floor(r() * 18), z = 2 + Math.floor(r() * 18);
     if (x >= 3 && x <= 14 && z >= 3 && z <= 14) continue;
@@ -363,12 +365,96 @@ function buildMap() {
     for (let y = 1; y <= h; y++) sym8(x, y, z, T.WOOD);
   }
 }
-buildMap();
 
+// ---- Peaks: rolling mountains inside a ring of cliffs. A tall snowy summit in the
+// middle, four lesser peaks, ridges along the edges, and pine trees for cover.
+// Heights are computed from mirrored coordinates, so the map stays 8-fold symmetric.
+function peakHeight(x, z) {
+  let a = Math.min(x, W - 1 - x), b = Math.min(z, D - 1 - z);
+  if (a > b) { const s = a; a = b; b = s; }
+  const cx = 23.5;
+  const dist = (px, pz) => Math.hypot(a - px, b - pz);
+  let h = 0;
+  h = Math.max(h, 11 - Math.hypot(a - cx, b - cx) * 0.95);   // central summit
+  h = Math.max(h, 8 - dist(10, 10) * 1.0);                    // four lesser peaks
+  h = Math.max(h, 6 - dist(4, 23.5) * 0.9);                   // edge ridges
+  h = Math.max(h, 4 - dist(15, 4) * 0.8);                     // foothills
+  h += Math.sin(a * 0.55) * Math.cos(b * 0.45) * 0.9;         // rolling ground
+  const valley = Math.hypot(a - 16, b - 17);                  // a dip between the peaks
+  if (valley < 3.5) h -= (3.5 - valley) * 0.6;
+  return clamp(Math.round(h), 0, 11);
+}
+function buildPeaks() {
+  for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) {
+    const edge = x === 0 || z === 0 || x === W - 1 || z === D - 1;
+    const h = edge ? 9 : peakHeight(x, z);
+    setB(x, 0, z, T.GROUND);
+    for (let y = 1; y <= h; y++) {
+      let t = T.STONE;
+      if (!edge) {
+        if (y === h) t = h >= 8 ? T.SNOW : T.GRASS;
+        else if (y >= h - 2) t = T.DIRT;
+      } else if (y === h) t = T.SNOW;
+      setB(x, y, z, t);
+    }
+  }
+  // Pine trees
+  const r = rng32(4242);
+  const nearSpawn = (x, z) => MAPS.peaks.seeds.some(([a, b]) => Math.abs(a - x) <= 2 && Math.abs(b - z) <= 2);
+  let placed = 0;
+  for (let i = 0; i < 60 && placed < 2; i++) {
+    const x = 3 + Math.floor(r() * 20), z = 3 + Math.floor(r() * 20);
+    if (x > z || nearSpawn(x, z) || nearSpawn(z, x)) continue;
+    const g = peakHeight(x, z);
+    if (g > 5 || g + 7 >= H) continue;
+    let clear = true;
+    for (let dx = -2; dx <= 2 && clear; dx++) for (let dz = -2; dz <= 2; dz++) if (grid[idx(x + dx, g + 1, z + dz)] === T.WOOD || grid[idx(x + dx, g + 1, z + dz)] === T.LEAF) { clear = false; break; }
+    if (!clear) continue;
+    for (let y = g + 1; y <= g + 4; y++) sym8(x, y, z, T.WOOD);
+    for (let y = g + 3; y <= g + 5; y++) {
+      const rad = y === g + 5 ? 0 : y === g + 4 ? 1 : 1;
+      for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) {
+        if (dx === 0 && dz === 0 && y <= g + 4) continue;
+        if (Math.abs(dx) + Math.abs(dz) === 2 && y === g + 4) continue;
+        sym8(x + dx, y, z + dz, T.LEAF);
+      }
+    }
+    sym8(x, g + 6, z, T.LEAF);
+    placed++;
+  }
+  // Boulders for cover on the slopes
+  for (let i = 0; i < 30; i++) {
+    const x = 2 + Math.floor(r() * 21), z = 2 + Math.floor(r() * 21);
+    if (x > z || nearSpawn(x, z) || nearSpawn(z, x)) continue;
+    const g = peakHeight(x, z);
+    if (grid[idx(x, g + 1, z)]) continue;
+    sym8(x, g + 1, z, T.STONE);
+    if (r() < 0.4) sym8(x, g + 2, z, T.STONE);
+  }
+  // Summit cover
+  for (const [x, z] of [[22, 21], [21, 22]]) { const g = peakHeight(x, z); sym8(x, g + 1, z, T.STONE); }
+}
+
+const MAPS = {
+  arena: { name: "Arena", build: buildArena, seeds: [[2, 2], [2, 13], [8, 16], [15, 15], [16, 8], [13, 2]], sky: 0x8fc6f2, ground: 0x7aa457, outer: 0x5f8546, fog: [40, 95] },
+  peaks: { name: "Peaks", build: buildPeaks, seeds: [[3, 3], [3, 12], [9, 19], [14, 14], [19, 9], [12, 3], [6, 8]], sky: 0xa3d2f5, ground: 0x6fa04e, outer: 0x8a939c, fog: [45, 110] },
+};
+let mapId = "arena";
 const spawns = [];
-for (const [sx, sz] of SPAWN_SEEDS) {
-  const pts = [[sx, sz], [W - 1 - sx, sz], [sx, D - 1 - sz], [W - 1 - sx, D - 1 - sz], [sz, sx], [W - 1 - sz, sx], [sz, D - 1 - sx], [W - 1 - sz, D - 1 - sx]];
-  for (const [x, z] of pts) if (!solid(x, 1, z) && !solid(x, 2, z) && !spawns.some(p => p.x === x + .5 && p.z === z + .5)) spawns.push(new V3(x + .5, 1, z + .5));
+function topY(x, z) { for (let y = H - 1; y >= 0; y--) if (grid[idx(x, y, z)]) return y; return 0; }
+function computeSpawns() {
+  spawns.length = 0;
+  for (const [sx, sz] of MAPS[mapId].seeds) {
+    const pts = [[sx, sz], [W - 1 - sx, sz], [sx, D - 1 - sz], [W - 1 - sx, D - 1 - sz], [sz, sx], [W - 1 - sz, sx], [sz, D - 1 - sx], [W - 1 - sz, D - 1 - sx]];
+    for (const [x, z] of pts) {
+      const ty = topY(x, z), top = grid[idx(x, ty, z)];
+      if (top === T.WOOD || top === T.LEAF || ty + 3 >= H) continue;
+      if (solid(x, ty + 1, z) || solid(x, ty + 2, z)) continue;
+      if (spawns.some(p => p.x === x + .5 && p.z === z + .5)) continue;
+      spawns.push(new V3(x + .5, ty + 1, z + .5));
+    }
+  }
+  if (!spawns.length) spawns.push(new V3(W / 2 + .5, topY(W / 2, D / 2) + 1, D / 2 + .5));
 }
 
 // ======================================================================
@@ -382,9 +468,8 @@ view.appendChild(renderer.domElement);
 const canvas = renderer.domElement;
 
 const scene = new THREE.Scene();
-const SKY = 0x8fc6f2;
-scene.background = new THREE.Color(SKY);
-scene.fog = new THREE.Fog(SKY, 40, 95);
+scene.background = new THREE.Color(0x8fc6f2);
+scene.fog = new THREE.Fog(0x8fc6f2, 40, 95);
 const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 200);
 camera.rotation.order = "YXZ";
 scene.add(new THREE.HemisphereLight(0xeaf4ff, 0x4a5a3a, 0.85));
@@ -407,6 +492,8 @@ function makeTex(kind) {
     } else if (kind === "ground") {
       v = 190 + r() * 60;
       if (i === 0 || j === 0) v -= 30;
+    } else if (kind === "leaf") {
+      v = r() < 0.25 ? 140 + r() * 30 : 200 + r() * 55;
     } else if (i === 0 || j === 0 || i === 15 || j === 15) v -= 45;
     v = Math.round(clamp(v, 0, 255));
     g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(i, j, 1, 1);
@@ -415,42 +502,63 @@ function makeTex(kind) {
   t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestMipmapLinearFilter;
   return t;
 }
-const TEX = { plain: makeTex("plain"), brick: makeTex("brick"), crate: makeTex("crate") };
+const TEX = { plain: makeTex("plain"), brick: makeTex("brick"), crate: makeTex("crate"), grass: makeTex("ground"), leaf: makeTex("leaf") };
 const BLOCK_STYLE = {
   [T.STONE]: { tex: "plain", color: 0x8d939c },
   [T.BRICK]: { tex: "brick", color: 0xb85a40 },
   [T.WOOD]: { tex: "crate", color: 0xc28f4e },
   [T.METAL]: { tex: "plain", color: 0x56606e },
   [T.TRIM]: { tex: "plain", color: 0xf0ad2a },
+  [T.GRASS]: { tex: "grass", color: 0x72ab4f },
+  [T.DIRT]: { tex: "plain", color: 0x8c6544 },
+  [T.SNOW]: { tex: "grass", color: 0xf4f7fa },
+  [T.LEAF]: { tex: "leaf", color: 0x3f7f3a },
 };
-(function buildMeshes() {
-  const lists = { plain: [], brick: [], crate: [] };
+const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+const groundTex = makeTex("ground"); groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping; groundTex.repeat.set(W, D);
+const groundMat = new THREE.MeshLambertMaterial({ map: groundTex, color: 0x7aa457 });
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, D), groundMat);
+ground.rotation.x = -Math.PI / 2; ground.position.set(W / 2, 1, D / 2);
+scene.add(ground);
+const outerMat = new THREE.MeshLambertMaterial({ color: 0x5f8546 });
+const outer = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), outerMat);
+outer.rotation.x = -Math.PI / 2; outer.position.set(W / 2, 0.98, D / 2); scene.add(outer);
+let mapMeshes = [];
+function buildMeshes() {
+  for (const m of mapMeshes) { scene.remove(m); m.material.dispose(); m.dispose && m.dispose(); }
+  mapMeshes = [];
+  const lists = {};
   const r = rng32(7);
   for (let y = 1; y < H; y++) for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
     const t = grid[idx(x, y, z)]; if (!t) continue;
     const exposed = !solid(x + 1, y, z) || !solid(x - 1, y, z) || !solid(x, y + 1, z) || !solid(x, y, z + 1) || !solid(x, y, z - 1) || (y > 1 && !solid(x, y - 1, z)) || x === 0 || z === 0 || x === W - 1 || z === D - 1;
     if (!exposed) continue;
-    lists[BLOCK_STYLE[t].tex].push([x, y, z, t]);
+    const k = BLOCK_STYLE[t].tex; (lists[k] = lists[k] || []).push([x, y, z, t]);
   }
-  const geo = new THREE.BoxGeometry(1, 1, 1);
   const m4 = new THREE.Matrix4(), col = new THREE.Color();
   for (const k of Object.keys(lists)) {
-    const L = lists[k]; if (!L.length) continue;
-    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ map: TEX[k] }), L.length);
+    const L = lists[k];
+    const mesh = new THREE.InstancedMesh(boxGeo, new THREE.MeshLambertMaterial({ map: TEX[k] }), L.length);
     L.forEach(([x, y, z, t], i) => {
       m4.makeTranslation(x + .5, y + .5, z + .5); mesh.setMatrixAt(i, m4);
       col.setHex(BLOCK_STYLE[t].color).multiplyScalar(0.9 + r() * 0.14); mesh.setColorAt(i, col);
     });
     mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    scene.add(mesh);
+    scene.add(mesh); mapMeshes.push(mesh);
   }
-  const gt = makeTex("ground"); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(W, D);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshLambertMaterial({ map: gt, color: 0x7aa457 }));
-  ground.rotation.x = -Math.PI / 2; ground.position.set(W / 2, 1, D / 2);
-  scene.add(ground);
-  const outer = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ color: 0x5f8546 }));
-  outer.rotation.x = -Math.PI / 2; outer.position.set(W / 2, 0.98, D / 2); scene.add(outer);
-})();
+}
+function loadMap(id) {
+  if (id === mapId && mapMeshes.length) return;
+  mapId = MAPS[id] ? id : "arena";
+  const M = MAPS[mapId];
+  grid.fill(0);
+  M.build();
+  buildMeshes();
+  computeSpawns();
+  scene.background.setHex(M.sky); scene.fog.color.setHex(M.sky); scene.fog.near = M.fog[0]; scene.fog.far = M.fog[1];
+  groundMat.color.setHex(M.ground); outerMat.color.setHex(M.outer);
+}
+loadMap(load("cfa.map"));
 
 // ======================================================================
 // Physics
@@ -706,21 +814,66 @@ sensVal = clamp(parseFloat(load("cfa.sens")) || 6, 1, 12);
 partyCode = cleanCode(load("cfa.code"));
 
 // ======================================================================
-// Multiplayer. Both transports carry the same thing: every player shares one
-// small state object about 20 times a second. Shooters announce their hits;
-// each victim applies the damage to themselves.
+// Multiplayer. Every transport carries the same thing: each player shares one
+// small state object many times a second. Shooters announce their hits; each
+// victim applies the damage to themselves. Each map + party code is its own lobby.
 //   - Inside claude.ai: the artifact's live room.
-//   - On the public web page: peer-to-peer WebRTC (Trystero, matchmaking over public Nostr relays).
+//   - Everywhere else: the Cubefire game server on Cloudflare (WebSocket relay).
+//   - If the server can't be reached: peer-to-peer WebRTC (Trystero) as a fallback.
 // ======================================================================
+const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
 let room = null, roomTarget = null, roomUnsub = null;
 let p2p = null, p2pRoom = null, p2pAct = null;
+let sock = null, sockRetry = 0;
 let lobbyName = null;
 const remotes = new Map(), heard = new Map();
 function setNet(s) { netState = s; renderStatus(); }
+const lobbyKey = code => mapId + "-" + (code || "open");
 
-// The single-file build inlines the networking code as a module that announces itself;
+function serverUrl(name) {
+  const local = location.host === SERVER_HOST || /^(localhost|127\.0\.0\.1):87\d\d$/.test(location.host);
+  const host = local ? location.host : SERVER_HOST;
+  const proto = local && location.protocol === "http:" ? "ws:" : "wss:";
+  return proto + "//" + host + "/ws?room=" + encodeURIComponent(name);
+}
+// Resolves true once the game server answers, false if it can't be reached
+function probeServer() {
+  return new Promise(res => {
+    let s;
+    try { s = new WebSocket(serverUrl("probe")); } catch (e) { res(false); return; }
+    const t = setTimeout(() => { try { s.close(); } catch (e) {} res(false); }, 6000);
+    s.onopen = () => { clearTimeout(t); try { s.close(); } catch (e) {} res(true); };
+    s.onerror = () => { clearTimeout(t); res(false); };
+  });
+}
+function connectServer(name) {
+  if (sock) { sock.onclose = null; try { sock.close(); } catch (e) {} sock = null; }
+  const s = new WebSocket(serverUrl(name));
+  sock = s;
+  s.onopen = () => { sockRetry = 0; setNet("live"); publish(true); };
+  s.onmessage = e => {
+    let m; try { m = JSON.parse(e.data); } catch (err) { return; }
+    if (!m || typeof m !== "object") return;
+    if (m.t === "welcome") {
+      myPeer = String(m.id || "");
+      if (Array.isArray(m.peers)) for (const p of m.peers) if (p && p.id && p.d) onPeer({ peer: String(p.id), presence: p.d, kind: "viewer", sameTab: false });
+      renderStatus();
+    } else if (m.t === "st" && m.id) {
+      onPeer({ peer: String(m.id), presence: m.d && typeof m.d === "object" ? m.d : {}, kind: "viewer", sameTab: false });
+      renderStatus();
+    } else if (m.t === "leave" && m.id) removeRemote(String(m.id));
+  };
+  s.onclose = () => {
+    if (sock !== s) return;
+    sock = null; clearRemotes(); setNet("connecting");
+    const wait = Math.min(8000, 600 * 2 ** sockRetry++);
+    setTimeout(() => { if (!sock && lobbyName === name) connectServer(name); }, wait);
+  };
+}
+
+// The single-file build inlines the peer-to-peer code as a module that announces itself;
 // the hosted build loads it from vendor/.
 function loadP2P() {
   if (window.__cfaP2P) return Promise.resolve(window.__cfaP2P);
@@ -738,6 +891,7 @@ async function initNet() {
     await joinLobby("");
     return;
   }
+  if (await probeServer()) { netKind = "ws"; await joinLobby(""); return; }
   try { p2p = await loadP2P(); } catch (e) { p2p = null; }
   if (p2p && p2p.joinRoom) {
     netKind = "p2p"; myPeer = p2p.selfId;
@@ -756,17 +910,17 @@ function removeRemote(id) {
   heard.delete(id); renderStatus();
 }
 async function joinLobby(code) {
-  const name = code ? "party-" + code : "arena";
-  if (name === lobbyName) return;
+  const name = lobbyKey(code);
+  if (name === lobbyName || netKind === "none") return;
   lobbyName = name;
   clearRemotes();
   if (netKind === "room") {
     if (roomUnsub) { roomUnsub(); roomUnsub = null; }
     if (roomTarget && roomTarget !== room) roomTarget.leave().catch(() => {});
     roomTarget = room;
-    if (code) {
+    if (name !== "arena-open") {
       try { roomTarget = await room.join(name); room.presence({ n: myName, pl: 0 }).catch(() => {}); }
-      catch (e) { roomTarget = room; lobbyName = "arena"; banner("Party rooms aren't available here · joined the open arena"); }
+      catch (e) { roomTarget = room; lobbyName = "arena-open"; banner("Separate lobbies aren't available here · joined the open arena"); }
     }
     roomUnsub = roomTarget.onPeers(ch => {
       for (const p of ch.joined) onPeer(p);
@@ -774,6 +928,9 @@ async function joinLobby(code) {
       for (const p of ch.left) removeRemote(p.peer);
       renderStatus();
     }, () => setNet("offline"));
+  } else if (netKind === "ws") {
+    setNet("connecting");
+    connectServer(name);
   } else if (netKind === "p2p") {
     if (p2pRoom) { try { p2pRoom.leave(); } catch (e) {} }
     try {
@@ -783,11 +940,11 @@ async function joinLobby(code) {
         const id = ctx && ctx.peerId; if (!id) return;
         heard.set(id, now());
         onPeer({ peer: id, presence: data && typeof data === "object" ? data : {}, kind: "viewer", sameTab: false });
-        renderStatus();
+        if (netState !== "live") setNet("live"); else renderStatus();
       };
       p2pRoom.onPeerJoin = id => { heard.set(id, now()); publish(true, id); };
       p2pRoom.onPeerLeave = id => removeRemote(id);
-      setNet("live");
+      setNet("searching");
     } catch (e) { p2pRoom = null; p2pAct = null; setNet("offline"); }
   }
   publish(true);
@@ -811,7 +968,7 @@ function onPeer(p) {
   }
   r.name = cleanName(s.n) || "Player";
   r.color = clamp(Math.floor(num(s.c) || 0), 0, PAL.length - 1);
-  r.pl = s.pl === 1;
+  r.pl = s.pl === 1 && (s.m === undefined || s.m === mapId);
   r.alive = s.al !== 0;
   r.cr = s.cr === 1;
   r.k = Math.max(0, Math.floor(num(s.k) || 0));
@@ -870,16 +1027,17 @@ let lastPub = 0;
 const r2 = v => Math.round(v * 100) / 100, r3 = v => Math.round(v * 1000) / 1000;
 function publish(force, target) {
   if (netKind === "none") return;
-  const t = now(); if (!force && t - lastPub < 0.05) return; if (!target) lastPub = t;
+  const t = now(); if (!force && t - lastPub < (netKind === "ws" ? 0.066 : 0.05)) return; if (!target) lastPub = t;
   const playing = state === "play" && mode === "online";
   const P = {
-    n: myName, c: myColor, pl: playing ? 1 : 0,
+    n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0,
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
     al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, k: playing ? kills : 0, d: playing ? deaths : 0,
     sh: playing ? lastShot : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
-  if (netKind === "room" && roomTarget) roomTarget.presence(P).catch(() => {});
+  if (netKind === "ws") { if (sock && sock.readyState === 1) { try { sock.send(JSON.stringify(P)); } catch (e) {} } }
+  else if (netKind === "room" && roomTarget) roomTarget.presence(P).catch(() => {});
   else if (netKind === "p2p" && p2pAct) { try { const pr = p2pAct.send(P, target ? { target } : undefined); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {} }
 }
 // Peer-to-peer has no presence service, so forget players we haven't heard from in a while
@@ -1318,13 +1476,18 @@ function rowEl(cells, cls) {
   for (const c of cells) { const s = document.createElement("span"); s.textContent = c; r.appendChild(s); }
   return r;
 }
-function lobbyLabel() { return lobbyName && lobbyName !== "arena" ? "party " + lobbyName.slice(6).toUpperCase() : "the open arena"; }
+function lobbyCode() { return lobbyName ? lobbyName.slice(mapId.length + 1) : "open"; }
+function lobbyLabel() {
+  const m = MAPS[mapId].name, code = lobbyCode();
+  return code === "open" ? "the open " + m + " lobby" : "party " + code.toUpperCase() + " on " + m;
+}
 function renderStatus() {
   const n = playersOnline();
   const st = $("#menuStatus");
   let txt;
   if (netState === "live") txt = n === 0 ? `Online · nobody in ${lobbyLabel()} yet` : `Online · ${n} playing in ${lobbyLabel()}`;
-  else if (netState === "connecting") txt = "Connecting to the arena…";
+  else if (netState === "connecting") txt = "Connecting to the game server…";
+  else if (netState === "searching") txt = "Looking for other players…";
   else txt = "Online play unavailable here · bot match still works";
   st.className = "status" + (netState === "live" ? " live" : "");
   st.querySelector("span").textContent = txt;
@@ -1362,7 +1525,7 @@ function renderHud(t) {
   $("#tDash").style.setProperty("--cd", dp.toFixed(3));
   if (t - hudT < 0.1) return; hudT = t;
   const mini = $("#mini"); mini.classList.toggle("live", mode === "online" && netState === "live");
-  $("#miniTitle").textContent = mode === "bots" ? "Bot match" : `Online · ${playersOnline() + 1} in ${lobbyName === "arena" ? "arena" : lobbyName.slice(6).toUpperCase()}`;
+  $("#miniTitle").textContent = mode === "bots" ? "Bot match · " + MAPS[mapId].name : `Online · ${playersOnline() + 1} · ${MAPS[mapId].name}${lobbyCode() === "open" ? "" : " · " + lobbyCode().toUpperCase()}`;
   const st = standings(), rows = $("#miniRows"); rows.replaceChildren();
   st.slice(0, 5).forEach(p => rows.appendChild(rowEl([p.name, String(p.k)], p.me ? "me" : "")));
   const hpEl = $("#hpBar"); hpEl.style.width = clamp(hp, 0, 100) + "%";
@@ -1404,6 +1567,13 @@ PAL.forEach((c, i) => {
 });
 const sens = $("#sens"); sens.value = String(sensVal); $("#sensOut").textContent = String(sensVal);
 sens.addEventListener("input", () => { sensVal = clamp(parseFloat(sens.value) || 6, 1, 12); $("#sensOut").textContent = String(sensVal); save("cfa.sens", sensVal); });
+const mapPick = $("#mapPick");
+function renderMapPick() { [...mapPick.children].forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === mapId))); }
+mapPick.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b || state !== "menu") return;
+  loadMap(b.dataset.v); save("cfa.map", mapId); renderMapPick(); joinLobby(""); renderStatus();
+});
+renderMapPick();
 const assistSeg = $("#assist");
 function renderAssist() { [...assistSeg.children].forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.v === assistLevel))); }
 assistSeg.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; assistLevel = +b.dataset.v; save("cfa.assist", assistLevel); renderAssist(); });
