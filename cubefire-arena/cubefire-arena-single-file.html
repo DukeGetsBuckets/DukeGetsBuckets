@@ -130,6 +130,14 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 .dash .bar i{background:#36d6c3;transition:none}
 .dash.ready{color:var(--ink)}
 .touch .dash{display:none}
+.nades{display:flex;align-items:baseline;gap:6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.nades b{font:400 18px var(--display);color:var(--ink)}
+.nades .key{border:1px solid var(--line);border-radius:3px;padding:0 4px}
+.touch .nades{display:none}
+#dnums{position:absolute;inset:0;overflow:hidden}
+.dnum{position:absolute;left:0;top:0;font:400 22px var(--display);color:var(--ink);text-shadow:0 2px 0 rgba(0,0,0,.65),0 0 2px #000;white-space:nowrap;will-change:transform,opacity}
+.dnum.head{color:var(--hot);font-size:28px}
+.dnum.nade{color:var(--accent)}
 .wname{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .wname.rel{color:var(--accent)}
 .slots{display:flex;gap:4px}
@@ -165,7 +173,6 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 
 /* touch */
 #touch{position:fixed;inset:0;pointer-events:none}
-#moveZone{position:absolute;left:0;top:30%;bottom:0;width:42%;pointer-events:auto}
 #stick{position:absolute;left:28px;bottom:calc(70px + env(safe-area-inset-bottom,0px));width:140px;height:140px;margin:0;border-radius:50%;border:2px solid var(--line);background:rgba(0,0,0,.22);pointer-events:none}
 #stick i{position:absolute;left:46px;top:46px;width:48px;height:48px;border-radius:50%;background:rgba(243,239,228,.4)}
 .tb{position:absolute;pointer-events:auto;border-radius:50%;border:2px solid var(--line);background:rgba(0,0,0,.35);font-weight:700;font-size:12px;letter-spacing:.06em;display:grid;place-items:center;text-transform:uppercase;touch-action:none}
@@ -175,6 +182,9 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 #tJump{right:24px;bottom:calc(40px + env(safe-area-inset-bottom,0px));width:76px;height:76px}
 #tDash{right:118px;bottom:calc(46px + env(safe-area-inset-bottom,0px));width:64px;height:64px;--cd:1;background:conic-gradient(rgba(54,214,195,.5) calc(var(--cd) * 360deg),rgba(0,0,0,.4) 0)}
 #tCrouch.on{background:rgba(255,182,39,.45)}
+.tb.down{filter:brightness(1.5);transform:scale(.94)}
+#tNade{right:212px;bottom:calc(222px + env(safe-area-inset-bottom,0px));width:52px;height:52px;font-size:10px;line-height:1.1;text-align:center;background:rgba(95,140,60,.45)}
+#tNade b{display:block;font-size:15px}
 #tReload{right:212px;bottom:calc(150px + env(safe-area-inset-bottom,0px));width:52px;height:52px}
 #tCrouch{right:202px;bottom:calc(50px + env(safe-area-inset-bottom,0px));width:52px;height:52px}
 #tPause{right:16px;top:calc(130px + env(safe-area-inset-top,0px));width:44px;height:44px;border-radius:4px}
@@ -221,18 +231,20 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
     <div class="wname" id="wname">Rifle</div>
     <div class="ammo" id="ammo"><b id="ammoNum">30</b><span id="ammoMag">/ 30</span></div>
     <div class="pips" id="pips"></div>
+    <div class="nades" id="nadeHud"><span>Grenades</span><b id="nadeN">2</b><span class="key">G</span></div>
   </div>
+  <div id="dnums"></div>
   <div id="death" hidden><div><h3 id="deathTitle">Eliminated</h3><p id="deathSub">Respawning in 3</p></div></div>
   <div id="board" hidden><h3>Scoreboard <small id="boardSub"></small></h3><div id="boardRows"></div></div>
 </div>
 
 <div id="touch" hidden>
-  <div id="moveZone"></div>
   <div id="stick"><i id="knob"></i></div>
   <button class="tb" id="tFire" type="button">Fire<small>+ aim</small></button>
   <button class="tb" id="tJump" type="button">Jump</button>
   <button class="tb" id="tDash" type="button">Dash</button>
   <button class="tb" id="tCrouch" type="button">Duck</button>
+  <button class="tb" id="tNade" type="button" aria-label="Throw grenade">Nade<b id="tNadeN">2</b></button>
   <button class="tb" id="tReload" type="button" aria-label="Reload">R</button>
   <button class="tb" id="tPause" type="button" aria-label="Pause">II</button>
 </div>
@@ -291,9 +303,10 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
       <li><b>C</b>Crouch</li>
       <li><b>R</b>Reload</li>
       <li><b>1 2 3</b>Rifle, shotgun, sniper</li>
+      <li><b>G</b>Throw grenade</li>
       <li><b>Tab</b>Scoreboard · <b>P</b>Pause</li>
     </ul>
-    <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck and Reload sit around it; tap a weapon at the top to switch.</p>
+    <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
     <p class="fine">Friends who type the same party code land in the same private match. Leave it blank to join the open arena.</p>
   </div>
 </div>
@@ -675,11 +688,13 @@ function rayPlayer(o, d, p, grow, crouched) {
 // Weapons
 // ======================================================================
 const WEAPONS = [
-  { name: "Rifle", rate: 0.1, dmg: 18, head: 34, mag: 30, reload: 1.5, spread: 0.016, aimSpread: 0.004, pellets: 1, range: 140, auto: true, recoil: 0.009, fov: 58, snd: [1700, 0.09, 0.28] },
-  { name: "Shotgun", rate: 0.8, dmg: 11, head: 16, mag: 6, reload: 1.9, spread: 0.075, aimSpread: 0.055, pellets: 9, range: 30, auto: false, recoil: 0.05, fov: 64, snd: [800, 0.24, 0.45] },
-  { name: "Sniper", rate: 1.2, dmg: 100, head: 150, adsSpeed: 26, quickscope: 0.5, mag: 5, reload: 2.3, spread: 0.07, aimSpread: 0, pellets: 1, range: 220, auto: false, recoil: 0.07, fov: 20, snd: [500, 0.4, 0.55] },
+  { name: "Rifle", aa: { cone: 0.7, pull: 0.6, track: 0.8, snap: 0.6, magnet: 0.7, slow: 1.3 }, rate: 0.1, dmg: 18, head: 34, mag: 30, reload: 1.5, spread: 0.016, aimSpread: 0.004, pellets: 1, range: 140, auto: true, recoil: 0.009, fov: 58, snd: [1700, 0.09, 0.28] },
+  { name: "Shotgun", aa: { cone: 0.75, pull: 0.6, track: 0.8, snap: 0.6, magnet: 0.6, slow: 1.3 }, rate: 0.8, dmg: 11, head: 16, mag: 6, reload: 1.9, spread: 0.075, aimSpread: 0.055, pellets: 9, range: 30, auto: false, recoil: 0.05, fov: 64, snd: [800, 0.24, 0.45] },
+  { name: "Sniper", aa: { cone: 1.9, pull: 2.4, track: 1.2, snap: 1.6, magnet: 2.4, slow: 0.6 }, rate: 1.2, dmg: 100, head: 150, adsSpeed: 26, quickscope: 0.5, mag: 5, reload: 2.3, spread: 0.07, aimSpread: 0, pellets: 1, range: 220, auto: false, recoil: 0.07, fov: 20, snd: [500, 0.4, 0.55] },
 ];
-const MAXDMG = WEAPONS.map(w => w.head * w.pellets);
+// Grenades: a few per life, thrown in an arc, bounce, and burst after a short fuse
+const NADE = { count: 2, fuse: 1.7, speed: 16, lift: 4.5, radius: 4.8, dmg: 95, cooldown: 0.8 };
+const MAXDMG = WEAPONS.map(w => w.head * w.pellets).concat([NADE.dmg]); // index 3 = grenade
 const PAL = ["#ff5d5d", "#ffb627", "#5fd17a", "#43b7ff", "#b57bff", "#ff7ac8", "#f3efe4", "#36d6c3"];
 
 // Aim assist tuning: cone (radians), slow (look-speed multiplier over a target),
@@ -777,6 +792,7 @@ function updateFx(dt) {
   for (let i = fx.length - 1; i >= 0; i--) {
     const f = fx[i]; f.t -= dt; f.o.material.opacity = Math.max(0, f.t / f.life);
     if (f.grow) f.o.scale.setScalar(1 + (1 - f.t / f.life) * 1.5);
+    if (f.boom) f.o.scale.setScalar(0.6 + (1 - f.t / f.life) * NADE.radius * 0.8);
     if (f.t <= 0) { scene.remove(f.o); f.o.geometry.dispose(); f.o.material.dispose(); fx.splice(i, 1); }
   }
 }
@@ -1011,18 +1027,20 @@ function onPeer(p) {
   const hits = Array.isArray(s.hits) ? s.hits.slice(0, 8).filter(h => h && typeof h === "object" && num(h.s) !== null) : [];
   const dth = s.dth && typeof s.dth === "object" && num(s.dth.s) !== null ? s.dth : null;
   const sh = s.sh && typeof s.sh === "object" && num(s.sh.s) !== null ? s.sh : null;
+  const gr = s.gr && typeof s.gr === "object" && num(s.gr.s) !== null ? s.gr : null;
   if (!r.init) {
     r.init = true;
     r.lastHit = hits.reduce((m, h) => Math.max(m, h.s), 0);
     r.lastDeath = dth ? dth.s : 0;
     r.lastShot = sh ? sh.s : 0;
+    r.lastNade = gr ? gr.s : 0;
     return;
   }
   const online = state === "play" && mode === "online";
   for (const h of hits) {
     if (h.s <= r.lastHit) continue;
     if (h.t === myPeer && online && alive) {
-      const wi = clamp(Math.floor(num(h.w) || 0), 0, 2);
+      const wi = clamp(Math.floor(num(h.w) || 0), 0, 3);
       const dm = clamp(num(h.dm) || 0, 0, MAXDMG[wi]);
       takeDamage(dm, { name: r.name, peer: r.peer, pos: r.pos }, !!h.hs);
     }
@@ -1039,6 +1057,11 @@ function onPeer(p) {
       } else if (typeof dth.by === "string" && remotes.has(dth.by)) killer = remotes.get(dth.by).name;
       addFeed(killer, r.name, dth.by === myPeer);
     }
+  }
+  if (gr && gr.s > (r.lastNade || 0)) {
+    r.lastNade = gr.s;
+    const o = vec(gr.o), v = Array.isArray(gr.v) && gr.v.length === 3 && gr.v.every(n => num(n) !== null) ? new V3(clamp(gr.v[0], -40, 40), clamp(gr.v[1], -40, 40), clamp(gr.v[2], -40, 40)) : null;
+    if (o && v && r.pl && online) spawnNade(o, v, null);
   }
   if (sh && sh.s > r.lastShot) {
     r.lastShot = sh.s;
@@ -1062,7 +1085,7 @@ function publish(force, target) {
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
     al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, k: playing ? kills : 0, d: playing ? deaths : 0,
-    sh: playing ? lastShot : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
+    sh: playing ? lastShot : null, gr: playing ? lastNade : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
   if (netKind === "ws") { if (sock && sock.readyState === 1) { try { sock.send(JSON.stringify(P)); } catch (e) {} } }
   else if (netKind === "room" && roomTarget) roomTarget.presence(P).catch(() => {});
@@ -1163,7 +1186,7 @@ function respawn() {
   const c = new V3(W / 2, 1, D / 2).sub(me.pos);
   yaw = Math.atan2(-c.x, -c.z); pitch = 0;
   hp = 100; alive = true; spawnProt = now() + 1.5; crouch = false; dashReady = 0;
-  ammo = WEAPONS.map(w => w.mag); reloading = false;
+  ammo = WEAPONS.map(w => w.mag); reloading = false; nades = NADE.count;
   $("#death").hidden = true;
   publish(true);
 }
@@ -1198,7 +1221,7 @@ function assistPick(coneMul) {
     const dist = v.length(); if (dist < 0.6 || dist > WEAPONS[cur].range * 0.8) continue;
     v.divideScalar(dist);
     const ang = Math.acos(clamp(f.dot(v), -1, 1));
-    const cone = A.cone * touchMul * coneMul + Math.atan(0.45 / dist);
+    const cone = A.cone * WEAPONS[cur].aa.cone * touchMul * coneMul + Math.atan(0.45 / dist);
     if (ang > cone) continue;
     if (rayVoxel(o, v, dist) < dist - 0.6) continue;
     const score = ang / cone + dist * 0.004;
@@ -1216,12 +1239,13 @@ function aimAssist(dt) {
   assistTg = best;
   // Follow the target as it (or you) moves
   if (assistPrev && assistPrev.tg.r === best.tg.r) {
-    yaw += wrapA(best.yawT - assistPrev.yawT) * A.track;
-    pitch += (best.pitchT - assistPrev.pitchT) * A.track;
+    const tr = Math.min(1, A.track * WEAPONS[cur].aa.track);
+    yaw += wrapA(best.yawT - assistPrev.yawT) * tr;
+    pitch += (best.pitchT - assistPrev.pitchT) * tr;
   }
   // Draw the crosshair toward center mass, harder while shooting or aiming
   const engage = firing || aiming ? 1 : 0.3;
-  const k = 1 - Math.exp(-A.pull * (isTouch ? 1.3 : 1) * engage * dt);
+  const k = 1 - Math.exp(-A.pull * WEAPONS[cur].aa.pull * (isTouch ? 1.3 : 1) * engage * dt);
   yaw += wrapA(best.yawT - yaw) * k;
   pitch = clamp(pitch + (best.pitchT - pitch) * k, -1.52, 1.52);
   assistPrev = best;
@@ -1229,8 +1253,9 @@ function aimAssist(dt) {
 function aimSnap() {
   const A = assistNow(); if (!A || !alive) return;
   const best = assistPick(2.2); if (!best) return;
-  yaw += wrapA(best.yawT - yaw) * A.snap;
-  pitch = clamp(pitch + (best.pitchT - pitch) * A.snap, -1.52, 1.52);
+  const sn = Math.min(1, A.snap * WEAPONS[cur].aa.snap);
+  yaw += wrapA(best.yawT - yaw) * sn;
+  pitch = clamp(pitch + (best.pitchT - pitch) * sn, -1.52, 1.52);
 }
 
 function fire() {
@@ -1255,7 +1280,7 @@ function fire() {
     let best = null;
     for (const tg of targets) {
       const dist = tg.pos.distanceTo(o);
-      const grow = A ? A.magnet * (isTouch ? 1.3 : 1) * (1 + dist * 0.025) : 0;
+      const grow = A ? A.magnet * w.aa.magnet * (isTouch ? 1.3 : 1) * (1 + dist * 0.025) : 0;
       const h = rayPlayer(o, d, tg.pos, grow, tg.r.cr);
       if (h && h.t < wall && (!best || h.t < best.t)) best = { t: h.t, head: h.head, tg };
     }
@@ -1263,7 +1288,7 @@ function fire() {
     const end = o.clone().addScaledVector(d, endT);
     if (!firstEnd) firstEnd = end;
     if (best) {
-      const prev = dealt.get(best.tg) || { dm: 0, head: false };
+      const prev = dealt.get(best.tg) || { dm: 0, head: false, at: end.clone() };
       prev.dm += best.head ? w.head : w.dmg; prev.head = prev.head || best.head; dealt.set(best.tg, prev);
       if (best.head) anyHead = true;
       spark(end, 0xff6070, 0.14);
@@ -1274,6 +1299,7 @@ function fire() {
   let killedAny = false;
   for (const [tg, v] of dealt) {
     const dm = Math.min(v.dm, MAXDMG[cur]);
+    dmgNumber(v.at, dm, v.head ? "head" : "");
     if (tg.kind === "peer") {
       hitsOut.push({ t: tg.r.peer, s: ++hitSeq, w: cur, dm, hs: v.head ? 1 : 0 });
       while (hitsOut.length > 6) hitsOut.shift();
@@ -1299,6 +1325,116 @@ function fire() {
 let flashT = 0, dryT = 0;
 function dryFire() { const t = now(); if (t < dryT) return; dryT = t + 0.3; blip(1900, 0.03, 0.08, "square"); blip(900, 0.04, 0.06, "square", 0.04); }
 function killSound() { blip(1200, 0.12, 0.12); blip(1600, 0.18, 0.1, "square", 0.08); }
+let nades = NADE.count, nadeReady = 0, nadeSeq = 0, lastNade = null, shake = 0;
+const liveNades = [];
+const nadeGeo = new THREE.BoxGeometry(0.24, 0.3, 0.24), nadeMat = lam(0x3f5f2c);
+const boomGeo = new THREE.SphereGeometry(1, 12, 8);
+// owner: "me", a bot, or null for another player's grenade (visual only)
+function spawnNade(o, v, owner) {
+  const mesh = new THREE.Mesh(nadeGeo, nadeMat); mesh.position.copy(o); scene.add(mesh);
+  liveNades.push({ pos: o.clone(), vel: v.clone(), t: 0, mesh, owner });
+}
+function throwGrenade() {
+  const t = now();
+  if (!alive || paused || state !== "play" || nades <= 0 || t < nadeReady) return;
+  nades--; nadeReady = t + NADE.cooldown;
+  const d = aimDir(), o = eyePos().addScaledVector(d, 0.6);
+  if (solid(Math.floor(o.x), Math.floor(o.y), Math.floor(o.z))) o.copy(eyePos());
+  const v = d.multiplyScalar(NADE.speed); v.y += NADE.lift; v.x += me.vel.x * 0.4; v.z += me.vel.z * 0.4;
+  spawnNade(o, v, "me");
+  lastNade = { s: ++nadeSeq, o: [r2(o.x), r2(o.y), r2(o.z)], v: [r2(v.x), r2(v.y), r2(v.z)] };
+  recoilKick = -0.8; blip(260, 0.08, 0.08, "triangle");
+  publish(true);
+}
+function stepNade(n, h) {
+  n.vel.y -= GRAV * h;
+  for (const a of ["x", "y", "z"]) {
+    n.pos[a] += n.vel[a] * h;
+    if (solid(Math.floor(n.pos.x), Math.floor(n.pos.y), Math.floor(n.pos.z))) {
+      n.pos[a] -= n.vel[a] * h;
+      n.vel[a] *= -0.35;
+      if (a === "y") { n.vel.x *= 0.7; n.vel.z *= 0.7; if (Math.abs(n.vel.y) < 1) n.vel.y = 0; }
+    }
+  }
+}
+function updateNades(dt) {
+  for (let i = liveNades.length - 1; i >= 0; i--) {
+    const n = liveNades[i];
+    n.t += dt;
+    for (let k = 0; k < 4; k++) stepNade(n, dt / 4);
+    n.mesh.position.copy(n.pos); n.mesh.rotation.x += dt * 9; n.mesh.rotation.z += dt * 6;
+    if (n.t >= NADE.fuse) { explode(n); scene.remove(n.mesh); liveNades.splice(i, 1); }
+  }
+  shake *= Math.exp(-8 * dt);
+}
+function explode(n) {
+  const p = n.pos;
+  const ball = new THREE.Mesh(boomGeo, new THREE.MeshBasicMaterial({ color: 0xffa035, transparent: true, opacity: 0.85, depthWrite: false }));
+  ball.position.copy(p); ball.scale.setScalar(0.6); scene.add(ball);
+  fx.push({ o: ball, t: 0.35, life: 0.35, boom: true });
+  for (let i = 0; i < 10; i++) spark(p.clone().add(new V3((Math.random() - .5) * 2.4, Math.random() * 1.6, (Math.random() - .5) * 2.4)), i % 2 ? 0xffd36b : 0x777777, 0.18);
+  const dist = state === "play" ? p.distanceTo(me.pos) : 30;
+  shake = Math.max(shake, clamp(1 - dist / 14, 0, 1));
+  if (ac) {
+    const t = ac.currentTime, src = ac.createBufferSource(); src.buffer = noiseBuf;
+    const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 700;
+    const g = ac.createGain(); const vol = clamp(1 - dist / 50, 0.05, 1) * 0.7;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+    src.connect(f).connect(g).connect(ac.destination); src.start(t); src.stop(t + 0.6);
+    const o = ac.createOscillator(), og = ac.createGain();
+    o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.4);
+    og.gain.setValueAtTime(vol * 0.9, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    o.connect(og).connect(ac.destination); o.start(t); o.stop(t + 0.5);
+  }
+  if (n.owner !== "me") return; // only the thrower deals the damage
+  const from = p.clone(); from.y += 0.2;
+  let killedAny = false, hitAny = false;
+  for (const tg of enemies()) {
+    const chest = tg.pos.clone(); chest.y += tg.r.cr ? 0.8 : 1.1;
+    const d = from.distanceTo(chest); if (d > NADE.radius) continue;
+    const dir = chest.clone().sub(from).normalize();
+    if (rayVoxel(from, dir, d) < d - 0.4) continue; // cover blocks the blast
+    const dm = Math.round(Math.max(12, NADE.dmg * (1 - d / NADE.radius)));
+    hitAny = true;
+    dmgNumber(chest, dm, "nade");
+    if (tg.kind === "peer") {
+      hitsOut.push({ t: tg.r.peer, s: ++hitSeq, w: 3, dm, hs: 0 });
+      while (hitsOut.length > 6) hitsOut.shift();
+    } else {
+      const b = tg.r; b.hp -= dm;
+      if (b.hp <= 0 && b.alive) {
+        b.alive = false; b.d++; b.respawnAt = now() + 3; kills++; killedAny = true;
+        addFeed(myName, b.name, true); banner("+1  Eliminated " + b.name); killSound();
+      }
+    }
+  }
+  if (hitAny) { flashHit(killedAny); blip(950, 0.05, 0.09); publish(true); }
+}
+
+// Floating numbers that show how much damage each hit did
+const dnums = [], dnumLayer = $("#dnums"), _proj = new V3();
+function dmgNumber(at, amount, kind) {
+  if (!dnumLayer) return;
+  const el = document.createElement("div");
+  el.className = "dnum" + (kind ? " " + kind : "");
+  el.textContent = String(Math.round(amount));
+  dnumLayer.appendChild(el);
+  dnums.push({ el, p: at.clone(), t: 0, dx: (Math.random() - .5) * 36 });
+  while (dnums.length > 24) dnums.shift().el.remove();
+}
+function updateDmgNumbers(dt) {
+  const w = view.clientWidth || innerWidth, h = view.clientHeight || innerHeight;
+  for (let i = dnums.length - 1; i >= 0; i--) {
+    const d = dnums[i]; d.t += dt;
+    if (d.t > 0.9) { d.el.remove(); dnums.splice(i, 1); continue; }
+    _proj.copy(d.p); _proj.y += 0.4 + d.t * 1.1; _proj.project(camera);
+    if (_proj.z > 1) { d.el.style.opacity = 0; continue; }
+    const x = (_proj.x * 0.5 + 0.5) * w + d.dx, y = (-_proj.y * 0.5 + 0.5) * h;
+    const pop = d.t < 0.08 ? 1.35 - d.t * 4 : 1;
+    d.el.style.transform = `translate(${x}px,${y}px) translate(-50%,-50%) scale(${pop})`;
+    d.el.style.opacity = String(clamp(1 - (d.t - 0.5) / 0.4, 0, 1));
+  }
+}
 function dash() {
   const t = now();
   if (!alive || paused || t < dashReady) return;
@@ -1342,12 +1478,12 @@ const keys = new Set();
 let firing = false, fireQueued = false, aiming = false, wasAiming = false, locked = false, noLock = false, boardOpen = false;
 const isTouch = !!(window.matchMedia && (matchMedia("(pointer: coarse)").matches || (navigator.maxTouchPoints > 0 && !matchMedia("(pointer: fine)").matches)));
 const touchMove = { x: 0, y: 0 };
-let touchJump = false, touchCombo = false;
+let touchJump = false, touchCombo = false, jumpHeld = false, releaseAllTouches = () => {};
 if (isTouch) { document.body.classList.add("touch"); $("#keysHelp").hidden = true; $("#touchHelp").hidden = false; }
 
 function showPause(on) {
   paused = on; $("#pause").hidden = !on;
-  if (on) { $("#pauseSlot").appendChild($("#settings")); firing = false; aiming = false; crouch = false; keys.clear(); }
+  if (on) { $("#pauseSlot").appendChild($("#settings")); releaseAllTouches(); firing = false; aiming = false; crouch = false; keys.clear(); }
 }
 function requestLock() {
   if (isTouch || noLock) { showPause(false); return; }
@@ -1374,6 +1510,7 @@ window.addEventListener("keydown", e => {
   if (e.code === "Digit2") switchWeapon(1);
   if (e.code === "Digit3") switchWeapon(2);
   if ((e.code === "KeyQ" || e.code === "KeyX") && !e.repeat) dash();
+  if (e.code === "KeyG" && !e.repeat) throwGrenade();
   if (e.code === "KeyE") aiming = true;
   if (e.code === "KeyC") crouch = true;
   if (e.code === "KeyR") startReload();
@@ -1386,7 +1523,7 @@ window.addEventListener("wheel", e => { if (state === "play" && !paused && alive
 function look(dx, dy, base) {
   const zoom = 1 - aim * (1 - WEAPONS[cur].fov / 75) * 0.85;
   const A = assistNow();
-  const slow = assistTg && A ? A.slow : 1;
+  const slow = assistTg && A ? clamp(A.slow * WEAPONS[cur].aa.slow, 0.15, 1) : 1;
   const s = base * sensVal * zoom * slow;
   yaw -= dx * s; pitch = clamp(pitch - dy * s, -1.52, 1.52);
 }
@@ -1404,51 +1541,95 @@ canvas.addEventListener("mousedown", e => {
 window.addEventListener("mouseup", e => { if (e.button === 0) firing = false; if (e.button === 2) aiming = false; });
 canvas.addEventListener("contextmenu", e => e.preventDefault());
 
-// Touch: drag on the left to move (the stick follows your thumb), drag elsewhere to look
+// Touch: every finger is tracked on its own, so you can move, look, fire, jump and
+// dash at the same time. A finger that lands on a button presses it; one that lands
+// on the left side drives the move stick (which follows your thumb); any other
+// finger looks around. Dragging the Fire button also looks.
 if (isTouch) {
-  const zone = $("#moveZone"), stick = $("#stick"), knob = $("#knob");
-  let stickId = null, sx = 0, sy = 0;
-  const home = () => { stick.style.left = ""; stick.style.top = ""; stick.style.bottom = ""; };
-  zone.addEventListener("pointerdown", e => {
-    e.preventDefault();
-    stickId = e.pointerId; sx = e.clientX; sy = e.clientY;
-    stick.style.left = (sx - 70) + "px"; stick.style.top = (sy - 70) + "px"; stick.style.bottom = "auto";
-    try { zone.setPointerCapture(e.pointerId); } catch (err) {}
-    moveStick(e);
-  });
-  function moveStick(e) {
-    let dx = e.clientX - sx, dy = e.clientY - sy; const m = Math.hypot(dx, dy), R = 56;
+  const stick = $("#stick"), knob = $("#knob");
+  const fingers = new Map();
+  const BTN = {
+    // Hold to aim and shoot. The sniper only scopes while held and fires when you let go.
+    tFire: {
+      down() {
+        aiming = true; touchCombo = true;
+        if (!WEAPONS[cur].quickscope) { firing = true; fireQueued = true; }
+      },
+      up(cancel) {
+        if (!cancel && WEAPONS[cur].quickscope && touchCombo && state === "play" && !paused) fire();
+        firing = false; aiming = false; touchCombo = false;
+      },
+      looks: true,
+    },
+    tJump: { down() { touchJump = true; jumpHeld = true; }, up() { jumpHeld = false; } },
+    tDash: { down() { dash(); } },
+    tCrouch: { down() { crouch = !crouch; } },
+    tReload: { down() { startReload(); } },
+    tNade: { down() { throwGrenade(); } },
+    tPause: { down() { showPause(true); } },
+  };
+  const btnEls = Object.keys(BTN).map(id => $("#" + id));
+  function buttonAt(x, y) {
+    for (const el of btnEls) {
+      const r = el.getBoundingClientRect(); if (!r.width) continue;
+      const rad = Math.max(r.width, r.height) / 2 + 10;
+      if (Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2)) <= rad) return el;
+    }
+    return null;
+  }
+  function moveStick(f, x, y) {
+    let dx = x - f.sx, dy = y - f.sy; const m = Math.hypot(dx, dy), R = 56;
     if (m > R) { dx *= R / m; dy *= R / m; }
     touchMove.x = dx / R; touchMove.y = dy / R;
     knob.style.transform = `translate(${dx}px,${dy}px)`;
   }
-  zone.addEventListener("pointermove", e => { if (e.pointerId === stickId) moveStick(e); });
-  const endStick = e => { if (e.pointerId !== stickId) return; stickId = null; touchMove.x = touchMove.y = 0; knob.style.transform = ""; home(); };
-  zone.addEventListener("pointerup", endStick); zone.addEventListener("pointercancel", endStick);
-
-  const lookers = new Map();
-  const startLook = e => { lookers.set(e.pointerId, { x: e.clientX, y: e.clientY }); };
-  const moveLook = e => {
-    const l = lookers.get(e.pointerId); if (!l || state !== "play" || paused) return;
-    look(e.clientX - l.x, e.clientY - l.y, TOUCH_BASE); l.x = e.clientX; l.y = e.clientY;
+  const inMenus = t => t && t.closest && (t.closest("#pause") || t.closest("#menu") || t.closest(".slots"));
+  document.addEventListener("touchstart", e => {
+    if (state !== "play" || paused || inMenus(e.target)) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      const x = t.clientX, y = t.clientY, el = buttonAt(x, y);
+      if (el) {
+        fingers.set(t.identifier, { kind: "btn", el, x, y });
+        el.classList.add("down"); BTN[el.id].down();
+      } else if (x < innerWidth * 0.42 && y > innerHeight * 0.3 && ![...fingers.values()].some(f => f.kind === "stick")) {
+        const f = { kind: "stick", sx: x, sy: y };
+        fingers.set(t.identifier, f);
+        stick.style.left = (x - 70) + "px"; stick.style.top = (y - 70) + "px"; stick.style.bottom = "auto";
+        moveStick(f, x, y);
+      } else fingers.set(t.identifier, { kind: "look", x, y });
+    }
+  }, { passive: false });
+  document.addEventListener("touchmove", e => {
+    if (!fingers.size) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      const f = fingers.get(t.identifier); if (!f) continue;
+      if (f.kind === "stick") moveStick(f, t.clientX, t.clientY);
+      else if (f.kind === "look" || (f.kind === "btn" && BTN[f.el.id].looks)) {
+        if (state === "play" && !paused) look(t.clientX - f.x, t.clientY - f.y, TOUCH_BASE);
+        f.x = t.clientX; f.y = t.clientY;
+      }
+    }
+  }, { passive: false });
+  const release = e => {
+    for (const t of e.changedTouches) {
+      const f = fingers.get(t.identifier); if (!f) continue;
+      fingers.delete(t.identifier);
+      if (f.kind === "stick") { touchMove.x = touchMove.y = 0; knob.style.transform = ""; stick.style.left = ""; stick.style.top = ""; stick.style.bottom = ""; }
+      else if (f.kind === "btn") { f.el.classList.remove("down"); if (BTN[f.el.id].up) BTN[f.el.id].up(!!f.cancel); }
+    }
   };
-  const endLook = e => lookers.delete(e.pointerId);
-  canvas.addEventListener("pointerdown", startLook);
-  window.addEventListener("pointermove", moveLook);
-  window.addEventListener("pointerup", endLook); window.addEventListener("pointercancel", endLook);
-
-  for (const id of ["#tFire"]) {
-    const btn = $(id);
-    btn.addEventListener("pointerdown", e => { e.preventDefault(); firing = true; fireQueued = true; aiming = true; touchCombo = true; startLook(e); try { btn.setPointerCapture(e.pointerId); } catch (err) {} });
-    btn.addEventListener("pointermove", moveLook);
-    const endFire = e => { firing = false; aiming = false; touchCombo = false; endLook(e); };
-    btn.addEventListener("pointerup", endFire); btn.addEventListener("pointercancel", endFire);
-  }
-  $("#tJump").addEventListener("pointerdown", e => { e.preventDefault(); touchJump = true; });
-  $("#tDash").addEventListener("pointerdown", e => { e.preventDefault(); dash(); });
-  $("#tCrouch").addEventListener("pointerdown", e => { e.preventDefault(); crouch = !crouch; });
-  $("#tReload").addEventListener("pointerdown", e => { e.preventDefault(); startReload(); });
-  $("#tPause").addEventListener("pointerdown", e => { e.preventDefault(); showPause(true); });
+  document.addEventListener("touchend", release);
+  document.addEventListener("touchcancel", e => {
+    for (const t of e.changedTouches) { const f = fingers.get(t.identifier); if (f && f.kind === "btn") f.cancel = true; }
+    release(e);
+  });
+  // Let go of everything if the game pauses or the page loses focus mid-press
+  releaseAllTouches = () => {
+    for (const f of fingers.values()) if (f.kind === "btn") { f.el.classList.remove("down"); if (BTN[f.el.id].up) BTN[f.el.id].up(true); }
+    fingers.clear(); touchMove.x = touchMove.y = 0; knob.style.transform = "";
+  };
 }
 
 // ======================================================================
@@ -1573,6 +1754,8 @@ function renderHud(t) {
   if (!alive && state === "play") $("#deathSub").textContent = "Respawning in " + Math.max(1, Math.ceil(respawnAt - t));
   $("#tFire").classList.toggle("on", touchCombo);
   $("#tCrouch").classList.toggle("on", crouch);
+  $("#nadeN").textContent = nades; $("#tNadeN").textContent = nades;
+  $("#tNade").style.opacity = nades > 0 ? 1 : 0.45;
   const board = $("#board"); board.hidden = !boardOpen;
   if (boardOpen) {
     $("#boardSub").textContent = mode === "bots" ? "Bot match" : `${st.length} playing`;
@@ -1671,7 +1854,7 @@ function tick() {
       const k = t < dashUntil ? 0 : 1 - Math.exp(-(me.onGround ? 20 : 8) * (t < dashUntil + 0.15 ? 0.35 : 1) * dt);
       me.vel.x += (wx - me.vel.x) * k; me.vel.z += (wz - me.vel.z) * k;
       me.vel.y -= GRAV * dt;
-      if (input && (keys.has("Space") || touchJump) && me.onGround) me.vel.y = JUMP;
+      if (input && (keys.has("Space") || touchJump || jumpHeld) && me.onGround) me.vel.y = JUMP;
       touchJump = false;
       moveEnt(me, dt);
 
@@ -1680,9 +1863,8 @@ function tick() {
       wasAiming = input && aiming;
       if (input) aimAssist(dt); else { assistTg = null; assistPrev = null; }
       if (reloading && t >= reloadEnd) { reloading = false; ammo[cur] = WEAPONS[cur].mag; blip(700, 0.05, 0.07); }
-      const waitScope = touchCombo && WEAPONS[cur].quickscope && aim < WEAPONS[cur].quickscope;
-      if (input && !waitScope && (fireQueued || (firing && WEAPONS[cur].auto))) fire();
-      if (!waitScope) fireQueued = false;
+      if (input && (fireQueued || (firing && WEAPONS[cur].auto))) fire();
+      fireQueued = false;
       if (t - lastHurt > 4 && hp < 100) hp = Math.min(100, hp + 12 * dt);
       bob += Math.hypot(me.vel.x, me.vel.z) * dt * (me.onGround ? 1.4 : 0);
     } else {
@@ -1691,7 +1873,7 @@ function tick() {
     }
     camera.position.set(me.pos.x, me.pos.y + EYE - crouchAmt * 0.45 + me.stepOff, me.pos.z);
     if (!alive) camera.position.y = me.pos.y + 0.6;
-    camera.rotation.set(pitch + recoilKick * 0.012, yaw, alive ? 0 : 0.35);
+    camera.rotation.set(pitch + recoilKick * 0.012 + (Math.random() - .5) * shake * 0.05, yaw + (Math.random() - .5) * shake * 0.05, alive ? 0 : 0.35);
     const w = WEAPONS[cur];
     dashFov *= Math.exp(-5 * dt);
     camera.fov = 75 + (w.fov - 75) * aim + dashFov * 10; camera.updateProjectionMatrix();
@@ -1738,7 +1920,9 @@ function tick() {
   const hurt = state === "play" ? clamp((1 - hp / 100) * 0.7 + Math.max(0, 0.6 - (t - lastHurt)), 0, 1) : 0;
   $("#hurt").style.opacity = hurt;
 
+  updateNades(dt);
   updateFx(dt);
+  updateDmgNumbers(dt);
   renderer.clear();
   renderer.render(scene, camera);
   if (showVm) { renderer.clearDepth(); renderer.render(vmScene, vmCam); }
