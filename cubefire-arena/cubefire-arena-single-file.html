@@ -478,9 +478,44 @@ function buildPeaks() {
   for (const [x, z] of [[22, 21], [21, 22]]) { const g = peakHeight(x, z); sym8(x, g + 1, z, T.STONE); }
 }
 
-// ---- Farm: a red barn with a hayloft and a stepped roof in the middle, grain silos in
-// the corners, farmhouses on the sides, fenced corn fields, hay bales, and jump pads that
-// launch you onto the barn roof and the silos. Mirrored 4 ways (not diagonally).
+// ---- Farm: five red barns (a big one with haylofts in the middle, two on the sides, two
+// small ones at the ends), grain silos in the corners, fenced corn fields, hay bales, and
+// jump pads onto the barn roofs and silos. Mirrored 4 ways (not diagonally).
+// A red barn with a stepped gable roof. Big doors on both ends, a side door at
+// `sideDoor` ("x0" | "x1" | "z0" | "z1"), hay inside. Ridge runs along the longer side.
+function placeBarn(x0, z0, x1, z1, h, sideDoor) {
+  const alongX = x1 - x0 >= z1 - z0;
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+    if (x === x0 || x === x1 || z === z0 || z === z1) for (let y = 1; y <= h; y++) setB(x, y, z, T.BARN);
+  }
+  // end doors (3 high) on the short walls, a 2-wide side door, and windows
+  const mz0 = Math.floor((z0 + z1) / 2), mx0 = Math.floor((x0 + x1) / 2);
+  for (let y = 1; y <= Math.min(3, h - 1); y++) for (let d = -1; d <= 2; d++) {
+    if (alongX) { setB(x0, y, mz0 + d, 0); setB(x1, y, mz0 + d, 0); }
+    else { setB(mx0 + d, y, z0, 0); setB(mx0 + d, y, z1, 0); }
+  }
+  for (let y = 1; y <= 2; y++) for (let d = 0; d <= 1; d++) {
+    if (sideDoor === "x0") setB(x0, y, mz0 + d, 0); if (sideDoor === "x1") setB(x1, y, mz0 + d, 0);
+    if (sideDoor === "z0") setB(mx0 + d, y, z0, 0); if (sideDoor === "z1") setB(mx0 + d, y, z1, 0);
+  }
+  // stepped gable roof with filled gable ends
+  for (let k = 0; ; k++) {
+    const a = (alongX ? z0 : x0) - 1 + k, b = (alongX ? z1 : x1) + 1 - k, y = h + 1 + k;
+    if (a > b || y >= H) break;
+    const from = (alongX ? x0 : z0) - 1, to = (alongX ? x1 : z1) + 1;
+    for (let u = from; u <= to; u++) {
+      if (alongX) { setB(u, y, a, T.ROOF); setB(u, y, b, T.ROOF); }
+      else { setB(a, y, u, T.ROOF); setB(b, y, u, T.ROOF); }
+    }
+    for (let v = a + 1; v < b; v++) {
+      if (alongX) { setB(x0, y, v, T.BARN); setB(x1, y, v, T.BARN); }
+      else { setB(v, y, z0, T.BARN); setB(v, y, z1, T.BARN); }
+    }
+    if (b - a <= 1) break;
+  }
+  // hay bales inside
+  setB(x0 + 1, 1, z0 + 1, T.HAY); setB(x1 - 1, 1, z1 - 1, T.HAY); setB(x1 - 1, 2, z1 - 1, T.HAY);
+}
 function buildFarm() {
   for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) setB(x, 0, z, T.GROUND);
   for (let i = 0; i < W; i++) for (let y = 1; y <= 4; y++) {             // board fence around the farm
@@ -511,20 +546,15 @@ function buildFarm() {
     if (d <= 0.8) sym(x, 8, z, T.TRIM);
   }
   sym(10, 1, 10, T.PAD);                                                         // jump pad up the silo
-  // Farmhouses on the east and west sides
-  for (let x = 3; x <= 9; x++) for (let z = 20; z <= 23; z++) {
-    if (x === 3 || x === 9 || z === 20) for (let y = 1; y <= 3; y++) sym(x, y, z, T.HOUSE);
-    sym(x, 4, z, T.ROOF);
-  }
-  for (let y = 1; y <= 2; y++) sym(9, y, 23, 0);                                 // front doors
-  sym(5, 2, 20, 0); sym(7, 2, 20, 0); sym(9, 2, 21, 0);                          // windows
-  sym(11, 1, 20, T.PAD);                                                         // jump pad onto the roof
+  // Side barns (east and west) and small barns (north and south)
+  placeBarn(2, 19, 10, 28, 4, "x1"); placeBarn(W - 11, 19, W - 3, 28, 4, "x0");
+  placeBarn(20, 2, 27, 8, 3, "z1"); placeBarn(20, D - 9, 27, D - 3, 3, "z0");
+  sym(11, 1, 20, T.PAD);                                                         // jump pads onto the side barn roofs
   // Corn fields (north and south), with paths and a fence
-  for (let z = 4; z <= 10; z += 2) for (let x = 14; x <= 23; x++) {
-    if (x === 18 || x === 23) continue;
+  for (let z = 4; z <= 10; z += 2) for (let x = 13; x <= 17; x++) {
     sym(x, 1, z, T.CROP); sym(x, 2, z, T.CROP);
   }
-  for (let x = 13; x <= 23; x++) if (x % 2 === 1 && x !== 23) sym(x, 1, 13, T.WOOD);
+  for (let x = 13; x <= 18; x++) if (x % 2 === 1) sym(x, 1, 13, T.WOOD);
   for (let z = 3; z <= 13; z++) if (z % 2 === 1) sym(13, 1, z, T.WOOD);
   // Jump pads in front of the barn launch you onto its roof
   sym(22, 1, 15, T.PAD);
@@ -780,7 +810,8 @@ const WEAPONS = [
   { name: "Sniper", aa: { cone: 1.9, pull: 2.4, track: 1.2, snap: 1.6, magnet: 2.4, slow: 0.6 }, rate: 1.2, dmg: 100, head: 150, adsSpeed: 26, quickscope: 0.5, mag: 5, reload: 2.3, spread: 0.07, aimSpread: 0, pellets: 1, range: 220, auto: false, recoil: 0.07, fov: 20, snd: [500, 0.4, 0.55] },
 ];
 // Grenades: a few per life, thrown in an arc, bounce, and burst after a short fuse
-const NADE = { count: 2, fuse: 1.7, speed: 16, lift: 4.5, radius: 4.8, dmg: 95, cooldown: 0.8 };
+// Inside killRadius a grenade is an instant kill; out to radius it still hits hard.
+const NADE = { count: 2, fuse: 1.7, speed: 16, lift: 4.5, radius: 7.5, killRadius: 5, dmg: 150, edgeDmg: 45, cooldown: 0.8 };
 const MAXDMG = WEAPONS.map(w => w.head * w.pellets).concat([NADE.dmg]); // index 3 = grenade
 const PAL = ["#ff5d5d", "#ffb627", "#5fd17a", "#43b7ff", "#b57bff", "#ff7ac8", "#f3efe4", "#36d6c3"];
 
@@ -1468,10 +1499,10 @@ function explode(n) {
   const p = n.pos;
   const ball = new THREE.Mesh(boomGeo, new THREE.MeshBasicMaterial({ color: 0xffa035, transparent: true, opacity: 0.85, depthWrite: false }));
   ball.position.copy(p); ball.scale.setScalar(0.6); scene.add(ball);
-  fx.push({ o: ball, t: 0.35, life: 0.35, boom: true });
-  for (let i = 0; i < 10; i++) spark(p.clone().add(new V3((Math.random() - .5) * 2.4, Math.random() * 1.6, (Math.random() - .5) * 2.4)), i % 2 ? 0xffd36b : 0x777777, 0.18);
+  fx.push({ o: ball, t: 0.45, life: 0.45, boom: true });
+  for (let i = 0; i < 18; i++) spark(p.clone().add(new V3((Math.random() - .5) * 4.5, Math.random() * 2.5, (Math.random() - .5) * 4.5)), i % 3 ? 0xffd36b : 0x777777, 0.22);
   const dist = state === "play" ? p.distanceTo(me.pos) : 30;
-  shake = Math.max(shake, clamp(1 - dist / 14, 0, 1));
+  shake = Math.max(shake, clamp(1.4 - dist / 16, 0, 1.4));
   if (ac) {
     const t = ac.currentTime, src = ac.createBufferSource(); src.buffer = noiseBuf;
     const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 700;
@@ -1491,7 +1522,8 @@ function explode(n) {
     const d = from.distanceTo(chest); if (d > NADE.radius) continue;
     const dir = chest.clone().sub(from).normalize();
     if (rayVoxel(from, dir, d) < d - 0.4) continue; // cover blocks the blast
-    const dm = Math.round(Math.max(12, NADE.dmg * (1 - d / NADE.radius)));
+    const dm = d <= NADE.killRadius ? NADE.dmg
+      : Math.round(NADE.edgeDmg + (100 - NADE.edgeDmg) * (1 - (d - NADE.killRadius) / (NADE.radius - NADE.killRadius)));
     hitAny = true;
     dmgNumber(chest, dm, "nade");
     if (tg.kind === "peer") {
