@@ -157,13 +157,14 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 #stick{position:absolute;left:28px;bottom:calc(70px + env(safe-area-inset-bottom,0px));width:140px;height:140px;margin:0;border-radius:50%;border:2px solid var(--line);background:rgba(0,0,0,.22);pointer-events:none}
 #stick i{position:absolute;left:46px;top:46px;width:48px;height:48px;border-radius:50%;background:rgba(243,239,228,.4)}
 .tb{position:absolute;pointer-events:auto;border-radius:50%;border:2px solid var(--line);background:rgba(0,0,0,.35);font-weight:700;font-size:12px;letter-spacing:.06em;display:grid;place-items:center;text-transform:uppercase;touch-action:none}
-#tFire{right:30px;bottom:calc(96px + env(safe-area-inset-bottom,0px));width:96px;height:96px;background:rgba(255,79,94,.38);font-size:14px}
-#tJump{right:136px;bottom:calc(64px + env(safe-area-inset-bottom,0px));width:68px;height:68px}
-#tDash{right:142px;bottom:calc(156px + env(safe-area-inset-bottom,0px));width:60px;height:60px;--cd:1;background:conic-gradient(rgba(54,214,195,.5) calc(var(--cd) * 360deg),rgba(0,0,0,.4) 0)}
-#tAim{right:40px;bottom:calc(220px + env(safe-area-inset-bottom,0px));width:60px;height:60px}
-#tAim.on,#tCrouch.on{background:rgba(255,182,39,.45)}
-#tReload{right:216px;bottom:calc(118px + env(safe-area-inset-bottom,0px));width:50px;height:50px}
-#tCrouch{right:218px;bottom:calc(40px + env(safe-area-inset-bottom,0px));width:50px;height:50px}
+#tFire{right:64px;bottom:calc(150px + env(safe-area-inset-bottom,0px));width:128px;height:128px;background:rgba(255,79,94,.4);font-size:15px;line-height:1.15;text-align:center}
+#tFire small{display:block;font-size:10px;letter-spacing:.1em;opacity:.75}
+#tFire.on{background:rgba(255,79,94,.62)}
+#tJump{right:24px;bottom:calc(40px + env(safe-area-inset-bottom,0px));width:76px;height:76px}
+#tDash{right:118px;bottom:calc(46px + env(safe-area-inset-bottom,0px));width:64px;height:64px;--cd:1;background:conic-gradient(rgba(54,214,195,.5) calc(var(--cd) * 360deg),rgba(0,0,0,.4) 0)}
+#tCrouch.on{background:rgba(255,182,39,.45)}
+#tReload{right:212px;bottom:calc(150px + env(safe-area-inset-bottom,0px));width:52px;height:52px}
+#tCrouch{right:202px;bottom:calc(50px + env(safe-area-inset-bottom,0px));width:52px;height:52px}
 #tPause{right:16px;top:calc(130px + env(safe-area-inset-top,0px));width:44px;height:44px;border-radius:4px}
 .touch .mini{top:calc(12px + env(safe-area-inset-top,0px))}
 .touch .vitals{left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));width:min(240px,36vw)}
@@ -216,9 +217,8 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 <div id="touch" hidden>
   <div id="moveZone"></div>
   <div id="stick"><i id="knob"></i></div>
-  <button class="tb" id="tFire" type="button">Fire</button>
+  <button class="tb" id="tFire" type="button">Fire<small>+ aim</small></button>
   <button class="tb" id="tJump" type="button">Jump</button>
-  <button class="tb" id="tAim" type="button">Aim</button>
   <button class="tb" id="tDash" type="button">Dash</button>
   <button class="tb" id="tCrouch" type="button">Duck</button>
   <button class="tb" id="tReload" type="button" aria-label="Reload">R</button>
@@ -281,7 +281,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
       <li><b>1 2 3</b>Rifle, shotgun, sniper</li>
       <li><b>Tab</b>Scoreboard · <b>P</b>Pause</li>
     </ul>
-    <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Fire, Jump, Dash, Aim, Duck and Reload sit on the right; tap a weapon at the top to switch.</p>
+    <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck and Reload sit around it; tap a weapon at the top to switch.</p>
     <p class="fine">Friends who type the same party code land in the same private match. Leave it blank to join the open arena.</p>
   </div>
 </div>
@@ -665,8 +665,8 @@ const PAL = ["#ff5d5d", "#ffb627", "#5fd17a", "#43b7ff", "#b57bff", "#ff7ac8", "
 const assistNow = () => ASSIST[mode === "online" ? 1 : assistLevel];
 const ASSIST = [
   null,
-  { cone: 0.09, slow: 0.72, pull: 3.2, track: 0.45, snap: 0.35, magnet: 0.12 },
-  { cone: 0.16, slow: 0.5, pull: 7.5, track: 0.85, snap: 0.75, magnet: 0.3 },
+  { cone: 0.15, slow: 0.5, pull: 8, track: 0.85, snap: 0.75, magnet: 0.3 },
+  { cone: 0.24, slow: 0.35, pull: 14, track: 1, snap: 0.95, magnet: 0.45 },
 ];
 
 // ======================================================================
@@ -1317,7 +1317,7 @@ const keys = new Set();
 let firing = false, fireQueued = false, aiming = false, wasAiming = false, locked = false, noLock = false, boardOpen = false;
 const isTouch = !!(window.matchMedia && (matchMedia("(pointer: coarse)").matches || (navigator.maxTouchPoints > 0 && !matchMedia("(pointer: fine)").matches)));
 const touchMove = { x: 0, y: 0 };
-let touchJump = false;
+let touchJump = false, touchCombo = false;
 if (isTouch) { document.body.classList.add("touch"); $("#keysHelp").hidden = true; $("#touchHelp").hidden = false; }
 
 function showPause(on) {
@@ -1414,13 +1414,12 @@ if (isTouch) {
 
   for (const id of ["#tFire"]) {
     const btn = $(id);
-    btn.addEventListener("pointerdown", e => { e.preventDefault(); firing = true; fireQueued = true; startLook(e); try { btn.setPointerCapture(e.pointerId); } catch (err) {} });
+    btn.addEventListener("pointerdown", e => { e.preventDefault(); firing = true; fireQueued = true; aiming = true; touchCombo = true; startLook(e); try { btn.setPointerCapture(e.pointerId); } catch (err) {} });
     btn.addEventListener("pointermove", moveLook);
-    const endFire = e => { firing = false; endLook(e); };
+    const endFire = e => { firing = false; aiming = false; touchCombo = false; endLook(e); };
     btn.addEventListener("pointerup", endFire); btn.addEventListener("pointercancel", endFire);
   }
   $("#tJump").addEventListener("pointerdown", e => { e.preventDefault(); touchJump = true; });
-  $("#tAim").addEventListener("pointerdown", e => { e.preventDefault(); aiming = !aiming; });
   $("#tDash").addEventListener("pointerdown", e => { e.preventDefault(); dash(); });
   $("#tCrouch").addEventListener("pointerdown", e => { e.preventDefault(); crouch = !crouch; });
   $("#tReload").addEventListener("pointerdown", e => { e.preventDefault(); startReload(); });
@@ -1547,7 +1546,7 @@ function renderHud(t) {
     waiting.textContent = netState === "live" ? `Waiting for players in ${lobbyLabel()} · send friends this page's link` : "Connecting to other players…";
   } else waiting.hidden = true;
   if (!alive && state === "play") $("#deathSub").textContent = "Respawning in " + Math.max(1, Math.ceil(respawnAt - t));
-  $("#tAim").classList.toggle("on", aiming);
+  $("#tFire").classList.toggle("on", touchCombo);
   $("#tCrouch").classList.toggle("on", crouch);
   const board = $("#board"); board.hidden = !boardOpen;
   if (boardOpen) {
@@ -1656,8 +1655,9 @@ function tick() {
       wasAiming = input && aiming;
       if (input) aimAssist(dt); else { assistTg = null; assistPrev = null; }
       if (reloading && t >= reloadEnd) { reloading = false; ammo[cur] = WEAPONS[cur].mag; blip(700, 0.05, 0.07); }
-      if (input && (fireQueued || (firing && WEAPONS[cur].auto))) fire();
-      fireQueued = false;
+      const waitScope = touchCombo && WEAPONS[cur].quickscope && aim < WEAPONS[cur].quickscope;
+      if (input && !waitScope && (fireQueued || (firing && WEAPONS[cur].auto))) fire();
+      if (!waitScope) fireQueued = false;
       if (t - lastHurt > 4 && hp < 100) hp = Math.min(100, hp + 12 * dt);
       bob += Math.hypot(me.vel.x, me.vel.z) * dt * (me.onGround ? 1.4 : 0);
     } else {
