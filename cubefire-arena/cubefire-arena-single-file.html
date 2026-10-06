@@ -960,6 +960,13 @@ let p2p = null, p2pRoom = null, p2pAct = null;
 let sock = null, sockRetry = 0;
 let lobbyName = null;
 const remotes = new Map(), heard = new Map();
+// AFK: a player counts as away after AFK_IDLE seconds without touching any control, or
+// while their game is in the background. Away players are hidden from everyone else.
+// Players we stop hearing from for STALE seconds are treated the same way.
+const AFK_IDLE = 45, STALE = 6;
+let lastInputT = now();
+const iAmAfk = () => document.hidden || now() - lastInputT > AFK_IDLE;
+const activePeer = r => r.pl && !r.afk && now() - r.seen < STALE;
 function setNet(s) { netState = s; renderStatus(); }
 const lobbyKey = code => mapId + "-" + (code || "open");
 
@@ -1098,6 +1105,8 @@ function onPeer(p) {
     remotes.set(p.peer, r);
   }
   r.name = cleanName(s.n) || "Player";
+  r.afk = s.afk === 1;
+  r.seen = now();
   r.color = clamp(Math.floor(num(s.c) || 0), 0, PAL.length - 1);
   r.pl = s.pl === 1 && (s.m === undefined || s.m === mapId);
   r.alive = s.al !== 0;
@@ -1148,12 +1157,12 @@ function onPeer(p) {
   if (gr && gr.s > (r.lastNade || 0)) {
     r.lastNade = gr.s;
     const o = vec(gr.o), v = Array.isArray(gr.v) && gr.v.length === 3 && gr.v.every(n => num(n) !== null) ? new V3(clamp(gr.v[0], -40, 40), clamp(gr.v[1], -40, 40), clamp(gr.v[2], -40, 40)) : null;
-    if (o && v && r.pl && online) spawnNade(o, v, null);
+    if (o && v && activePeer(r) && online) spawnNade(o, v, null);
   }
   if (sh && sh.s > r.lastShot) {
     r.lastShot = sh.s;
     const o = vec(sh.o), e = vec(sh.e);
-    if (o && e && r.pl && online) {
+    if (o && e && activePeer(r) && online) {
       tracer(o, e, 0xffc6a0);
       const wi = clamp(Math.floor(num(sh.w) || 0), 0, 2);
       gunSound(wi, clamp(1 - o.distanceTo(me.pos) / 60, 0, 0.7));
@@ -1168,7 +1177,7 @@ function publish(force, target) {
   const t = now(); if (!force && t - lastPub < (netKind === "ws" ? 0.066 : 0.05)) return; if (!target) lastPub = t;
   const playing = state === "play" && mode === "online";
   const P = {
-    n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0,
+    n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0, afk: playing && iAmAfk() ? 1 : 0, hb: Math.floor(now()),
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
     al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, k: playing ? kills : 0, d: playing ? deaths : 0,
@@ -1253,7 +1262,7 @@ function updateBot(b, dt, t) {
 // ======================================================================
 function enemies() {
   const list = [];
-  if (mode === "online") { for (const r of remotes.values()) if (r.pl && r.alive && r.hasPos) list.push({ kind: "peer", r, pos: r.pos }); }
+  if (mode === "online") { for (const r of remotes.values()) if (activePeer(r) && r.alive && r.hasPos) list.push({ kind: "peer", r, pos: r.pos }); }
   else for (const b of bots) if (b.alive) list.push({ kind: "bot", r: b, pos: b.pos });
   return list;
 }
@@ -1615,6 +1624,13 @@ window.addEventListener("keydown", e => {
   if (e.code === "Tab") boardOpen = true;
 });
 window.addEventListener("keyup", e => { keys.delete(e.code); if (e.code === "Tab") boardOpen = false; if (e.code === "KeyE") aimKey = false; if (e.code === "KeyC") crouch = false; });
+for (const ev of ["keydown", "mousedown", "mousemove", "wheel", "touchstart", "touchmove"]) {
+  window.addEventListener(ev, () => {
+    const wasAfk = iAmAfk(); lastInputT = now();
+    if (wasAfk && state === "play") publish(true);
+  }, { passive: true, capture: true });
+}
+document.addEventListener("visibilitychange", () => { if (state === "play") publish(true); });
 window.addEventListener("blur", () => { keys.clear(); resetAim(); crouch = false; boardOpen = false; });
 window.addEventListener("wheel", e => { if (state === "play" && !paused && alive) switchWeapon((cur + (e.deltaY > 0 ? 1 : 2)) % 3); }, { passive: true });
 
@@ -1769,10 +1785,10 @@ function showDmgDir(p) {
   const el = $("#dmgdir"); el.style.transform = `rotate(${-ang}rad)`; el.style.opacity = 1;
   clearTimeout(dmgT); dmgT = setTimeout(() => { el.style.opacity = 0; }, 600);
 }
-function playersOnline() { let n = 0; for (const r of remotes.values()) if (r.pl) n++; return n; }
+function playersOnline() { let n = 0; for (const r of remotes.values()) if (activePeer(r)) n++; return n; }
 function standings() {
   const list = [{ name: myName, k: kills, d: deaths, me: true }];
-  if (mode === "online") { for (const r of remotes.values()) if (r.pl) list.push({ name: r.name, k: r.k, d: r.d }); }
+  if (mode === "online") { for (const r of remotes.values()) if (activePeer(r)) list.push({ name: r.name, k: r.k, d: r.d }); }
   else for (const b of bots) list.push({ name: b.name, k: b.k, d: b.d });
   list.sort((a, b) => b.k - a.k || a.d - b.d);
   return list;
@@ -1844,7 +1860,10 @@ function renderHud(t) {
   [...pipsEl.children].forEach((p, i) => p.classList.toggle("off", i >= ammo[cur]));
   [...slotsEl.children].forEach((d, i) => d.classList.toggle("on", i === cur));
   const waiting = $("#waiting");
-  if (mode === "online" && playersOnline() === 0) {
+  if (mode === "online" && iAmAfk()) {
+    waiting.hidden = false;
+    waiting.textContent = "You're marked as away, so other players can't see you · move or tap to jump back in";
+  } else if (mode === "online" && playersOnline() === 0) {
     waiting.hidden = false;
     waiting.textContent = netState === "live" ? `Waiting for players in ${lobbyLabel()} · send friends this page's link` : "Connecting to other players…";
   } else waiting.hidden = true;
@@ -1995,7 +2014,7 @@ function tick() {
   // remote players (only shown in online matches)
   const kk = 1 - Math.exp(-14 * dt);
   for (const r of remotes.values()) {
-    const show = mode === "online" && r.pl && r.hasPos && r.alive;
+    const show = mode === "online" && activePeer(r) && r.hasPos && r.alive;
     if (show && !r.av) r.av = makeAvatar(PAL[r.color], r.name);
     if (!r.av) continue;
     r.av.g.visible = show;
