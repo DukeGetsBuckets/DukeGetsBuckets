@@ -273,7 +273,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
     <div class="set-row">
       <span class="lbl-sm" id="mapLbl">Map</span>
       <div class="seg" id="mapPick" role="group" aria-labelledby="mapLbl">
-        <button type="button" data-v="arena">Arena</button><button type="button" data-v="peaks">Peaks</button>
+        <button type="button" data-v="arena">Arena</button><button type="button" data-v="farm">Farm</button><button type="button" data-v="peaks">Peaks</button>
       </div>
     </div>
     <div class="modes">
@@ -336,12 +336,12 @@ document.addEventListener("gesturestart", e => e.preventDefault());
 document.addEventListener("dblclick", e => e.preventDefault());
 
 // ======================================================================
-// Maps: 48x48 voxel worlds, 8-fold symmetric so every spawn is fair
+// Maps: 48x48 voxel worlds, mirrored so every spawn is fair
 // ======================================================================
 const W = 48, D = 48, H = 18;
 const grid = new Uint8Array(W * H * D);
 const idx = (x, y, z) => x + W * (z + D * y);
-const T = { GROUND: 1, STONE: 2, BRICK: 3, WOOD: 4, METAL: 5, TRIM: 6, GRASS: 7, DIRT: 8, SNOW: 9, LEAF: 10 };
+const T = { GROUND: 1, STONE: 2, BRICK: 3, WOOD: 4, METAL: 5, TRIM: 6, GRASS: 7, DIRT: 8, SNOW: 9, LEAF: 10, HAY: 11, BARN: 12, ROOF: 13, CROP: 14, PLANK: 15, SILO: 16, HOUSE: 17, PAD: 18 };
 function solid(x, y, z) {
   if (y < 0) return 1;
   if (x < 0 || z < 0 || x >= W || z >= D) return 1;
@@ -378,6 +378,8 @@ function buildArena() {
   for (let y = 1; y <= 3; y++) sym8(23, y, 28, T.STONE);
   for (let y = 1; y <= 2; y++) sym8(23, y, 29, T.STONE);
   sym8(23, 1, 30, T.STONE);
+  sym8(17, 1, 17, T.PAD);                                  // jump pads up to the tower
+  sym8(12, 1, 3, T.PAD);                                   // jump pads up to the house roofs
   for (let x = 14; x <= 17; x++) for (let y = 1; y <= 2; y++) sym8(x, y, 12, T.STONE);
   for (let y = 1; y <= 2; y++) { sym8(17, y, 18, T.STONE); sym8(18, y, 17, T.STONE); }
   const r = rng32(1337);
@@ -457,12 +459,71 @@ function buildPeaks() {
     sym8(x, g + 1, z, T.STONE);
     if (r() < 0.4) sym8(x, g + 2, z, T.STONE);
   }
+  // Jump pads in the valleys launch you toward the peaks
+  for (const [x, z] of [[16, 17], [6, 15]]) { const g = peakHeight(x, z); if (!grid[idx(x, g + 1, z)]) sym8(x, g + 1, z, T.PAD); }
   // Summit cover
   for (const [x, z] of [[22, 21], [21, 22]]) { const g = peakHeight(x, z); sym8(x, g + 1, z, T.STONE); }
 }
 
+// ---- Farm: a red barn with a hayloft and a stepped roof in the middle, grain silos in
+// the corners, farmhouses on the sides, fenced corn fields, hay bales, and jump pads that
+// launch you onto the barn roof and the silos. Mirrored 4 ways (not diagonally).
+function buildFarm() {
+  for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) setB(x, 0, z, T.GROUND);
+  for (let i = 0; i < W; i++) for (let y = 1; y <= 4; y++) {             // board fence around the farm
+    const t = y === 4 ? T.WOOD : T.PLANK;
+    setB(i, y, 0, t); setB(i, y, D - 1, t); setB(0, y, i, t); setB(W - 1, y, i, t);
+  }
+  // Barn: x 17..30, z 19..28
+  for (let x = 17; x <= 23; x++) for (let z = 19; z <= 23; z++) {
+    if (x === 17 || z === 19) for (let y = 1; y <= 4; y++) sym(x, y, z, T.BARN);
+  }
+  for (let y = 1; y <= 3; y++) for (let z = 22; z <= 23; z++) sym(17, y, z, 0);   // end doors
+  for (let y = 1; y <= 3; y++) for (let x = 22; x <= 23; x++) sym(x, y, 19, 0);   // side doors
+  sym(19, 3, 19, 0); sym(17, 3, 20, 0);                                          // windows
+  for (let x = 18; x <= 21; x++) for (let z = 20; z <= 23; z++) sym(x, 4, z, T.WOOD); // haylofts
+  sym(22, 1, 21, T.HAY); sym(22, 1, 22, T.HAY); sym(22, 2, 22, T.HAY);              // hay steps up to the loft
+  sym(22, 1, 23, T.HAY); sym(22, 2, 23, T.HAY); sym(22, 3, 23, T.HAY);
+  sym(19, 5, 21, T.HAY); sym(18, 5, 20, T.HAY);                                  // bales in the loft
+  for (let k = 0; k <= 3; k++) {                                                 // stepped roof
+    for (let x = 16; x <= 23; x++) sym(x, 5 + k, 18 + k, T.ROOF);
+    for (let z = 19 + k; z <= 23; z++) sym(17, 5 + k, z, T.BARN);                // gable ends
+  }
+  for (let x = 16; x <= 23; x++) for (let z = 22; z <= 23; z++) sym(x, 9, z, T.ROOF); // flat ridge
+  // Silos in the corners, with a domed cap
+  for (let x = 3; x <= 11; x++) for (let z = 3; z <= 11; z++) {
+    const d = Math.hypot(x - 7, z - 7);
+    if (d <= 2.3) for (let y = 1; y <= 6; y++) sym(x, y, z, T.SILO);
+    if (d <= 1.5) sym(x, 7, z, T.SILO);
+    if (d <= 0.8) sym(x, 8, z, T.TRIM);
+  }
+  sym(10, 1, 10, T.PAD);                                                         // jump pad up the silo
+  // Farmhouses on the east and west sides
+  for (let x = 3; x <= 9; x++) for (let z = 20; z <= 23; z++) {
+    if (x === 3 || x === 9 || z === 20) for (let y = 1; y <= 3; y++) sym(x, y, z, T.HOUSE);
+    sym(x, 4, z, T.ROOF);
+  }
+  for (let y = 1; y <= 2; y++) sym(9, y, 23, 0);                                 // front doors
+  sym(5, 2, 20, 0); sym(7, 2, 20, 0); sym(9, 2, 21, 0);                          // windows
+  sym(11, 1, 20, T.PAD);                                                         // jump pad onto the roof
+  // Corn fields (north and south), with paths and a fence
+  for (let z = 4; z <= 10; z += 2) for (let x = 14; x <= 23; x++) {
+    if (x === 18 || x === 23) continue;
+    sym(x, 1, z, T.CROP); sym(x, 2, z, T.CROP);
+  }
+  for (let x = 13; x <= 23; x++) if (x % 2 === 1 && x !== 23) sym(x, 1, 13, T.WOOD);
+  for (let z = 3; z <= 13; z++) if (z % 2 === 1) sym(13, 1, z, T.WOOD);
+  // Jump pads in front of the barn launch you onto its roof
+  sym(22, 1, 15, T.PAD);
+  // Hay bales for cover
+  for (const [x, z, h] of [[14, 16, 2], [15, 16, 1], [2, 16, 1], [11, 14, 2], [20, 15, 1], [15, 20, 1], [12, 23, 1]]) {
+    for (let y = 1; y <= h; y++) sym(x, y, z, T.HAY);
+  }
+}
+
 const MAPS = {
   arena: { name: "Arena", build: buildArena, seeds: [[2, 2], [2, 13], [8, 16], [15, 15], [16, 8], [13, 2]], sky: 0x8fc6f2, ground: 0x7aa457, outer: 0x5f8546, fog: [40, 95] },
+  farm: { name: "Farm", build: buildFarm, mirrors: 4, seeds: [[2, 2], [2, 15], [12, 17], [16, 2], [11, 23], [20, 16]], sky: 0x9fd0f0, ground: 0x86ad55, outer: 0x6f9a4c, fog: [42, 100] },
   peaks: { name: "Peaks", build: buildPeaks, seeds: [[3, 3], [3, 12], [9, 19], [14, 14], [19, 9], [12, 3], [6, 8]], sky: 0xa3d2f5, ground: 0x6fa04e, outer: 0x8a939c, fog: [45, 110] },
 };
 let mapId = "arena";
@@ -471,10 +532,11 @@ function topY(x, z) { for (let y = H - 1; y >= 0; y--) if (grid[idx(x, y, z)]) r
 function computeSpawns() {
   spawns.length = 0;
   for (const [sx, sz] of MAPS[mapId].seeds) {
-    const pts = [[sx, sz], [W - 1 - sx, sz], [sx, D - 1 - sz], [W - 1 - sx, D - 1 - sz], [sz, sx], [W - 1 - sz, sx], [sz, D - 1 - sx], [W - 1 - sz, D - 1 - sx]];
+    const pts = [[sx, sz], [W - 1 - sx, sz], [sx, D - 1 - sz], [W - 1 - sx, D - 1 - sz]];
+    if (MAPS[mapId].mirrors !== 4) pts.push([sz, sx], [W - 1 - sz, sx], [sz, D - 1 - sx], [W - 1 - sz, D - 1 - sx]);
     for (const [x, z] of pts) {
       const ty = topY(x, z), top = grid[idx(x, ty, z)];
-      if (top === T.WOOD || top === T.LEAF || ty + 3 >= H) continue;
+      if (top === T.WOOD || top === T.LEAF || top === T.PAD || top === T.CROP || ty + 3 >= H) continue;
       if (solid(x, ty + 1, z) || solid(x, ty + 2, z)) continue;
       if (spawns.some(p => p.x === x + .5 && p.z === z + .5)) continue;
       spawns.push(new V3(x + .5, ty + 1, z + .5));
@@ -518,6 +580,13 @@ function makeTex(kind) {
     } else if (kind === "ground") {
       v = 190 + r() * 60;
       if (i === 0 || j === 0) v -= 30;
+    } else if (kind === "plank") {
+      v = 200 + r() * 30; if (i % 4 === 0) v = 150 + r() * 15; if (j === 0 || j === 15) v -= 30;
+    } else if (kind === "hay") {
+      v = 190 + r() * 60; if (j % 3 === 0) v -= 35; if (i === 0 || i === 15) v -= 40;
+    } else if (kind === "pad") {
+      const d = Math.max(Math.abs(i - 7.5), Math.abs(j - 7.5));
+      v = d > 6.5 ? 120 : (Math.floor(d) % 3 === 0 ? 255 : 170);
     } else if (kind === "leaf") {
       v = r() < 0.25 ? 140 + r() * 30 : 200 + r() * 55;
     } else if (i === 0 || j === 0 || i === 15 || j === 15) v -= 45;
@@ -528,7 +597,7 @@ function makeTex(kind) {
   t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestMipmapLinearFilter;
   return t;
 }
-const TEX = { plain: makeTex("plain"), brick: makeTex("brick"), crate: makeTex("crate"), grass: makeTex("ground"), leaf: makeTex("leaf") };
+const TEX = { plain: makeTex("plain"), brick: makeTex("brick"), crate: makeTex("crate"), grass: makeTex("ground"), leaf: makeTex("leaf"), plank: makeTex("plank"), hay: makeTex("hay"), pad: makeTex("pad") };
 const BLOCK_STYLE = {
   [T.STONE]: { tex: "plain", color: 0x8d939c },
   [T.BRICK]: { tex: "brick", color: 0xb85a40 },
@@ -539,6 +608,14 @@ const BLOCK_STYLE = {
   [T.DIRT]: { tex: "plain", color: 0x8c6544 },
   [T.SNOW]: { tex: "grass", color: 0xf4f7fa },
   [T.LEAF]: { tex: "leaf", color: 0x3f7f3a },
+  [T.HAY]: { tex: "hay", color: 0xe8c45a },
+  [T.BARN]: { tex: "plank", color: 0xb23a2e },
+  [T.ROOF]: { tex: "plain", color: 0x4b525c },
+  [T.CROP]: { tex: "leaf", color: 0x9bbf3c },
+  [T.PLANK]: { tex: "plank", color: 0x9c7348 },
+  [T.SILO]: { tex: "plank", color: 0xc9ced4 },
+  [T.HOUSE]: { tex: "plank", color: 0xeee7da },
+  [T.PAD]: { tex: "pad", color: 0x36d6c3 },
 };
 const boxGeo = new THREE.BoxGeometry(1, 1, 1);
 const groundTex = makeTex("ground"); groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping; groundTex.repeat.set(W, D);
@@ -564,7 +641,9 @@ function buildMeshes() {
   const m4 = new THREE.Matrix4(), col = new THREE.Color();
   for (const k of Object.keys(lists)) {
     const L = lists[k];
-    const mesh = new THREE.InstancedMesh(boxGeo, new THREE.MeshLambertMaterial({ map: TEX[k] }), L.length);
+    const mat = new THREE.MeshLambertMaterial({ map: TEX[k] });
+    if (k === "pad") mat.emissive = new THREE.Color(0x1d8077); // jump pads glow
+    const mesh = new THREE.InstancedMesh(boxGeo, mat, L.length);
     L.forEach(([x, y, z, t], i) => {
       m4.makeTranslation(x + .5, y + .5, z + .5); mesh.setMatrixAt(i, m4);
       col.setHex(BLOCK_STYLE[t].color).multiplyScalar(0.9 + r() * 0.14); mesh.setColorAt(i, col);
@@ -629,6 +708,14 @@ function moveEnt(e, dt) {
   e.stepOff *= Math.exp(-14 * dt);
   if (e.pos.y < -4) { e.pos.copy(spawns[0]); e.vel.set(0, 0, 0); }
 }
+// Standing on a jump pad launches you high into the air, keeping your run-up
+const PAD_VEL = 18;
+function onPad(e) {
+  return e.onGround && grid[idx(clamp(Math.floor(e.pos.x), 0, W - 1), clamp(Math.floor(e.pos.y - 0.05), 0, H - 1), clamp(Math.floor(e.pos.z), 0, D - 1))] === T.PAD;
+}
+function launchPad(e) {
+  e.vel.y = PAD_VEL; e.vel.x *= 1.3; e.vel.z *= 1.3; e.onGround = false; e.padT = now();
+}
 function makeEnt() { return { pos: new V3(), vel: new V3(), onGround: false, wasGround: false, airT: 0, stepOff: 0, blocked: false }; }
 
 function rayVoxel(o, d, max) {
@@ -676,7 +763,7 @@ function rayPlayer(o, d, p, grow, crouched) {
 // ======================================================================
 const WEAPONS = [
   { name: "Rifle", aa: { cone: 0.7, pull: 0.6, track: 0.8, snap: 0.6, magnet: 0.7, slow: 1.3 }, rate: 0.1, dmg: 18, head: 34, mag: 30, reload: 1.5, spread: 0.016, aimSpread: 0.004, pellets: 1, range: 140, auto: true, recoil: 0.009, fov: 58, snd: [1700, 0.09, 0.28] },
-  { name: "Shotgun", aa: { cone: 0.75, pull: 0.6, track: 0.8, snap: 0.6, magnet: 0.6, slow: 1.3 }, rate: 0.8, dmg: 11, head: 16, mag: 6, reload: 1.9, spread: 0.075, aimSpread: 0.055, pellets: 9, range: 30, auto: false, recoil: 0.05, fov: 64, snd: [800, 0.24, 0.45] },
+  { name: "Shotgun", aa: { cone: 0.75, pull: 0.6, track: 0.8, snap: 0.6, magnet: 0.6, slow: 1.3 }, rate: 0.8, dmg: 16, head: 23, mag: 6, reload: 1.9, spread: 0.062, aimSpread: 0.042, pellets: 9, range: 48, auto: false, recoil: 0.05, fov: 64, snd: [800, 0.24, 0.45] },
   { name: "Sniper", aa: { cone: 1.9, pull: 2.4, track: 1.2, snap: 1.6, magnet: 2.4, slow: 0.6 }, rate: 1.2, dmg: 100, head: 150, adsSpeed: 26, quickscope: 0.5, mag: 5, reload: 2.3, spread: 0.07, aimSpread: 0, pellets: 1, range: 220, auto: false, recoil: 0.07, fov: 20, snd: [500, 0.4, 0.55] },
 ];
 // Grenades: a few per life, thrown in an arc, bounce, and burst after a short fuse
@@ -1142,6 +1229,7 @@ function updateBot(b, dt, t) {
   b.vel.y -= GRAV * dt;
   b.blocked = false;
   moveEnt(b, dt);
+  if (onPad(b)) launchPad(b);
   if (b.blocked && b.onGround) { b.vel.y = JUMP; if (Math.random() < 0.3) b.goal = null; }
   b.av.g.position.set(b.pos.x, b.pos.y + b.stepOff, b.pos.z);
   b.av.g.rotation.y = b.yaw; b.av.head.rotation.x = b.pitch; b.av.arms.rotation.x = b.pitch;
@@ -1191,7 +1279,7 @@ function die(src) {
   if (src.bot) src.bot.k++;
   addFeed(src.name, myName, false);
   $("#death").hidden = false; $("#deathTitle").textContent = "Eliminated by " + src.name;
-  aiming = false; firing = false;
+  resetAim();
   publish(true);
 }
 function eyePos() { const o = me.pos.clone(); o.y += EYE - crouchAmt * 0.45 + me.stepOff; return o; }
@@ -1452,7 +1540,7 @@ function startReload() {
 }
 function switchWeapon(i) {
   if (i === cur || i < 0 || i > 2 || !alive) return;
-  prevWeap = cur; cur = i; reloading = false;
+  prevWeap = cur; cur = i; reloading = false; snipeHeld = false; snipePending = 0;
   nextFire = Math.max(nextFire, now() + 0.25); recoilKick = -1.5;
   buildPips();
   blip(500, 0.04, 0.05);
@@ -1463,6 +1551,16 @@ function switchWeapon(i) {
 // ======================================================================
 const keys = new Set();
 let firing = false, fireQueued = false, aiming = false, wasAiming = false, locked = false, noLock = false, boardOpen = false;
+// Aiming has several sources; each frame `aiming` is true if any of them is held.
+let aimRMB = false, aimKey = false, touchAim = false, snipeHeld = false, snipePending = 0;
+function resetAim() { aimRMB = aimKey = touchAim = snipeHeld = false; snipePending = 0; aiming = false; firing = false; }
+// The sniper never fires on press: pressing scopes in, letting go takes the shot.
+function pressSnipe() { snipeHeld = true; }
+function releaseSnipe(cancel) {
+  if (!snipeHeld) return;
+  snipeHeld = false;
+  if (!cancel && state === "play" && !paused && alive) snipePending = now() + 0.35;
+}
 const isTouch = !!(window.matchMedia && (matchMedia("(pointer: coarse)").matches || (navigator.maxTouchPoints > 0 && !matchMedia("(pointer: fine)").matches)));
 const touchMove = { x: 0, y: 0 };
 let touchJump = false, touchCombo = false, jumpHeld = false, releaseAllTouches = () => {};
@@ -1470,7 +1568,7 @@ if (isTouch) { document.body.classList.add("touch"); $("#keysHelp").hidden = tru
 
 function showPause(on) {
   paused = on; $("#pause").hidden = !on;
-  if (on) { $("#pauseSlot").appendChild($("#settings")); releaseAllTouches(); firing = false; aiming = false; crouch = false; keys.clear(); }
+  if (on) { $("#pauseSlot").appendChild($("#settings")); releaseAllTouches(); resetAim(); crouch = false; keys.clear(); }
 }
 function requestLock() {
   if (isTouch || noLock) { showPause(false); return; }
@@ -1498,13 +1596,13 @@ window.addEventListener("keydown", e => {
   if (e.code === "Digit3") switchWeapon(2);
   if ((e.code === "KeyQ" || e.code === "KeyX") && !e.repeat) dash();
   if (e.code === "KeyG" && !e.repeat) throwGrenade();
-  if (e.code === "KeyE") aiming = true;
+  if (e.code === "KeyE") aimKey = true;
   if (e.code === "KeyC") crouch = true;
   if (e.code === "KeyR") startReload();
   if (e.code === "Tab") boardOpen = true;
 });
-window.addEventListener("keyup", e => { keys.delete(e.code); if (e.code === "Tab") boardOpen = false; if (e.code === "KeyE") aiming = false; if (e.code === "KeyC") crouch = false; });
-window.addEventListener("blur", () => { keys.clear(); firing = false; aiming = false; crouch = false; boardOpen = false; });
+window.addEventListener("keyup", e => { keys.delete(e.code); if (e.code === "Tab") boardOpen = false; if (e.code === "KeyE") aimKey = false; if (e.code === "KeyC") crouch = false; });
+window.addEventListener("blur", () => { keys.clear(); resetAim(); crouch = false; boardOpen = false; });
 window.addEventListener("wheel", e => { if (state === "play" && !paused && alive) switchWeapon((cur + (e.deltaY > 0 ? 1 : 2)) % 3); }, { passive: true });
 
 function look(dx, dy, base) {
@@ -1522,16 +1620,19 @@ document.addEventListener("mousemove", e => {
 canvas.addEventListener("mousedown", e => {
   if (state !== "play" || isTouch) return;
   if (paused || (!locked && !noLock)) { requestLock(); return; }
-  if (e.button === 0) { firing = true; fireQueued = true; }
-  if (e.button === 2) aiming = true;
+  if (e.button === 0) { if (WEAPONS[cur].quickscope) pressSnipe(); else { firing = true; fireQueued = true; } }
+  if (e.button === 2) aimRMB = true;
 });
-window.addEventListener("mouseup", e => { if (e.button === 0) firing = false; if (e.button === 2) aiming = false; });
+window.addEventListener("mouseup", e => {
+  if (e.button === 0) { firing = false; releaseSnipe(state !== "play" || paused); }
+  if (e.button === 2) aimRMB = false;
+});
 canvas.addEventListener("contextmenu", e => e.preventDefault());
 
 // Touch: every finger is tracked on its own, so you can move, look, fire, jump and
 // dash at the same time. A finger that lands on a button presses it; one that lands
 // on the left side drives the move stick (which follows your thumb); any other
-// finger looks around. Dragging the Fire button also looks.
+// finger looks around. Dragging from any button (Fire, Jump, Dash...) also looks.
 if (isTouch) {
   const stick = $("#stick"), knob = $("#knob");
   const fingers = new Map();
@@ -1539,14 +1640,10 @@ if (isTouch) {
     // Hold to aim and shoot. The sniper only scopes while held and fires when you let go.
     tFire: {
       down() {
-        aiming = true; touchCombo = true;
-        if (!WEAPONS[cur].quickscope) { firing = true; fireQueued = true; }
+        touchCombo = true;
+        if (WEAPONS[cur].quickscope) pressSnipe(); else { touchAim = true; firing = true; fireQueued = true; }
       },
-      up(cancel) {
-        if (!cancel && WEAPONS[cur].quickscope && touchCombo && state === "play" && !paused) fire();
-        firing = false; aiming = false; touchCombo = false;
-      },
-      looks: true,
+      up(cancel) { releaseSnipe(cancel); touchAim = false; firing = false; touchCombo = false; },
     },
     tJump: { down() { touchJump = true; jumpHeld = true; }, up() { jumpHeld = false; } },
     tDash: { down() { dash(); } },
@@ -1593,7 +1690,7 @@ if (isTouch) {
     for (const t of e.changedTouches) {
       const f = fingers.get(t.identifier); if (!f) continue;
       if (f.kind === "stick") moveStick(f, t.clientX, t.clientY);
-      else if (f.kind === "look" || (f.kind === "btn" && BTN[f.el.id].looks)) {
+      else if (f.kind === "look" || (f.kind === "btn" && f.el.id !== "tPause")) {
         if (state === "play" && !paused) look(t.clientX - f.x, t.clientY - f.y, TOUCH_BASE);
         f.x = t.clientX; f.y = t.clientY;
       }
@@ -1795,7 +1892,7 @@ $("#playOnline").addEventListener("click", () => { if (netState === "offline") {
 $("#playBots").addEventListener("click", () => startGame("bots"));
 $("#resume").addEventListener("click", () => { initAudio(); requestLock(); if (isTouch || noLock) showPause(false); });
 $("#leave").addEventListener("click", () => {
-  state = "menu"; alive = false; firing = false; aiming = false;
+  state = "menu"; alive = false; resetAim();
   if (document.exitPointerLock && locked) document.exitPointerLock();
   showPause(false);
   $(".card").appendChild($("#settings"));
@@ -1838,18 +1935,25 @@ function tick() {
       const speed = (sprint && f > 0.2 && aim < 0.3 && !crouch ? SPRINT : WALK) * (1 - aim * 0.35) * (crouch ? 0.5 : 1);
       const fwx = -Math.sin(yaw), fwz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
       const wx = (fwx * f + rx * s) * speed, wz = (fwz * f + rz * s) * speed;
-      const k = t < dashUntil ? 0 : 1 - Math.exp(-(me.onGround ? 20 : 8) * (t < dashUntil + 0.15 ? 0.35 : 1) * dt);
+      const k = t < dashUntil ? 0 : 1 - Math.exp(-(me.onGround ? 20 : (t - (me.padT || -9) < 1.2 ? 4 : 8)) * (t < dashUntil + 0.15 ? 0.35 : 1) * dt);
       me.vel.x += (wx - me.vel.x) * k; me.vel.z += (wz - me.vel.z) * k;
       me.vel.y -= GRAV * dt;
       if (input && (keys.has("Space") || touchJump || jumpHeld) && me.onGround) me.vel.y = JUMP;
       touchJump = false;
       moveEnt(me, dt);
+      if (onPad(me)) { launchPad(me); dashFov = Math.max(dashFov, 0.7); blip(300, 0.05, 0.1, "sine"); blip(600, 0.08, 0.08, "sine", 0.04); blip(1100, 0.1, 0.06, "sine", 0.09); }
 
+      aiming = aimRMB || aimKey || touchAim || snipeHeld || snipePending > 0;
       aim += ((input && aiming ? 1 : 0) - aim) * (1 - Math.exp(-(WEAPONS[cur].adsSpeed || 14) * dt));
       if (input && aiming && !wasAiming) aimSnap();
       wasAiming = input && aiming;
       if (input) aimAssist(dt); else { assistTg = null; assistPrev = null; }
       if (reloading && t >= reloadEnd) { reloading = false; ammo[cur] = WEAPONS[cur].mag; blip(700, 0.05, 0.07); }
+      if (snipePending) {
+        const w = WEAPONS[cur];
+        if (!w.quickscope || reloading || t > snipePending + 1.5) snipePending = 0;
+        else if (t >= nextFire && (aim >= w.quickscope || t > snipePending)) { fire(); snipePending = 0; }
+      }
       if (input && (fireQueued || (firing && WEAPONS[cur].auto))) fire();
       fireQueued = false;
       if (t - lastHurt > 4 && hp < 100) hp = Math.min(100, hp + 12 * dt);
