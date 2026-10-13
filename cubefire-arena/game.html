@@ -131,6 +131,14 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 .slots{display:flex;gap:4px}
 .slots div{border:1px solid var(--line);background:var(--panel);padding:3px 8px;font-size:12px;font-weight:600;border-radius:3px;color:var(--muted)}
 .slots div.on{color:#1a1205;background:var(--accent);border-color:var(--accent)}
+#elim{position:absolute;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) scale(.92);display:flex;align-items:stretch;background:var(--panel);border:1px solid var(--line);border-radius:4px;overflow:hidden;opacity:0;transition:opacity .2s,transform .2s;max-width:calc(100% - 32px)}
+#elim.show{opacity:1;transform:translateX(-50%) scale(1)}
+#elim .tag{background:var(--hot);color:#fff;font:400 13px var(--display);letter-spacing:.06em;padding:8px 10px;display:grid;place-items:center}
+#elim .body{padding:6px 14px;display:grid;gap:1px;min-width:0}
+#elim .who{font:400 clamp(18px,3.4vw,24px) var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#elim .how{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+#elim .how b{color:var(--accent)}
+.touch #elim{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 #banner{position:absolute;left:0;right:0;top:28%;text-align:center;font:400 clamp(18px,4vw,30px) var(--display);color:var(--accent);text-shadow:0 2px 0 rgba(0,0,0,.5);opacity:0;transition:opacity .25s;padding:0 16px}
 #waiting{position:absolute;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 14px;font-size:13px;font-weight:600;text-align:center;max-width:calc(100% - 32px)}
 #hurt{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(255,40,60,.55));opacity:0}
@@ -209,6 +217,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
   </div>
   <div id="dmgdir"><i></i></div>
   <div id="banner"></div>
+  <div id="elim" aria-live="polite"><div class="tag">Eliminated</div><div class="body"><div class="who" id="elimWho"></div><div class="how" id="elimHow"></div></div></div>
   <div class="vitals">
     <div class="lbl"><b id="hpNum">100</b><span>Health</span></div>
     <div class="bar"><i id="hpBar"></i></div>
@@ -266,7 +275,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
     </div>
     <div class="modes">
       <button class="mode primary" id="playOnline" type="button"><b>Play online</b><span id="onlineSub">Real players only, no bots</span></button>
-      <button class="mode" id="playBots" type="button"><b>Bot match</b><span>Practice against 5 bots</span></button>
+      <button class="mode" id="playBots" type="button"><b>Bot match</b><span>Practice against 6–8 bots</span></button>
     </div>
     <div class="settings" id="settings">
       <div class="set-row">
@@ -324,10 +333,11 @@ document.addEventListener("gesturestart", e => e.preventDefault());
 document.addEventListener("dblclick", e => e.preventDefault());
 
 // ======================================================================
-// Maps: 48x48 voxel worlds, mirrored so every spawn is fair
+// Maps: big voxel worlds (each map sets its own size), mirrored so every spawn is fair
 // ======================================================================
-const W = 48, D = 48, H = 18;
-const grid = new Uint8Array(W * H * D);
+let W = 64, D = 64;
+const H = 24;
+let grid = new Uint8Array(W * H * D);
 const idx = (x, y, z) => x + W * (z + D * y);
 const T = { GROUND: 1, STONE: 2, BRICK: 3, WOOD: 4, METAL: 5, TRIM: 6, GRASS: 7, DIRT: 8, SNOW: 9, LEAF: 10, HAY: 11, BARN: 12, ROOF: 13, CROP: 14, PLANK: 15, SILO: 16, HOUSE: 17, PAD: 18 };
 function solid(x, y, z) {
@@ -341,52 +351,95 @@ function sym(x, y, z, t) { setB(x, y, z, t); setB(W - 1 - x, y, z, t); setB(x, y
 function sym8(x, y, z, t) { sym(x, y, z, t); sym(z, y, x, t); }
 function rng32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
-// ---- Arena: walled courtyard with a center tower and four brick houses
+// ---- Arena (96x96): four walled courtyards in a 2x2 grid, joined by broken low walls.
+// Each courtyard has a center tower, brick houses in its corners, concrete bunkers, a
+// sniper tower with stairs on each side, cover walls and crates.
+// Tiles mirror around their own centers (8 ways), so the whole map stays fair.
+function arenaTile(ox, oz, L, padX, padZ) {
+  const c = L / 2;
+  const s8 = (x, y, z, t) => {
+    for (const [a, b] of [[x, z], [z, x]]) {
+      setB(ox + a, y, oz + b, t); setB(ox + L - 1 - a, y, oz + b, t);
+      setB(ox + a, y, oz + L - 1 - b, t); setB(ox + L - 1 - a, y, oz + L - 1 - b, t);
+    }
+  };
+  // Corner houses with walkable roofs and outside stairs
+  for (let x = 4; x <= 10; x++) for (let z = 4; z <= 10; z++) {
+    if (x === 4 || x === 10 || z === 4 || z === 10) for (let y = 1; y <= 3; y++) s8(x, y, z, T.BRICK);
+    s8(x, 4, z, T.METAL);
+  }
+  for (let y = 1; y <= 2; y++) { s8(7, y, 10, 0); s8(6, y, 10, 0); }
+  s8(4, 2, 7, 0); s8(6, 2, 4, 0); s8(8, 2, 4, 0);
+  s8(10, 5, 10, T.TRIM); s8(10, 5, 9, T.TRIM); s8(9, 5, 10, T.TRIM);
+  for (let z = 5; z <= 6; z++) {
+    for (let y = 1; y <= 3; y++) s8(11, y, z, T.WOOD);
+    for (let y = 1; y <= 2; y++) s8(12, y, z, T.WOOD);
+    s8(13, 1, z, T.WOOD);
+  }
+  // Center tower: open ground floor, platform on top, four staircases
+  for (let x = c - 4; x <= c + 3; x++) for (let z = c - 4; z <= c + 3; z++) setB(ox + x, 4, oz + z, T.METAL);
+  for (let y = 1; y <= 3; y++) { s8(c - 4, y, c - 4, T.STONE); s8(c - 4, y, c - 1, T.STONE); }
+  s8(c - 4, 5, c - 4, T.TRIM); s8(c - 4, 5, c - 3, T.TRIM); s8(c - 3, 5, c - 4, T.TRIM);
+  for (let y = 1; y <= 3; y++) s8(c - 1, y, c + 4, T.STONE);
+  for (let y = 1; y <= 2; y++) s8(c - 1, y, c + 5, T.STONE);
+  s8(c - 1, 1, c + 6, T.STONE);
+  for (let x = c - 10; x <= c - 7; x++) for (let y = 1; y <= 2; y++) s8(x, y, c - 7, T.STONE);  // low ring walls
+  // Concrete bunkers: door facing in, slit windows, flat roof
+  const b0 = c - 8;
+  for (let x = b0; x <= b0 + 4; x++) for (let z = 3; z <= 7; z++) {
+    if (x === b0 || x === b0 + 4 || z === 3 || z === 7) for (let y = 1; y <= 2; y++) s8(x, y, z, T.STONE);
+    s8(x, 3, z, T.METAL);
+  }
+  for (let y = 1; y <= 2; y++) s8(b0 + 2, y, 7, 0);
+  s8(b0, 2, 5, 0); s8(b0 + 4, 2, 5, 0);
+  // Sniper towers on each side, with stairs up the inside face
+  for (let x = 2; x <= 3; x++) for (let z = c - 2; z <= c - 1; z++) for (let y = 1; y <= 4; y++) s8(x, y, z, T.BRICK);
+  s8(2, 5, c - 3, T.TRIM);
+  for (let y = 1; y <= 3; y++) s8(4, y, c - 2, T.WOOD);
+  for (let y = 1; y <= 2; y++) s8(5, y, c - 2, T.WOOD);
+  s8(6, 1, c - 2, T.WOOD);
+  // Cover walls
+  for (let x = 14; x <= 16; x++) for (let y = 1; y <= 2; y++) s8(x, y, 12, T.STONE);
+  for (let x = 8; x <= 10; x++) for (let y = 1; y <= 2; y++) s8(x, y, c - 5, T.STONE);
+  // One jump pad per courtyard, by the tower corner that faces the middle of the map
+  setB(ox + padX, 1, oz + padZ, T.PAD);
+  // Crates
+  const r = rng32(1337);
+  const blocked = (x, z) => (x >= 3 && x <= 14 && z >= 3 && z <= 14) || (x >= c - 11 && z >= c - 11) || (x >= b0 - 1 && x <= b0 + 5 && z <= 8) || (x <= 7 && z >= c - 4);
+  const seeds = MAPS.arena.tileSeeds;
+  const nearSpawn = (x, z) => seeds.some(([a, b]) => Math.abs(a - x) <= 1 && Math.abs(b - z) <= 1);
+  for (let i = 0; i < 70; i++) {
+    const x = 2 + Math.floor(r() * (c - 3)), z = 2 + Math.floor(r() * (c - 3));
+    if (blocked(x, z) || blocked(z, x) || nearSpawn(x, z) || nearSpawn(z, x) || grid[idx(ox + x, 1, oz + z)]) continue;
+    const h = r() < 0.35 ? 2 : 1;
+    for (let y = 1; y <= h; y++) s8(x, y, z, T.WOOD);
+  }
+}
 function buildArena() {
+  const L = W / 2, c = L / 2;
   for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) setB(x, 0, z, T.GROUND);
   for (let i = 0; i < W; i++) for (let y = 1; y <= 5; y++) {
     const t = y === 5 ? T.TRIM : T.STONE;
     setB(i, y, 0, t); setB(i, y, D - 1, t); setB(0, y, i, t); setB(W - 1, y, i, t);
   }
-  for (let x = 4; x <= 10; x++) for (let z = 4; z <= 10; z++) {
-    if (x === 4 || x === 10 || z === 4 || z === 10) for (let y = 1; y <= 3; y++) sym8(x, y, z, T.BRICK);
-    sym8(x, 4, z, T.METAL);
-  }
-  for (let y = 1; y <= 2; y++) { sym8(7, y, 10, 0); sym8(6, y, 10, 0); }
-  sym8(4, 2, 7, 0); sym8(6, 2, 4, 0); sym8(8, 2, 4, 0);
-  sym8(10, 5, 10, T.TRIM); sym8(10, 5, 9, T.TRIM); sym8(9, 5, 10, T.TRIM);
-  for (let z = 5; z <= 6; z++) {
-    for (let y = 1; y <= 3; y++) sym8(11, y, z, T.WOOD);
-    for (let y = 1; y <= 2; y++) sym8(12, y, z, T.WOOD);
-    sym8(13, 1, z, T.WOOD);
-  }
-  for (let x = 20; x <= 27; x++) for (let z = 20; z <= 27; z++) setB(x, 4, z, T.METAL);
-  for (let y = 1; y <= 3; y++) { sym8(20, y, 20, T.STONE); sym8(20, y, 23, T.STONE); }
-  sym8(20, 5, 20, T.TRIM); sym8(20, 5, 21, T.TRIM); sym8(21, 5, 20, T.TRIM);
-  for (let y = 1; y <= 3; y++) sym8(23, y, 28, T.STONE);
-  for (let y = 1; y <= 2; y++) sym8(23, y, 29, T.STONE);
-  sym8(23, 1, 30, T.STONE);
-  sym8(17, 1, 17, T.PAD);                                  // jump pads up to the tower
-  sym8(12, 1, 3, T.PAD);                                   // jump pads up to the house roofs
-  for (let x = 14; x <= 17; x++) for (let y = 1; y <= 2; y++) sym8(x, y, 12, T.STONE);
-  for (let y = 1; y <= 2; y++) { sym8(17, y, 18, T.STONE); sym8(18, y, 17, T.STONE); }
-  const r = rng32(1337);
-  const nearSpawn = (x, z) => MAPS.arena.seeds.some(([a, b]) => Math.abs(a - x) <= 1 && Math.abs(b - z) <= 1);
-  for (let i = 0; i < 40; i++) {
-    const x = 2 + Math.floor(r() * 18), z = 2 + Math.floor(r() * 18);
-    if (x >= 3 && x <= 14 && z >= 3 && z <= 14) continue;
-    if (x >= 17 && z >= 17) continue;
-    if (nearSpawn(x, z) || solid(x, 1, z)) continue;
-    const h = r() < 0.35 ? 2 : 1;
-    for (let y = 1; y <= h; y++) sym8(x, y, z, T.WOOD);
+  const inner = c - 7, outerP = L - 1 - inner; // jump pad spots nearest the map center
+  arenaTile(0, 0, L, outerP, outerP); arenaTile(L, 0, L, inner, outerP);
+  arenaTile(0, L, L, outerP, inner); arenaTile(L, L, L, inner, inner);
+  // Broken low walls along the seams between courtyards (left open in the middle)
+  for (let i = 1; i < W - 1; i++) {
+    const m = Math.min(i, W - 1 - i);
+    if (m % 12 >= 6 || m > L - 8) continue;
+    for (let y = 1; y <= 2; y++) { setB(L - 1, y, i, T.STONE); setB(L, y, i, T.STONE); setB(i, y, L - 1, T.STONE); setB(i, y, L, T.STONE); }
   }
 }
 
 // ---- Peaks: rolling mountains inside a ring of cliffs. A tall snowy summit in the
-// middle, four lesser peaks, ridges along the edges, and pine trees for cover.
+// middle, four lesser peaks, ridges between them and along the edges, pine trees and
+// boulders for cover, and jump pads in the valleys.
 // Heights are computed from mirrored coordinates, so the map stays 8-fold symmetric.
 function peakHeight(x, z) {
-  let a = Math.min(x, W - 1 - x), b = Math.min(z, D - 1 - z);
+  // shape is designed on a 48-wide grid and stretched to the real map size
+  let a = Math.min(x, W - 1 - x) * 47 / (W - 1), b = Math.min(z, D - 1 - z) * 47 / (D - 1);
   if (a > b) { const s = a; a = b; b = s; }
   const cx = 23.5;
   const dist = (px, pz) => Math.hypot(a - px, b - pz);
@@ -395,20 +448,24 @@ function peakHeight(x, z) {
   h = Math.max(h, 8 - dist(10, 10) * 1.0);                    // four lesser peaks
   h = Math.max(h, 6 - dist(4, 23.5) * 0.9);                   // edge ridges
   h = Math.max(h, 4 - dist(15, 4) * 0.8);                     // foothills
+  h = Math.max(h, 6 - dist(20, 13) * 1.1);                    // a ridge between the peaks
   h += Math.sin(a * 0.55) * Math.cos(b * 0.45) * 0.9;         // rolling ground
   const valley = Math.hypot(a - 16, b - 17);                  // a dip between the peaks
   if (valley < 3.5) h -= (3.5 - valley) * 0.6;
-  return clamp(Math.round(h), 0, 11);
+  return clamp(Math.round(h * peakScale()), 0, 17);
 }
+// Taller mountains on bigger maps
+function peakScale() { return 1 + (W - 64) / 96; }
 function buildPeaks() {
+  const hs = peakScale(), snowLine = Math.round(8 * hs), area = (W / 64) ** 2;
   for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) {
     const edge = x === 0 || z === 0 || x === W - 1 || z === D - 1;
-    const h = edge ? 9 : peakHeight(x, z);
+    const h = edge ? Math.round(9 * hs) : peakHeight(x, z);
     setB(x, 0, z, T.GROUND);
     for (let y = 1; y <= h; y++) {
       let t = T.STONE;
       if (!edge) {
-        if (y === h) t = h >= 8 ? T.SNOW : T.GRASS;
+        if (y === h) t = h >= snowLine ? T.SNOW : T.GRASS;
         else if (y >= h - 2) t = T.DIRT;
       } else if (y === h) t = T.SNOW;
       setB(x, y, z, t);
@@ -418,11 +475,11 @@ function buildPeaks() {
   const r = rng32(4242);
   const nearSpawn = (x, z) => MAPS.peaks.seeds.some(([a, b]) => Math.abs(a - x) <= 2 && Math.abs(b - z) <= 2);
   let placed = 0;
-  for (let i = 0; i < 60 && placed < 2; i++) {
-    const x = 3 + Math.floor(r() * 20), z = 3 + Math.floor(r() * 20);
+  for (let i = 0; i < 300 && placed < Math.round(4 * area); i++) {
+    const x = 3 + Math.floor(r() * (W / 2 - 5)), z = 3 + Math.floor(r() * (D / 2 - 5));
     if (x > z || nearSpawn(x, z) || nearSpawn(z, x)) continue;
     const g = peakHeight(x, z);
-    if (g > 5 || g + 7 >= H) continue;
+    if (g > Math.round(5 * hs) || g + 7 >= H) continue;
     let clear = true;
     for (let dx = -2; dx <= 2 && clear; dx++) for (let dz = -2; dz <= 2; dz++) if (grid[idx(x + dx, g + 1, z + dz)] === T.WOOD || grid[idx(x + dx, g + 1, z + dz)] === T.LEAF) { clear = false; break; }
     if (!clear) continue;
@@ -439,8 +496,8 @@ function buildPeaks() {
     placed++;
   }
   // Boulders for cover on the slopes
-  for (let i = 0; i < 30; i++) {
-    const x = 2 + Math.floor(r() * 21), z = 2 + Math.floor(r() * 21);
+  for (let i = 0; i < Math.round(55 * area); i++) {
+    const x = 2 + Math.floor(r() * (W / 2 - 3)), z = 2 + Math.floor(r() * (D / 2 - 3));
     if (x > z || nearSpawn(x, z) || nearSpawn(z, x)) continue;
     const g = peakHeight(x, z);
     if (grid[idx(x, g + 1, z)]) continue;
@@ -448,14 +505,15 @@ function buildPeaks() {
     if (r() < 0.4) sym8(x, g + 2, z, T.STONE);
   }
   // Jump pads in the valleys launch you toward the peaks
-  for (const [x, z] of [[16, 17], [6, 15]]) { const g = peakHeight(x, z); if (!grid[idx(x, g + 1, z)]) sym8(x, g + 1, z, T.PAD); }
+  for (const [x, z] of [[Math.round(22 * W / 64), Math.round(22 * W / 64)]]) { const g = peakHeight(x, z); if (!grid[idx(x, g + 1, z)]) sym8(x, g + 1, z, T.PAD); }
   // Summit cover
-  for (const [x, z] of [[22, 21], [21, 22]]) { const g = peakHeight(x, z); sym8(x, g + 1, z, T.STONE); }
+  for (const [x, z] of [[W / 2 - 2, W / 2 - 3], [W / 2 - 3, W / 2 - 2]]) { const g = peakHeight(x, z); sym8(x, g + 1, z, T.STONE); }
 }
 
-// ---- Farm: five red barns (a big one with haylofts in the middle, two on the sides, two
-// small ones at the ends), grain silos in the corners, fenced corn fields, hay bales, and
-// jump pads onto the barn roofs and silos. Mirrored 4 ways (not diagonally).
+// ---- Farm (128x128): four farmsteads in a 2x2 grid, split by low fences with gates.
+// Each has five red barns (a big one with haylofts in the middle, two on the sides, two
+// small ones at the ends), four chicken coops, grain silos in its corners (so a ring of
+// silos stands at the middle of the map), fenced corn fields and hay bales.
 // A red barn with a stepped gable roof. Big doors on both ends, a side door at
 // `sideDoor` ("x0" | "x1" | "z0" | "z1"), hay inside. Ridge runs along the longer side.
 function placeBarn(x0, z0, x1, z1, h, sideDoor) {
@@ -491,28 +549,30 @@ function placeBarn(x0, z0, x1, z1, h, sideDoor) {
   // hay bales inside
   setB(x0 + 1, 1, z0 + 1, T.HAY); setB(x1 - 1, 1, z1 - 1, T.HAY); setB(x1 - 1, 2, z1 - 1, T.HAY);
 }
-function buildFarm() {
-  for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) setB(x, 0, z, T.GROUND);
-  for (let i = 0; i < W; i++) for (let y = 1; y <= 4; y++) {             // board fence around the farm
-    const t = y === 4 ? T.WOOD : T.PLANK;
-    setB(i, y, 0, t); setB(i, y, D - 1, t); setB(0, y, i, t); setB(W - 1, y, i, t);
+// One farmstead, mirrored around its own center. nx/nz map a local coordinate to the
+// side of the farmstead that faces the middle of the whole map (for the jump pads).
+function farmTile(ox, oz, L, nx, nz) {
+  const sym = (x, y, z, t) => {
+    setB(ox + x, y, oz + z, t); setB(ox + L - 1 - x, y, oz + z, t);
+    setB(ox + x, y, oz + L - 1 - z, t); setB(ox + L - 1 - x, y, oz + L - 1 - z, t);
+  };
+  const pb = (x0, z0, x1, z1, h, door) => placeBarn(ox + x0, oz + z0, ox + x1, oz + z1, h, door);
+  // Big center barn: x 25..38, z 27..36
+  for (let x = 25; x <= 31; x++) for (let z = 27; z <= 31; z++) {
+    if (x === 25 || z === 27) for (let y = 1; y <= 4; y++) sym(x, y, z, T.BARN);
   }
-  // Barn: x 17..30, z 19..28
-  for (let x = 17; x <= 23; x++) for (let z = 19; z <= 23; z++) {
-    if (x === 17 || z === 19) for (let y = 1; y <= 4; y++) sym(x, y, z, T.BARN);
-  }
-  for (let y = 1; y <= 3; y++) for (let z = 22; z <= 23; z++) sym(17, y, z, 0);   // end doors
-  for (let y = 1; y <= 3; y++) for (let x = 22; x <= 23; x++) sym(x, y, 19, 0);   // side doors
-  sym(19, 3, 19, 0); sym(17, 3, 20, 0);                                          // windows
-  for (let x = 18; x <= 21; x++) for (let z = 20; z <= 23; z++) sym(x, 4, z, T.WOOD); // haylofts
-  sym(22, 1, 21, T.HAY); sym(22, 1, 22, T.HAY); sym(22, 2, 22, T.HAY);              // hay steps up to the loft
-  sym(22, 1, 23, T.HAY); sym(22, 2, 23, T.HAY); sym(22, 3, 23, T.HAY);
-  sym(19, 5, 21, T.HAY); sym(18, 5, 20, T.HAY);                                  // bales in the loft
+  for (let y = 1; y <= 3; y++) for (let z = 30; z <= 31; z++) sym(25, y, z, 0);   // end doors
+  for (let y = 1; y <= 3; y++) for (let x = 30; x <= 31; x++) sym(x, y, 27, 0);   // side doors
+  sym(27, 3, 27, 0); sym(25, 3, 28, 0);                                          // windows
+  for (let x = 26; x <= 29; x++) for (let z = 28; z <= 31; z++) sym(x, 4, z, T.WOOD); // haylofts
+  sym(30, 1, 29, T.HAY); sym(30, 1, 30, T.HAY); sym(30, 2, 30, T.HAY);              // hay steps up to the loft
+  sym(30, 1, 31, T.HAY); sym(30, 2, 31, T.HAY); sym(30, 3, 31, T.HAY);
+  sym(27, 5, 29, T.HAY); sym(26, 5, 28, T.HAY);                                  // bales in the loft
   for (let k = 0; k <= 3; k++) {                                                 // stepped roof
-    for (let x = 16; x <= 23; x++) sym(x, 5 + k, 18 + k, T.ROOF);
-    for (let z = 19 + k; z <= 23; z++) sym(17, 5 + k, z, T.BARN);                // gable ends
+    for (let x = 24; x <= 31; x++) sym(x, 5 + k, 26 + k, T.ROOF);
+    for (let z = 27 + k; z <= 31; z++) sym(25, 5 + k, z, T.BARN);                // gable ends
   }
-  for (let x = 16; x <= 23; x++) for (let z = 22; z <= 23; z++) sym(x, 9, z, T.ROOF); // flat ridge
+  for (let x = 24; x <= 31; x++) for (let z = 30; z <= 31; z++) sym(x, 9, z, T.ROOF); // flat ridge
   // Silos in the corners, with a domed cap
   for (let x = 3; x <= 11; x++) for (let z = 3; z <= 11; z++) {
     const d = Math.hypot(x - 7, z - 7);
@@ -520,29 +580,59 @@ function buildFarm() {
     if (d <= 1.5) sym(x, 7, z, T.SILO);
     if (d <= 0.8) sym(x, 8, z, T.TRIM);
   }
-  sym(10, 1, 10, T.PAD);                                                         // jump pad up the silo
+  setB(ox + nx(10), 1, oz + nz(10), T.PAD);                                       // jump pad up the silo nearest the middle
   // Side barns (east and west) and small barns (north and south)
-  placeBarn(2, 19, 10, 28, 4, "x1"); placeBarn(W - 11, 19, W - 3, 28, 4, "x0");
-  placeBarn(20, 2, 27, 8, 3, "z1"); placeBarn(20, D - 9, 27, D - 3, 3, "z0");
-  sym(11, 1, 20, T.PAD);                                                         // jump pads onto the side barn roofs
+  pb(2, 27, 10, 36, 4, "x1"); pb(L - 11, 27, L - 3, 36, 4, "x0");
+  pb(28, 2, 35, 8, 3, "z1"); pb(28, L - 9, 35, L - 3, 3, "z0");
+  // Chicken coops between the fields and the big barn
+  pb(14, 18, 18, 22, 3, "x1"); pb(L - 19, 18, L - 15, 22, 3, "x0");
+  pb(14, L - 23, 18, L - 19, 3, "x1"); pb(L - 19, L - 23, L - 15, L - 19, 3, "x0");
   // Corn fields (north and south), with paths and a fence
-  for (let z = 4; z <= 10; z += 2) for (let x = 13; x <= 17; x++) {
+  for (let z = 4; z <= 12; z += 2) for (let x = 13; x <= 24; x++) {
+    if (x === 18) continue;
     sym(x, 1, z, T.CROP); sym(x, 2, z, T.CROP);
   }
-  for (let x = 13; x <= 18; x++) if (x % 2 === 1) sym(x, 1, 13, T.WOOD);
-  for (let z = 3; z <= 13; z++) if (z % 2 === 1) sym(13, 1, z, T.WOOD);
-  // Jump pads in front of the barn launch you onto its roof
-  sym(22, 1, 15, T.PAD);
+  for (let x = 13; x <= 25; x++) if (x % 2 === 1) sym(x, 1, 14, T.WOOD);
+  for (let z = 3; z <= 14; z++) if (z % 2 === 1) sym(12, 1, z, T.WOOD);
+  // A jump pad in front of the barn launches you onto its roof
+  setB(ox + nx(31), 1, oz + nz(23), T.PAD);
   // Hay bales for cover
-  for (const [x, z, h] of [[14, 16, 2], [15, 16, 1], [2, 16, 1], [11, 14, 2], [20, 15, 1], [15, 20, 1], [12, 23, 1]]) {
+  for (const [x, z, h] of [[14, 24, 2], [15, 24, 1], [2, 22, 1], [11, 16, 2], [27, 23, 1], [23, 29, 1], [20, 30, 2], [8, 24, 1], [24, 17, 2], [6, 15, 1], [21, 25, 1]]) {
     for (let y = 1; y <= h; y++) sym(x, y, z, T.HAY);
   }
 }
+function buildFarm() {
+  const L = W / 2;
+  for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) setB(x, 0, z, T.GROUND);
+  for (let i = 0; i < W; i++) for (let y = 1; y <= 4; y++) {             // board fence around the farm
+    const t = y === 4 ? T.WOOD : T.PLANK;
+    setB(i, y, 0, t); setB(i, y, D - 1, t); setB(0, y, i, t); setB(W - 1, y, i, t);
+  }
+  const hi = v => L - 1 - v, lo = v => v;
+  farmTile(0, 0, L, hi, hi); farmTile(L, 0, L, lo, hi); farmTile(0, L, L, hi, lo); farmTile(L, L, L, lo, lo);
+  // Low fences with gates between the farmsteads (open in the middle)
+  for (let i = 1; i < W - 1; i++) {
+    const m = Math.min(i, W - 1 - i);
+    if (m % 10 >= 7 || m > L - 6) continue;
+    setB(L - 1, 1, i, T.PLANK); setB(L, 1, i, T.PLANK); setB(i, 1, L - 1, T.PLANK); setB(i, 1, L, T.PLANK);
+  }
+}
 
+// Spawn points are listed for one tile and repeated in every mirrored copy of it
+function expandSeeds(seeds, L, eight) {
+  const out = [];
+  for (const [x, z] of seeds) {
+    out.push([x, z], [L - 1 - x, z], [x, L - 1 - z], [L - 1 - x, L - 1 - z]);
+    if (eight) out.push([z, x], [L - 1 - z, x], [z, L - 1 - x], [L - 1 - z, L - 1 - x]);
+  }
+  return out;
+}
+const ARENA_TILE_SEEDS = [[2, 2], [2, 15], [9, 18], [15, 15], [14, 2], [19, 10], [17, 21]];
+const FARM_TILE_SEEDS = [[2, 2], [2, 20], [13, 16], [20, 2], [12, 31], [22, 21], [26, 15]];
 const MAPS = {
-  arena: { name: "Arena", build: buildArena, seeds: [[2, 2], [2, 13], [8, 16], [15, 15], [16, 8], [13, 2]], sky: 0x8fc6f2, ground: 0x7aa457, outer: 0x5f8546, fog: [40, 95] },
-  farm: { name: "Farm", build: buildFarm, mirrors: 4, seeds: [[2, 2], [2, 15], [12, 17], [16, 2], [11, 23], [20, 16]], sky: 0x9fd0f0, ground: 0x86ad55, outer: 0x6f9a4c, fog: [42, 100] },
-  peaks: { name: "Peaks", build: buildPeaks, seeds: [[3, 3], [3, 12], [9, 19], [14, 14], [19, 9], [12, 3], [6, 8]], sky: 0xa3d2f5, ground: 0x6fa04e, outer: 0x8a939c, fog: [45, 110] },
+  arena: { name: "Arena", size: 96, build: buildArena, tileSeeds: ARENA_TILE_SEEDS, seeds: expandSeeds(ARENA_TILE_SEEDS, 48, true), sky: 0x8fc6f2, ground: 0x7aa457, outer: 0x5f8546, fog: [70, 190] },
+  farm: { name: "Farm", size: 128, build: buildFarm, mirrors: 4, seeds: expandSeeds(FARM_TILE_SEEDS, 64, false), sky: 0x9fd0f0, ground: 0x86ad55, outer: 0x6f9a4c, fog: [80, 230] },
+  peaks: { name: "Peaks", size: 112, build: buildPeaks, seeds: [[7, 7], [7, 28], [21, 44], [33, 33], [28, 7], [14, 19], [42, 17], [50, 30], [12, 48], [40, 50], [24, 24], [52, 52]], sky: 0xa3d2f5, ground: 0x6fa04e, outer: 0x8a939c, fog: [80, 220] },
 };
 let mapId = "arena";
 const spawns = [];
@@ -576,7 +666,7 @@ const canvas = renderer.domElement;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x8fc6f2);
 scene.fog = new THREE.Fog(0x8fc6f2, 40, 95);
-const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 200);
+const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 320);
 camera.rotation.order = "YXZ";
 scene.add(new THREE.HemisphereLight(0xeaf4ff, 0x4a5a3a, 0.85));
 const sun = new THREE.DirectionalLight(0xfff2d8, 0.75);
@@ -638,11 +728,11 @@ const BLOCK_STYLE = {
 const boxGeo = new THREE.BoxGeometry(1, 1, 1);
 const groundTex = makeTex("ground"); groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping; groundTex.repeat.set(W, D);
 const groundMat = new THREE.MeshLambertMaterial({ map: groundTex, color: 0x7aa457 });
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, D), groundMat);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), groundMat);
 ground.rotation.x = -Math.PI / 2; ground.position.set(W / 2, 1, D / 2);
 scene.add(ground);
 const outerMat = new THREE.MeshLambertMaterial({ color: 0x5f8546 });
-const outer = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), outerMat);
+const outer = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), outerMat);
 outer.rotation.x = -Math.PI / 2; outer.position.set(W / 2, 0.98, D / 2); scene.add(outer);
 let mapMeshes = [];
 function buildMeshes() {
@@ -674,12 +764,16 @@ function loadMap(id) {
   if (id === mapId && mapMeshes.length) return;
   mapId = MAPS[id] ? id : "arena";
   const M = MAPS[mapId];
-  grid.fill(0);
+  W = D = M.size;
+  grid = new Uint8Array(W * H * D);
   M.build();
   buildMeshes();
   computeSpawns();
   scene.background.setHex(M.sky); scene.fog.color.setHex(M.sky); scene.fog.near = M.fog[0]; scene.fog.far = M.fog[1];
   groundMat.color.setHex(M.ground); outerMat.color.setHex(M.outer);
+  groundTex.repeat.set(W, D);
+  ground.scale.set(W, D, 1); ground.position.set(W / 2, 1, D / 2);
+  outer.position.set(W / 2, 0.98, D / 2);
 }
 loadMap(load("cfa.map"));
 
@@ -727,12 +821,12 @@ function moveEnt(e, dt) {
   if (e.pos.y < -4) { e.pos.copy(spawns[0]); e.vel.set(0, 0, 0); }
 }
 // Standing on a jump pad launches you high into the air, keeping your run-up
-const PAD_VEL = 18;
+const PAD_VEL = 25; // about 13 blocks straight up
 function onPad(e) {
   return e.onGround && grid[idx(clamp(Math.floor(e.pos.x), 0, W - 1), clamp(Math.floor(e.pos.y - 0.05), 0, H - 1), clamp(Math.floor(e.pos.z), 0, D - 1))] === T.PAD;
 }
 function launchPad(e) {
-  e.vel.y = PAD_VEL; e.vel.x *= 1.3; e.vel.z *= 1.3; e.onGround = false; e.padT = now();
+  e.vel.y = PAD_VEL; e.vel.x *= 1.5; e.vel.z *= 1.5; e.onGround = false; e.padT = now();
 }
 function makeEnt() { return { pos: new V3(), vel: new V3(), onGround: false, wasGround: false, airT: 0, stepOff: 0, blocked: false }; }
 
@@ -744,7 +838,7 @@ function rayVoxel(o, d, max) {
   let tmy = sy > 0 ? (y + 1 - o.y) * tdy : sy < 0 ? (o.y - y) * tdy : Infinity;
   let tmz = sz > 0 ? (z + 1 - o.z) * tdz : sz < 0 ? (o.z - z) * tdz : Infinity;
   let t = 0;
-  for (let i = 0; i < 600 && t <= max; i++) {
+  for (let i = 0; i < 1500 && t <= max; i++) {
     if (solid(x, y, z)) return t;
     if (tmx < tmy && tmx < tmz) { x += sx; t = tmx; tmx += tdx; }
     else if (tmy < tmz) { y += sy; t = tmy; tmy += tdy; }
@@ -780,9 +874,9 @@ function rayPlayer(o, d, p, grow, crouched) {
 // Weapons
 // ======================================================================
 const WEAPONS = [
-  { name: "Rifle", aa: { cone: 0.7, pull: 0.6, track: 0.8, snap: 0.6, magnet: 0.7, slow: 1.3 }, rate: 0.1, dmg: 18, head: 34, mag: 30, reload: 1.5, spread: 0.016, aimSpread: 0.004, pellets: 1, range: 140, auto: true, recoil: 0.009, fov: 58, snd: [1700, 0.09, 0.28] },
-  { name: "Shotgun", aa: { cone: 0.75, pull: 0.6, track: 0.8, snap: 0.6, magnet: 0.6, slow: 1.3 }, rate: 0.8, dmg: 16, head: 23, mag: 6, reload: 1.9, spread: 0.062, aimSpread: 0.042, pellets: 9, range: 48, auto: false, recoil: 0.05, fov: 64, snd: [800, 0.24, 0.45] },
-  { name: "Sniper", aa: { cone: 1.9, pull: 2.4, track: 1.2, snap: 1.6, magnet: 2.4, slow: 0.6 }, rate: 1.2, dmg: 100, head: 150, adsSpeed: 26, quickscope: 0.5, mag: 5, reload: 2.3, spread: 0.07, aimSpread: 0, pellets: 1, range: 220, auto: false, recoil: 0.07, fov: 20, snd: [500, 0.4, 0.55] },
+  { name: "Rifle", aa: { cone: 1.4, pull: 1.7, track: 1.15, snap: 1.3, magnet: 1.6, slow: 0.75 }, rate: 0.1, dmg: 18, head: 34, mag: 30, reload: 1.5, spread: 0.016, aimSpread: 0.004, pellets: 1, range: 140, auto: true, recoil: 0.009, fov: 58, snd: [1700, 0.09, 0.28] },
+  { name: "Shotgun", aa: { cone: 1, pull: 1, track: 1, snap: 1, magnet: 1, slow: 1 }, rate: 0.8, dmg: 16, head: 23, mag: 6, reload: 1.9, spread: 0.062, aimSpread: 0.042, pellets: 9, range: 48, auto: false, recoil: 0.05, fov: 64, snd: [800, 0.24, 0.45] },
+  { name: "Sniper", aa: { cone: 0.5, pull: 0.4, track: 0.6, snap: 0.4, magnet: 0.4, slow: 1.4 }, rate: 1.2, dmg: 100, head: 150, adsSpeed: 26, quickscope: 0.5, mag: 5, reload: 2.3, spread: 0.07, aimSpread: 0, pellets: 1, range: 220, auto: false, recoil: 0.07, fov: 20, snd: [500, 0.4, 0.55] },
 ];
 // Grenades: a few per life, thrown in an arc, bounce, and burst after a short fuse
 // Inside killRadius a grenade is an instant kill; out to radius it still hits hard.
@@ -974,7 +1068,8 @@ let lastInputT = now();
 const iAmAfk = () => document.hidden || now() - lastInputT > AFK_IDLE;
 const activePeer = r => r.pl && !r.afk && now() - r.seen < STALE;
 function setNet(s) { netState = s; renderStatus(); }
-const lobbyKey = code => mapId + "-" + (code || "open");
+const MAP_VERSION = "v3"; // bump when map layouts change so mismatched versions never share a lobby
+const lobbyKey = code => mapId + MAP_VERSION + "-" + (code || "open");
 
 function serverUrl(name) {
   const local = location.host === SERVER_HOST || /^(localhost|127\.0\.0\.1):87\d\d$/.test(location.host);
@@ -1062,9 +1157,9 @@ async function joinLobby(code) {
     if (roomUnsub) { roomUnsub(); roomUnsub = null; }
     if (roomTarget && roomTarget !== room) roomTarget.leave().catch(() => {});
     roomTarget = room;
-    if (name !== "arena-open") {
+    if (name !== lobbyKey("") || mapId !== "arena") {
       try { roomTarget = await room.join(name); room.presence({ n: myName, pl: 0 }).catch(() => {}); }
-      catch (e) { roomTarget = room; lobbyName = "arena-open"; banner("Separate lobbies aren't available here · joined the open arena"); }
+      catch (e) { roomTarget = room; banner("Separate lobbies aren't available here · joined the open arena"); }
     }
     roomUnsub = roomTarget.onPeers(ch => {
       for (const p of ch.joined) onPeer(p);
@@ -1154,7 +1249,7 @@ function onPeer(p) {
       let killer = "The arena";
       if (dth.by === myPeer && myPeer) {
         killer = myName; kills++;
-        banner("+1  Eliminated " + r.name); killSound();
+        showElim(r.name, r.lastHitByMe); killSound();
         flashHit(true); publish(true);
       } else if (typeof dth.by === "string" && remotes.has(dth.by)) killer = remotes.get(dth.by).name;
       addFeed(killer, r.name, dth.by === myPeer);
@@ -1204,11 +1299,11 @@ setInterval(() => {
 // ======================================================================
 // Bot match (offline practice, never mixed with online players)
 // ======================================================================
-const BOT_DEFS = [["Rook", 3], ["Pixel", 4], ["Ember", 0], ["Moss", 2], ["Volt", 7]];
+const BOT_DEFS = [["Rook", 3], ["Pixel", 4], ["Ember", 0], ["Moss", 2], ["Volt", 7], ["Brick", 5], ["Juno", 1], ["Hex", 6]];
 let bots = [];
 function startBots() {
   stopBots();
-  bots = BOT_DEFS.map(([n, c], i) => {
+  bots = BOT_DEFS.slice(0, clamp(Math.round(W / 16), 5, 8)).map(([n, c], i) => {
     const b = makeEnt();
     Object.assign(b, { name: "Bot " + n, color: c, hp: 100, alive: true, k: 0, d: 0, yaw: 0, pitch: 0, nextShot: 0, goal: null, goalT: 0, strafe: 1, strafeT: 0, respawnAt: 0, av: makeAvatar(PAL[c], "Bot " + n), bot: true, id: i });
     b.pos.copy(farSpawn());
@@ -1301,7 +1396,7 @@ function takeDamage(dm, src, head) {
   if (hp <= 0) die(src);
 }
 function die(src) {
-  hp = 0; alive = false; deaths++;
+  hp = 0; alive = false; deaths++; streak = 0;
   respawnAt = now() + 3;
   dthOut = { s: ++deathSeq, by: src.peer || null };
   if (src.bot) src.bot.k++;
@@ -1405,12 +1500,13 @@ function fire() {
     dmgNumber(v.at, dm, v.head ? "head" : "");
     if (tg.kind === "peer") {
       hitsOut.push({ t: tg.r.peer, s: ++hitSeq, w: cur, dm, hs: v.head ? 1 : 0 });
+      tg.r.lastHitByMe = { w: cur, hs: v.head };
       while (hitsOut.length > 6) hitsOut.shift();
     } else {
       const b = tg.r; b.hp -= dm;
       if (b.hp <= 0 && b.alive) {
         b.alive = false; b.d++; b.respawnAt = now() + 3; kills++; killedAny = true;
-        addFeed(myName, b.name, true); banner("+1  Eliminated " + b.name); killSound();
+        addFeed(myName, b.name, true); showElim(b.name, { w: cur, hs: v.head }); killSound();
       }
     }
   }
@@ -1503,12 +1599,13 @@ function explode(n) {
     dmgNumber(chest, dm, "nade");
     if (tg.kind === "peer") {
       hitsOut.push({ t: tg.r.peer, s: ++hitSeq, w: 3, dm, hs: 0 });
+      tg.r.lastHitByMe = { w: 3 };
       while (hitsOut.length > 6) hitsOut.shift();
     } else {
       const b = tg.r; b.hp -= dm;
       if (b.hp <= 0 && b.alive) {
         b.alive = false; b.d++; b.respawnAt = now() + 3; kills++; killedAny = true;
-        addFeed(myName, b.name, true); banner("+1  Eliminated " + b.name); killSound();
+        addFeed(myName, b.name, true); showElim(b.name, { w: 3 }); killSound();
       }
     }
   }
@@ -1771,6 +1868,20 @@ function banner(text) {
   const b = $("#banner"); b.textContent = text; b.style.opacity = 1;
   clearTimeout(banner.t); banner.t = setTimeout(() => { b.style.opacity = 0; }, 1700);
 }
+// Bottom bar naming who you just eliminated, how, and your current streak
+let streak = 0, elimT = 0;
+function showElim(name, how) {
+  streak++;
+  const el = $("#elim"), h = $("#elimHow");
+  $("#elimWho").textContent = name;
+  const w = how && how.w === 3 ? "Grenade" : how && how.w != null ? WEAPONS[how.w].name : "";
+  h.replaceChildren();
+  const parts = [w, how && how.hs ? "Headshot" : ""].filter(Boolean).join(" · ");
+  if (parts) h.append(parts);
+  if (streak >= 2) { const b = document.createElement("b"); b.textContent = (parts ? " · " : "") + streak + " streak"; h.appendChild(b); }
+  el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+  clearTimeout(elimT); elimT = setTimeout(() => el.classList.remove("show"), 2600);
+}
 function flashHit(kill) {
   const h = $("#hitm"); h.classList.toggle("kill", !!kill); h.style.opacity = 1;
   clearTimeout(flashHit.t); flashHit.t = setTimeout(() => { h.style.opacity = 0; }, kill ? 340 : 140);
@@ -1805,7 +1916,7 @@ function rowEl(cells, cls) {
   for (const c of cells) { const s = document.createElement("span"); s.textContent = c; r.appendChild(s); }
   return r;
 }
-function lobbyCode() { return lobbyName ? lobbyName.slice(mapId.length + 1) : "open"; }
+function lobbyCode() { return lobbyName ? lobbyName.slice(mapId.length + MAP_VERSION.length + 1) : "open"; }
 function lobbyLabel() {
   const m = MAPS[mapId].name, code = lobbyCode();
   return code === "open" ? "the open " + m + " lobby" : "party " + code.toUpperCase() + " on " + m;
@@ -2012,7 +2123,7 @@ function tick() {
     publish(false);
   } else {
     orbit += dt * 0.07;
-    camera.position.set(W / 2 + Math.cos(orbit) * 30, 19, D / 2 + Math.sin(orbit) * 30);
+    camera.position.set(W / 2 + Math.cos(orbit) * W * 0.62, Math.max(26, W * 0.32), D / 2 + Math.sin(orbit) * D * 0.62);
     camera.rotation.set(0, 0, 0);
     camera.fov = 60; camera.updateProjectionMatrix();
     camera.lookAt(W / 2, 3, D / 2);
