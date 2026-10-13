@@ -178,6 +178,15 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 #board .row span:first-child{flex:1;max-width:none}
 
 /* pause */
+#notice{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--accent);border-radius:6px;padding:10px 12px 10px 16px;font-weight:600;max-width:calc(100% - 32px);box-shadow:0 12px 30px rgba(0,0,0,.4)}
+#notice b{color:var(--accent);font:400 13px var(--display);letter-spacing:.04em}
+#notice button{flex:none}
+#pw{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.7);padding:16px;z-index:5}
+#pw .card{gap:12px}
+#pw h2{font:400 26px var(--display);margin:0}
+#pw p{margin:0;color:var(--muted)}
+#pw input{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:4px;padding:11px 12px;color:var(--ink);font:600 17px var(--ui);-webkit-user-select:text;user-select:text}
+#pwErr{color:var(--hot)!important}
 #pause{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.6);padding:16px;overflow-y:auto}
 #pause h2{font:400 28px var(--display);margin:0}
 #pause p{margin:0;color:var(--muted)}
@@ -329,6 +338,21 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
     <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
     <p class="fine">Friends who type the same party code land in the same private match. Leave it blank to join the open arena.</p>
   </div>
+</div>
+
+<div id="notice" role="status" hidden><b>Update</b><span id="noticeText"></span><button class="btn primary" type="button" id="noticeOk">Got it</button></div>
+
+<div id="pw" hidden>
+  <form class="card" id="pwForm" autocomplete="off">
+    <h2>Password</h2>
+    <p>Doug needs the password to play online.</p>
+    <input type="password" id="pwIn" aria-label="Password" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <p id="pwErr" hidden>That password isn't right.</p>
+    <div class="btns">
+      <button class="btn primary" type="submit" id="pwGo">Join online</button>
+      <button class="btn" type="button" id="pwCancel">Cancel</button>
+    </div>
+  </form>
 </div>
 
 <div id="pause" hidden>
@@ -1204,7 +1228,11 @@ function connectServer(name) {
   if (sock) { sock.onclose = null; try { sock.close(); } catch (e) {} sock = null; }
   const s = new WebSocket(serverUrl(name));
   sock = s;
-  s.onopen = () => { sockRetry = 0; setNet("live"); publish(true); };
+  s.onopen = () => {
+    sockRetry = 0; setNet("live");
+    if (dougKey) s.send(JSON.stringify({ t: "auth", key: dougKey }));
+    publish(true);
+  };
   s.onmessage = e => {
     let m; try { m = JSON.parse(e.data); } catch (err) { return; }
     if (!m || typeof m !== "object") return;
@@ -1216,6 +1244,10 @@ function connectServer(name) {
       onPeer({ peer: String(m.id), presence: m.d && typeof m.d === "object" ? m.d : {}, kind: "viewer", sameTab: false });
       renderStatus();
     } else if (m.t === "leave" && m.id) removeRemote(String(m.id));
+    else if (m.t === "auth") { dougAuthed = !!m.ok; if (authWait) authWait(dougAuthed); }
+    else if (m.t === "denied" && state === "play" && mode === "online") {
+      leaveMatch(); banner("Doug needs the password to play online");
+    }
   };
   s.onclose = () => {
     if (sock !== s) return;
@@ -1501,13 +1533,35 @@ function respawn() {
   $("#death").hidden = true;
   publish(true);
 }
-// ---- Duke mode: only for the player named "Duke" wearing pink armor
-const DUKE_COLOR = 5; // pink in PAL
+// ---- Doug mode: only for the player named "Doug" wearing green armor. Bot matches
+// need nothing more; online matches need the password, which the game server checks
+// (it's a secret on the server, never in this code). Where there is no game server
+// (claude.ai, peer-to-peer) the password is checked against its SHA-256 fingerprint.
+const DOUG_COLOR = 2; // green in PAL
+const DOUG_HASH = "744120d75bb6e2e92c194f056307d6da7c113823649a6ef5ddcc9ff660e1043d";
 const duke = { on: false, aim: true, god: true, snipe: true };
+let dougKey = "", dougAuthed = false, authWait = null;
+const isDougIdentity = () => cleanName(nick.value).toLowerCase() === "doug" && myColor === DOUG_COLOR;
+async function sha256hex(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+async function checkDougPassword(pw) {
+  if (netKind === "ws") {
+    dougKey = pw;
+    if (!sock || sock.readyState !== 1) return false;
+    return new Promise(res => {
+      const t = setTimeout(() => { authWait = null; res(false); }, 6000);
+      authWait = ok => { clearTimeout(t); authWait = null; res(ok); };
+      sock.send(JSON.stringify({ t: "auth", key: pw }));
+    });
+  }
+  try { return (await sha256hex(pw)) === DOUG_HASH; } catch (e) { return false; }
+}
 const SNIPER_NORMAL = (({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }) => ({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }))(WEAPONS[2]);
 const SNIPER_DUKE = { auto: true, rate: 0.14, spread: 0, aimSpread: 0, quickscope: undefined, dmg: 150, head: 150, mag: 99, reload: 0.3 };
 function applyDuke() {
-  duke.on = myName.toLowerCase() === "duke" && myColor === DUKE_COLOR;
+  duke.on = myName.toLowerCase() === "doug" && myColor === DOUG_COLOR && (mode === "bots" || dougAuthed);
   Object.assign(WEAPONS[2], duke.on && duke.snipe ? SNIPER_DUKE : SNIPER_NORMAL);
   ammo[2] = WEAPONS[2].mag; buildPips();
   $("#duke").hidden = !duke.on;
@@ -2200,10 +2254,30 @@ function startGame(m) {
   showPause(false);
   requestLock();
 }
-$("#playOnline").addEventListener("click", () => { if (netState === "offline") { banner("Online play isn't available on this page"); return; } startGame("online"); });
+$("#playOnline").addEventListener("click", () => {
+  if (netState === "offline") { banner("Online play isn't available on this page"); return; }
+  if (isDougIdentity() && !dougAuthed) { $("#pwErr").hidden = true; $("#pwIn").value = ""; $("#pw").hidden = false; $("#pwIn").focus(); return; }
+  startGame("online");
+});
+$("#pwCancel").addEventListener("click", () => { $("#pw").hidden = true; });
+// One-time update notice; each device sees it until it's dismissed
+const NOTICE = { id: "duke-hacks-removed", text: "Duke's hacks have been removed." };
+if (load("cfa.notice") !== NOTICE.id) { $("#noticeText").textContent = NOTICE.text; $("#notice").hidden = false; }
+$("#noticeOk").addEventListener("click", () => { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); });
+$("#pwForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const go = $("#pwGo"); go.disabled = true; go.textContent = "Checking…";
+  myName = cleanName(nick.value) || myName;
+  const ok = await checkDougPassword($("#pwIn").value);
+  go.disabled = false; go.textContent = "Join online";
+  if (!ok) { dougKey = ""; dougAuthed = false; $("#pwErr").hidden = false; $("#pwIn").select(); return; }
+  dougAuthed = true; $("#pw").hidden = true;
+  startGame("online");
+});
 $("#playBots").addEventListener("click", () => startGame("bots"));
 $("#resume").addEventListener("click", () => { initAudio(); requestLock(); if (isTouch || noLock) showPause(false); });
-$("#leave").addEventListener("click", () => {
+$("#leave").addEventListener("click", () => leaveMatch());
+function leaveMatch() {
   state = "menu"; alive = false; resetAim();
   if (document.exitPointerLock && locked) document.exitPointerLock();
   showPause(false);
@@ -2212,7 +2286,7 @@ $("#leave").addEventListener("click", () => {
   $("#hud").hidden = true; $("#touch").hidden = true; $("#menu").hidden = false;
   stopBots();
   publish(true); renderStatus();
-});
+}
 
 // ======================================================================
 // Main loop

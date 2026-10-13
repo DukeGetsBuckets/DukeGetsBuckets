@@ -2,9 +2,16 @@
 // GET /ws?room=<lobby> upgrades to a WebSocket in that lobby's Durable Object,
 // which relays each player's state to everyone else in the lobby. Every other
 // path serves the game page from ./public.
+//
+// Players named "Doug" in green armor have extra powers, so online they must first
+// send {t: "auth", key} with the password stored in the DOUG_PASSWORD secret
+// (`wrangler secret put DOUG_PASSWORD`). Anyone else using that name and color is
+// refused.
 
 const MAX_PLAYERS = 16;
 const MAX_MESSAGE = 6000;
+const DOUG_COLOR = 2;
+const isDoug = d => String(d.n || "").trim().toLowerCase() === "doug" && d.c === DOUG_COLOR;
 
 function lobbyName(raw) {
   const name = String(raw || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48);
@@ -24,8 +31,9 @@ export default {
 };
 
 export class Lobby {
-  constructor(ctx) {
+  constructor(ctx, env) {
     this.ctx = ctx;
+    this.env = env;
     this.last = new Map(); // player id -> latest state, handed to newcomers
   }
 
@@ -36,7 +44,7 @@ export class Lobby {
     const [client, server] = Object.values(pair);
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 10);
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ id });
+    server.serializeAttachment({ id, auth: false });
     const peers = [];
     for (const ws of sockets) {
       const a = ws.deserializeAttachment();
@@ -53,6 +61,17 @@ export class Lobby {
     let d;
     try { d = JSON.parse(message); } catch { return; }
     if (!d || typeof d !== "object" || Array.isArray(d)) return;
+    if (d.t === "auth") {
+      const secret = this.env && this.env.DOUG_PASSWORD;
+      const ok = !!secret && typeof d.key === "string" && d.key === secret;
+      ws.serializeAttachment({ ...a, auth: ok });
+      try { ws.send(JSON.stringify({ t: "auth", ok })); } catch {}
+      return;
+    }
+    if (isDoug(d) && !a.auth) {
+      try { ws.send(JSON.stringify({ t: "denied" })); } catch {}
+      return;
+    }
     this.last.set(a.id, d);
     const out = JSON.stringify({ t: "st", id: a.id, d });
     for (const other of this.ctx.getWebSockets()) {
