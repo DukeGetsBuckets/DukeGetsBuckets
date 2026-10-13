@@ -147,6 +147,10 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 #duke button{border:1px solid #ff7ac8;background:rgba(255,122,200,.16);color:#ffd0ea;border-radius:4px;padding:5px 9px;font:700 12px var(--ui);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
 #duke button[aria-pressed="true"]{background:#ff7ac8;color:#2a0718}
 #duke button small{font-weight:600;opacity:.7;margin-left:4px}
+#duke{flex-wrap:wrap;justify-content:center;max-width:calc(100% - 32px)}
+#tpList{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);display:grid;gap:4px;background:var(--panel);border:1px solid #ff7ac8;border-radius:6px;padding:8px;min-width:200px;max-height:50vh;overflow-y:auto}
+#tpList p{margin:0 0 2px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+#tpList button{text-align:left}
 .touch #duke{top:calc(64px + env(safe-area-inset-top,0px))}
 .touch #duke button{padding:9px 12px}
 #elim{position:absolute;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) scale(.92);display:flex;align-items:stretch;background:var(--panel);border:1px solid var(--line);border-radius:4px;overflow:hidden;opacity:0;transition:opacity .2s,transform .2s;max-width:calc(100% - 32px)}
@@ -248,6 +252,10 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
     <button type="button" id="dkAim" aria-pressed="true">Aimbot<small>H</small></button>
     <button type="button" id="dkGod" aria-pressed="true">God<small>J</small></button>
     <button type="button" id="dkSnipe" aria-pressed="true">Auto sniper<small>K</small></button>
+    <button type="button" id="dkWall" aria-pressed="true">Walls<small>N</small></button>
+    <button type="button" id="dkInv" aria-pressed="false">Invisible<small>I</small></button>
+    <button type="button" id="dkTp" aria-pressed="false">Teleport<small>T</small></button>
+    <div id="tpList" hidden></div>
   </div>
   <div id="elim" aria-live="polite"><div class="tag">Eliminated</div><div class="body"><div class="who" id="elimWho"></div><div class="how" id="elimHow"></div></div></div>
   <div class="vitals">
@@ -1344,6 +1352,7 @@ function onPeer(p) {
   r.pl = s.pl === 1 && (s.m === undefined || s.m === mapId);
   r.alive = s.al !== 0;
   r.cr = s.cr === 1;
+  r.iv = s.iv === 1;
   r.k = Math.max(0, Math.floor(num(s.k) || 0));
   r.d = Math.max(0, Math.floor(num(s.d) || 0));
   const pos = vec(s.p);
@@ -1390,12 +1399,12 @@ function onPeer(p) {
   if (gr && gr.s > (r.lastNade || 0)) {
     r.lastNade = gr.s;
     const o = vec(gr.o), v = Array.isArray(gr.v) && gr.v.length === 3 && gr.v.every(n => num(n) !== null) ? new V3(clamp(gr.v[0], -40, 40), clamp(gr.v[1], -40, 40), clamp(gr.v[2], -40, 40)) : null;
-    if (o && v && activePeer(r) && online) spawnNade(o, v, null);
+    if (o && v && activePeer(r) && !r.iv && online) spawnNade(o, v, null);
   }
   if (sh && sh.s > r.lastShot) {
     r.lastShot = sh.s;
     const o = vec(sh.o), e = vec(sh.e);
-    if (o && e && activePeer(r) && online) {
+    if (o && e && activePeer(r) && !r.iv && online) {
       tracer(o, e, 0xffc6a0);
       const wi = clamp(Math.floor(num(sh.w) || 0), 0, 2);
       gunSound(wi, clamp(1 - o.distanceTo(me.pos) / 60, 0, 0.7));
@@ -1413,7 +1422,7 @@ function publish(force, target) {
     n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0, afk: playing && iAmAfk() ? 1 : 0, hb: Math.floor(now()),
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
-    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, k: playing ? kills : 0, d: playing ? deaths : 0,
+    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, k: playing ? kills : 0, d: playing ? deaths : 0,
     sh: playing ? lastShot : null, gr: playing ? lastNade : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
   if (netKind === "ws") { if (sock && sock.readyState === 1) { try { sock.send(JSON.stringify(P)); } catch (e) {} } }
@@ -1450,7 +1459,7 @@ function updateBot(b, dt, t) {
   const myEye = me.pos.clone(); myEye.y += EYE;
   let see = false, dist = Infinity;
   const to = myEye.clone().sub(eye);
-  if (alive && state === "play") {
+  if (alive && state === "play" && !(duke.on && duke.inv)) {
     dist = to.length();
     if (dist < 40) { const dir = to.clone().normalize(); see = rayVoxel(eye, dir, dist) >= dist - 0.4; }
   }
@@ -1495,7 +1504,7 @@ function updateBot(b, dt, t) {
 // ======================================================================
 function enemies() {
   const list = [];
-  if (mode === "online") { for (const r of remotes.values()) if (activePeer(r) && r.alive && r.hasPos) list.push({ kind: "peer", r, pos: r.pos }); }
+  if (mode === "online") { for (const r of remotes.values()) if (activePeer(r) && r.alive && r.hasPos && !r.iv) list.push({ kind: "peer", r, pos: r.pos }); }
   else for (const b of bots) if (b.alive) list.push({ kind: "bot", r: b, pos: b.pos });
   return list;
 }
@@ -1526,7 +1535,7 @@ function respawn() {
 // (claude.ai, peer-to-peer) the password is checked against its SHA-256 fingerprint.
 const DOUG_COLOR = 2; // green in PAL
 const DOUG_HASH = "744120d75bb6e2e92c194f056307d6da7c113823649a6ef5ddcc9ff660e1043d";
-const duke = { on: false, aim: true, god: true, snipe: true };
+const duke = { on: false, aim: true, god: true, snipe: true, wall: true, inv: false };
 let dougKey = "", dougAuthed = false, authWait = null;
 const isDougIdentity = () => cleanName(nick.value).toLowerCase() === "doug" && myColor === DOUG_COLOR;
 async function sha256hex(text) {
@@ -1555,16 +1564,72 @@ function applyDuke() {
   $("#dkAim").setAttribute("aria-pressed", String(duke.aim));
   $("#dkGod").setAttribute("aria-pressed", String(duke.god));
   $("#dkSnipe").setAttribute("aria-pressed", String(duke.snipe));
+  $("#dkWall").setAttribute("aria-pressed", String(duke.wall));
+  $("#dkInv").setAttribute("aria-pressed", String(duke.inv));
+  if (!duke.on) closeTpList();
 }
-for (const [id, k] of [["dkAim", "aim"], ["dkGod", "god"], ["dkSnipe", "snipe"]]) {
+for (const [id, k] of [["dkAim", "aim"], ["dkGod", "god"], ["dkSnipe", "snipe"], ["dkWall", "wall"], ["dkInv", "inv"]]) {
   document.addEventListener("click", e => { if (!isTouchUI() && e.target.closest && e.target.closest("#" + id)) toggleDuke(k); });
 }
+document.addEventListener("click", e => { if (!isTouchUI() && e.target.closest && e.target.closest("#dkTp")) openTpList(); });
 function isTouchUI() { return document.body.classList.contains("touch"); }
 function toggleDuke(k) {
   if (!duke.on) return;
   duke[k] = !duke[k];
   applyDuke();
-  banner((k === "aim" ? "Aimbot" : k === "god" ? "God mode" : "Auto sniper") + (duke[k] ? " on" : " off"));
+  const label = { aim: "Aimbot", god: "God mode", snipe: "Auto sniper", wall: "Wall hacks", inv: "Invisible" }[k];
+  banner(label + (duke[k] ? " on" : " off"));
+  if (k === "inv") publish(true);
+}
+// Wall hacks: a yellow box around every enemy, drawn on top of walls
+const espGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.9, 1.95, 0.9));
+const espMat = new THREE.LineBasicMaterial({ color: 0xffe14a, depthTest: false, depthWrite: false, transparent: true });
+const espBoxes = [];
+function updateEsp() {
+  const list = state === "play" && duke.on && duke.wall ? enemies() : [];
+  while (espBoxes.length < list.length) { const l = new THREE.LineSegments(espGeo, espMat); l.renderOrder = 999; scene.add(l); espBoxes.push(l); }
+  espBoxes.forEach((l, i) => {
+    const tg = list[i]; l.visible = !!tg;
+    if (tg) { l.position.set(tg.pos.x, tg.pos.y + (tg.r.cr ? 0.75 : 0.975), tg.pos.z); l.scale.y = tg.r.cr ? 0.77 : 1; }
+  });
+}
+// Teleport: land just behind someone, facing them
+let tpNext = 0;
+function teleportTo(tg) {
+  if (!tg || !alive || state !== "play") return;
+  const ty = tg.r.yaw || 0, p = new V3();
+  for (const dist of [2, 1.3, 3]) for (const a of [0, 0.7, -0.7, 1.4, -1.4, Math.PI]) {
+    p.set(tg.pos.x + Math.sin(ty + a) * dist, tg.pos.y, tg.pos.z + Math.cos(ty + a) * dist);
+    if (!collides(p)) return land(p);
+  }
+  p.set(tg.pos.x, tg.pos.y + 2.1, tg.pos.z);
+  if (!collides(p)) land(p);
+  function land(at) {
+    me.pos.copy(at); me.vel.set(0, 0, 0);
+    yaw = Math.atan2(-(tg.pos.x - at.x), -(tg.pos.z - at.z)); pitch = 0;
+    closeTpList(); publish(true); banner("Teleported to " + tg.r.name);
+  }
+}
+function teleportCycle() {
+  if (!duke.on) return;
+  const list = enemies();
+  if (!list.length) { banner("Nobody to teleport to"); return; }
+  teleportTo(list[tpNext++ % list.length]);
+}
+function closeTpList() { const el = $("#tpList"); if (el) { el.hidden = true; el.replaceChildren(); } $("#dkTp") && $("#dkTp").setAttribute("aria-pressed", "false"); }
+function openTpList() {
+  if (!duke.on) return;
+  const el = $("#tpList");
+  if (!el.hidden) { closeTpList(); return; }
+  const list = enemies();
+  const head = document.createElement("p"); head.textContent = list.length ? "Teleport to" : "Nobody to teleport to";
+  el.replaceChildren(head);
+  for (const tg of list) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = tg.r.name;
+    b.addEventListener("click", () => teleportTo(tg));
+    el.appendChild(b);
+  }
+  el.hidden = false; $("#dkTp").setAttribute("aria-pressed", "true");
 }
 // Aimbot: lock straight onto the head of the closest visible enemy in front of you
 function aimbot() {
@@ -1921,6 +1986,9 @@ window.addEventListener("keydown", e => {
   if (!e.repeat && e.code === "KeyH") toggleDuke("aim");
   if (!e.repeat && e.code === "KeyJ") toggleDuke("god");
   if (!e.repeat && e.code === "KeyK") toggleDuke("snipe");
+  if (!e.repeat && e.code === "KeyN") toggleDuke("wall");
+  if (!e.repeat && e.code === "KeyI") toggleDuke("inv");
+  if (!e.repeat && e.code === "KeyT") teleportCycle();
   if (e.code === "KeyE") aimKey = true;
   if (e.code === "KeyC") crouch = true;
   if (e.code === "KeyR") startReload();
@@ -1986,6 +2054,9 @@ if (isTouch) {
     dkAim: { down() { toggleDuke("aim"); } },
     dkGod: { down() { toggleDuke("god"); } },
     dkSnipe: { down() { toggleDuke("snipe"); } },
+    dkWall: { down() { toggleDuke("wall"); } },
+    dkInv: { down() { toggleDuke("inv"); } },
+    dkTp: { down() { openTpList(); } },
   };
   const btnEls = Object.keys(BTN).map(id => $("#" + id));
   function buttonAt(x, y) {
@@ -2002,7 +2073,7 @@ if (isTouch) {
     touchMove.x = dx / R; touchMove.y = dy / R;
     knob.style.transform = `translate(${dx}px,${dy}px)`;
   }
-  const inMenus = t => t && t.closest && (t.closest("#pause") || t.closest("#menu") || t.closest(".slots"));
+  const inMenus = t => t && t.closest && (t.closest("#pause") || t.closest("#menu") || t.closest(".slots") || t.closest("#tpList"));
   document.addEventListener("touchstart", e => {
     if (state !== "play" || paused || inMenus(e.target)) return;
     e.preventDefault();
@@ -2233,6 +2304,7 @@ function startGame(m) {
   save("cfa.name", myName); save("cfa.color", myColor); save("cfa.code", partyCode);
   mode = m; kills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null;
   applyDuke();
+  if (!$("#notice").hidden) { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); } // seen it; clear the screen for play
   state = "play";
   $("#menu").hidden = true; $("#hud").hidden = false; $("#touch").hidden = !isTouch;
   if (m === "bots") startBots(); else { stopBots(); joinLobby(partyCode); }
@@ -2359,7 +2431,7 @@ function tick() {
   // remote players (only shown in online matches)
   const kk = 1 - Math.exp(-14 * dt);
   for (const r of remotes.values()) {
-    const show = mode === "online" && activePeer(r) && r.hasPos && r.alive;
+    const show = mode === "online" && activePeer(r) && r.hasPos && r.alive && !r.iv;
     if (show && !r.av) r.av = makeAvatar(PAL[r.color], r.name);
     if (!r.av) continue;
     r.av.g.visible = show;
@@ -2389,6 +2461,7 @@ function tick() {
   $("#hurt").style.opacity = hurt;
 
   updateNades(dt);
+  updateEsp();
   updateFx(dt);
   updateDmgNumbers(dt);
   renderer.clear();

@@ -72,6 +72,7 @@ export class Lobby {
       try { ws.send(JSON.stringify({ t: "denied" })); } catch {}
       return;
     }
+    if (!a.auth) delete d.iv; // only a verified Doug can be invisible
     this.last.set(a.id, d);
     const out = JSON.stringify({ t: "st", id: a.id, d });
     for (const other of this.ctx.getWebSockets()) {
