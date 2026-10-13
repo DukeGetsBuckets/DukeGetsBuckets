@@ -143,6 +143,12 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 .slots{display:flex;gap:4px}
 .slots div{border:1px solid var(--line);background:var(--panel);padding:3px 8px;font-size:12px;font-weight:600;border-radius:3px;color:var(--muted)}
 .slots div.on{color:#1a1205;background:var(--accent);border-color:var(--accent)}
+#duke{position:absolute;left:50%;top:calc(52px + env(safe-area-inset-top,0px));transform:translateX(-50%);display:flex;gap:6px;pointer-events:auto}
+#duke button{border:1px solid #ff7ac8;background:rgba(255,122,200,.16);color:#ffd0ea;border-radius:4px;padding:5px 9px;font:700 12px var(--ui);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+#duke button[aria-pressed="true"]{background:#ff7ac8;color:#2a0718}
+#duke button small{font-weight:600;opacity:.7;margin-left:4px}
+.touch #duke{top:calc(64px + env(safe-area-inset-top,0px))}
+.touch #duke button{padding:9px 12px}
 #elim{position:absolute;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) scale(.92);display:flex;align-items:stretch;background:var(--panel);border:1px solid var(--line);border-radius:4px;overflow:hidden;opacity:0;transition:opacity .2s,transform .2s;max-width:calc(100% - 32px)}
 #elim.show{opacity:1;transform:translateX(-50%) scale(1)}
 #elim .tag{background:var(--hot);color:#fff;font:400 13px var(--display);letter-spacing:.06em;padding:8px 10px;display:grid;place-items:center}
@@ -229,6 +235,11 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
   </div>
   <div id="dmgdir"><i></i></div>
   <div id="banner"></div>
+  <div id="duke" hidden>
+    <button type="button" id="dkAim" aria-pressed="true">Aimbot<small>H</small></button>
+    <button type="button" id="dkGod" aria-pressed="true">God<small>J</small></button>
+    <button type="button" id="dkSnipe" aria-pressed="true">Auto sniper<small>K</small></button>
+  </div>
   <div id="elim" aria-live="polite"><div class="tag">Eliminated</div><div class="body"><div class="who" id="elimWho"></div><div class="how" id="elimHow"></div></div></div>
   <div class="vitals">
     <div class="lbl"><b id="hpNum">100</b><span>Health</span></div>
@@ -1490,8 +1501,50 @@ function respawn() {
   $("#death").hidden = true;
   publish(true);
 }
+// ---- Duke mode: only for the player named "Duke" wearing pink armor
+const DUKE_COLOR = 5; // pink in PAL
+const duke = { on: false, aim: true, god: true, snipe: true };
+const SNIPER_NORMAL = (({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }) => ({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }))(WEAPONS[2]);
+const SNIPER_DUKE = { auto: true, rate: 0.14, spread: 0, aimSpread: 0, quickscope: undefined, dmg: 150, head: 150, mag: 99, reload: 0.3 };
+function applyDuke() {
+  duke.on = myName.toLowerCase() === "duke" && myColor === DUKE_COLOR;
+  Object.assign(WEAPONS[2], duke.on && duke.snipe ? SNIPER_DUKE : SNIPER_NORMAL);
+  ammo[2] = WEAPONS[2].mag; buildPips();
+  $("#duke").hidden = !duke.on;
+  $("#dkAim").setAttribute("aria-pressed", String(duke.aim));
+  $("#dkGod").setAttribute("aria-pressed", String(duke.god));
+  $("#dkSnipe").setAttribute("aria-pressed", String(duke.snipe));
+}
+for (const [id, k] of [["dkAim", "aim"], ["dkGod", "god"], ["dkSnipe", "snipe"]]) {
+  document.addEventListener("click", e => { if (!isTouchUI() && e.target.closest && e.target.closest("#" + id)) toggleDuke(k); });
+}
+function isTouchUI() { return document.body.classList.contains("touch"); }
+function toggleDuke(k) {
+  if (!duke.on) return;
+  duke[k] = !duke[k];
+  applyDuke();
+  banner((k === "aim" ? "Aimbot" : k === "god" ? "God mode" : "Auto sniper") + (duke[k] ? " on" : " off"));
+}
+// Aimbot: lock straight onto the head of the closest visible enemy in front of you
+function aimbot() {
+  const o = eyePos(), f = aimDir();
+  let best = null, bestScore = Infinity;
+  for (const tg of enemies()) {
+    const v = tg.pos.clone(); v.y += tg.r.cr ? 1.2 : 1.6; v.sub(o);
+    const dist = v.length(); if (dist < 0.5 || dist > 200) continue;
+    v.divideScalar(dist);
+    if (rayVoxel(o, v, dist) < dist - 0.5) continue;
+    const ang = Math.acos(clamp(f.dot(v), -1, 1));
+    if (ang > 1.3) continue;
+    const score = ang + dist * 0.002;
+    if (score < bestScore) { bestScore = score; best = { yawT: Math.atan2(-v.x, -v.z), pitchT: Math.asin(clamp(v.y, -1, 1)) }; }
+  }
+  if (best) { yaw = best.yawT; pitch = clamp(best.pitchT, -1.52, 1.52); }
+  return best;
+}
 function takeDamage(dm, src, head) {
   if (!alive || state !== "play" || now() < spawnProt || dm <= 0) return;
+  if (duke.on && duke.god) { showDmgDir(src.pos); return; }
   hp -= dm; lastHurt = now();
   showDmgDir(src.pos);
   blip(head ? 180 : 140, 0.12, 0.12, "sawtooth");
@@ -1824,6 +1877,9 @@ window.addEventListener("keydown", e => {
   if (e.code === "Digit3") switchWeapon(2);
   if ((e.code === "KeyQ" || e.code === "KeyX") && !e.repeat) dash();
   if (e.code === "KeyG" && !e.repeat) throwGrenade();
+  if (!e.repeat && e.code === "KeyH") toggleDuke("aim");
+  if (!e.repeat && e.code === "KeyJ") toggleDuke("god");
+  if (!e.repeat && e.code === "KeyK") toggleDuke("snipe");
   if (e.code === "KeyE") aimKey = true;
   if (e.code === "KeyC") crouch = true;
   if (e.code === "KeyR") startReload();
@@ -1886,6 +1942,9 @@ if (isTouch) {
     tReload: { down() { startReload(); } },
     tNade: { down() { throwGrenade(); } },
     tPause: { down() { showPause(true); } },
+    dkAim: { down() { toggleDuke("aim"); } },
+    dkGod: { down() { toggleDuke("god"); } },
+    dkSnipe: { down() { toggleDuke("snipe"); } },
   };
   const btnEls = Object.keys(BTN).map(id => $("#" + id));
   function buttonAt(x, y) {
@@ -2132,6 +2191,7 @@ function startGame(m) {
   partyCode = cleanCode(codeIn.value);
   save("cfa.name", myName); save("cfa.color", myColor); save("cfa.code", partyCode);
   mode = m; kills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null;
+  applyDuke();
   state = "play";
   $("#menu").hidden = true; $("#hud").hidden = false; $("#touch").hidden = !isTouch;
   if (m === "bots") startBots(); else { stopBots(); joinLobby(partyCode); }
@@ -2199,7 +2259,11 @@ function tick() {
       aim += ((input && aiming ? 1 : 0) - aim) * (1 - Math.exp(-(WEAPONS[cur].adsSpeed || 14) * dt));
       if (input && aiming && !wasAiming) aimSnap();
       wasAiming = input && aiming;
-      if (input) aimAssist(dt); else { assistTg = null; assistPrev = null; }
+      if (input && duke.on && duke.aim) {
+        assistTg = null; assistPrev = null;
+        const locked = aimbot();
+        if (locked && duke.snipe && cur === 2 && t >= nextFire && !reloading) fire(); // auto sniper fires on lock
+      } else if (input) aimAssist(dt); else { assistTg = null; assistPrev = null; }
       if (reloading && t >= reloadEnd) { reloading = false; ammo[cur] = WEAPONS[cur].mag; blip(700, 0.05, 0.07); }
       if (snipePending) {
         const w = WEAPONS[cur];
