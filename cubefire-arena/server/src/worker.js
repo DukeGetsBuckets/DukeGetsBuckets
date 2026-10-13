@@ -6,12 +6,15 @@
 // Players named "Doug" in green armor have extra powers, so online they must first
 // send {t: "auth", key} with the password stored in the DOUG_PASSWORD secret
 // (`wrangler secret put DOUG_PASSWORD`). Anyone else using that name and color is
-// refused.
+// refused. "Alex" in blue may also be invisible, with no password.
 
 const MAX_PLAYERS = 16;
 const MAX_MESSAGE = 6000;
 const DOUG_COLOR = 2;
 const isDoug = d => String(d.n || "").trim().toLowerCase() === "doug" && d.c === DOUG_COLOR;
+// Alex in blue may be invisible without a password
+const ALEX_COLOR = 3;
+const isAlex = d => String(d.n || "").trim().toLowerCase() === "alex" && d.c === ALEX_COLOR;
 
 function lobbyName(raw) {
   const name = String(raw || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48);
@@ -72,7 +75,7 @@ export class Lobby {
       try { ws.send(JSON.stringify({ t: "denied" })); } catch {}
       return;
     }
-    if (!a.auth) delete d.iv; // only a verified Doug can be invisible
+    if (!a.auth && !isAlex(d)) delete d.iv; // only a verified Doug, or Alex in blue, can be invisible
     this.last.set(a.id, d);
     const out = JSON.stringify({ t: "st", id: a.id, d });
     for (const other of this.ctx.getWebSockets()) {

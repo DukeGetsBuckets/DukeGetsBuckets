@@ -1522,6 +1522,9 @@ function respawn() {
 // (it's a secret on the server, never in this code). Where there is no game server
 // (claude.ai, peer-to-peer) the password is checked against its SHA-256 fingerprint.
 const DOUG_COLOR = 2; // green in PAL
+// Alex in blue gets only wall hacks and invisibility, and needs no password.
+const ALEX_COLOR = 3; // blue in PAL
+const ALEX_ONLY = ["wall", "inv"];
 const DOUG_HASH = "744120d75bb6e2e92c194f056307d6da7c113823649a6ef5ddcc9ff660e1043d";
 const duke = { on: false, aim: true, god: true, snipe: true, wall: true, inv: false };
 let dougKey = "", dougAuthed = false, authWait = null;
@@ -1545,7 +1548,13 @@ async function checkDougPassword(pw) {
 const SNIPER_NORMAL = (({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }) => ({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }))(WEAPONS[2]);
 const SNIPER_DUKE = { auto: true, rate: 0.14, spread: 0, aimSpread: 0, quickscope: undefined, dmg: 150, head: 150, mag: 99, reload: 0.3 };
 function applyDuke() {
-  duke.on = myName.toLowerCase() === "doug" && myColor === DOUG_COLOR && (mode === "bots" || dougAuthed);
+  const nm = myName.toLowerCase();
+  const isDoug = nm === "doug" && myColor === DOUG_COLOR && (mode === "bots" || dougAuthed);
+  const isAlex = !isDoug && nm === "alex" && myColor === ALEX_COLOR;
+  if (isAlex && !duke.limited) { duke.aim = duke.god = duke.snipe = false; }        // Alex: walls + invisible only
+  if (isDoug && duke.limited) { duke.aim = duke.god = duke.snipe = true; }          // back to Doug's full set
+  duke.on = isDoug || isAlex; duke.limited = isAlex;
+  for (const id of ["dkAim", "dkGod", "dkSnipe", "dkTp"]) $("#" + id).hidden = duke.limited;
   Object.assign(WEAPONS[2], duke.on && duke.snipe ? SNIPER_DUKE : SNIPER_NORMAL);
   ammo[2] = WEAPONS[2].mag; buildPips();
   $("#duke").hidden = !duke.on;
@@ -1562,7 +1571,7 @@ for (const [id, k] of [["dkAim", "aim"], ["dkGod", "god"], ["dkSnipe", "snipe"],
 document.addEventListener("click", e => { if (!isTouchUI() && e.target.closest && e.target.closest("#dkTp")) openTpList(); });
 function isTouchUI() { return document.body.classList.contains("touch"); }
 function toggleDuke(k) {
-  if (!duke.on) return;
+  if (!duke.on || (duke.limited && !ALEX_ONLY.includes(k))) return;
   duke[k] = !duke[k];
   applyDuke();
   const label = { aim: "Aimbot", god: "God mode", snipe: "Auto sniper", wall: "Wall hacks", inv: "Invisible" }[k];
@@ -1599,14 +1608,14 @@ function teleportTo(tg) {
   }
 }
 function teleportCycle() {
-  if (!duke.on) return;
+  if (!duke.on || duke.limited) return;
   const list = enemies();
   if (!list.length) { banner("Nobody to teleport to"); return; }
   teleportTo(list[tpNext++ % list.length]);
 }
 function closeTpList() { const el = $("#tpList"); if (el) { el.hidden = true; el.replaceChildren(); } $("#dkTp") && $("#dkTp").setAttribute("aria-pressed", "false"); }
 function openTpList() {
-  if (!duke.on) return;
+  if (!duke.on || duke.limited) return;
   const el = $("#tpList");
   if (!el.hidden) { closeTpList(); return; }
   const list = enemies();
