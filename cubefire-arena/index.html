@@ -296,7 +296,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
     <div class="two">
       <div class="field">
         <label for="nick">Callsign</label>
-        <input type="text" id="nick" maxlength="16" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Your name">
+        <input type="text" id="nick" maxlength="24" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Your name">
       </div>
       <div class="field">
         <label for="code">Party code <em>optional</em></label>
@@ -1034,15 +1034,15 @@ const ASSIST = [
 const lam = c => new THREE.MeshLambertMaterial({ color: c });
 function box(w, h, d, mat, x, y, z, parent) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); parent.add(m); return m; }
 function nameSprite(text) {
-  const c = document.createElement("canvas"); c.width = 256; c.height = 64;
+  const c = document.createElement("canvas"); c.width = 448; c.height = 64;
   const g = c.getContext("2d");
   g.font = '700 30px "Chakra Petch", system-ui, sans-serif';
-  const w = Math.min(248, g.measureText(text).width + 24);
-  g.fillStyle = "rgba(10,14,20,.6)"; g.fillRect(128 - w / 2, 10, w, 44);
-  g.fillStyle = "#f3efe4"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, 128, 33, 236);
+  const w = Math.min(440, g.measureText(text).width + 24);
+  g.fillStyle = "rgba(10,14,20,.6)"; g.fillRect(224 - w / 2, 10, w, 44);
+  g.fillStyle = "#f3efe4"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, 224, 33, 424);
   const tex = new THREE.CanvasTexture(c);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: true, transparent: true }));
-  s.scale.set(1.6, 0.4, 1); return s;
+  s.scale.set(2.8, 0.4, 1); return s;
 }
 function makeAvatar(colorHex, name) {
   const g = new THREE.Group();
@@ -1165,7 +1165,7 @@ const hitsOut = [];
 let lastShot = null, dthOut = null;
 
 function cleanName(v) {
-  return String(v == null ? "" : v).replace(/[\u0000-\u001f\u007f-\u009f­​-‏‪-‮⁠-⁯﻿]/g, "").trim().slice(0, 16);
+  return String(v == null ? "" : v).replace(/[\u0000-\u001f\u007f-\u009f­​-‏‪-‮⁠-⁯﻿]/g, "").trim().slice(0, 24);
 }
 const cleanCode = v => String(v || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12);
 function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
