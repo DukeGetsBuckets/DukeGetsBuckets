@@ -9,6 +9,9 @@
 // refused. "Alex" in blue may also be invisible, with no password.
 
 const MAX_PLAYERS = 16;
+// Oldest game copy allowed online. Older copies (including any that still have the
+// removed Duke cheats) are told to refresh and can't join until they do.
+const MIN_BUILD = 5;
 const MAX_MESSAGE = 6000;
 const DOUG_COLOR = 2;
 const isDoug = d => String(d.n || "").trim().toLowerCase() === "doug" && d.c === DOUG_COLOR;
@@ -26,6 +29,14 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/ws") {
       if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket upgrade", { status: 426 });
+      if ((Number(url.searchParams.get("v")) || 0) < MIN_BUILD) {
+        const pair = new WebSocketPair();
+        const [client, server] = Object.values(pair);
+        server.accept();
+        server.send(JSON.stringify({ t: "update" }));
+        server.close(4001, "Refresh to get the new version");
+        return new Response(null, { status: 101, webSocket: client });
+      }
       const stub = env.LOBBY.get(env.LOBBY.idFromName(lobbyName(url.searchParams.get("room"))));
       return stub.fetch(request);
     }
