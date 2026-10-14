@@ -3,21 +3,19 @@
 // which relays each player's state to everyone else in the lobby. Every other
 // path serves the game page from ./public.
 //
-// Players named "Doug" in green armor have extra powers, so online they must first
-// send {t: "auth", key} with the password stored in the DOUG_PASSWORD secret
-// (`wrangler secret put DOUG_PASSWORD`). Anyone else using that name and color is
-// refused. "Alex" in blue may also be invisible, with no password.
+// Some name + armor color combinations have extra powers. Online they must first send
+// {t: "auth", key, who} with the password in that profile's Worker secret
+// (DOUG_PASSWORD, ALEX_PASSWORD, NOLAN_PASSWORD; set with `wrangler secret put`). Anyone else using a
+// protected name and color is refused.
 
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed Duke cheats) are told to refresh and can't join until they do.
 const MIN_BUILD = 5;
 const MAX_MESSAGE = 6000;
-const DOUG_COLOR = 2;
-const isDoug = d => String(d.n || "").trim().toLowerCase() === "doug" && d.c === DOUG_COLOR;
-// Alex in blue may be invisible without a password
-const ALEX_COLOR = 3;
-const isAlex = d => String(d.n || "").trim().toLowerCase() === "alex" && d.c === ALEX_COLOR;
+// protected profiles: name -> armor color, and which can turn invisible
+const PROTECTED = { doug: { color: 2, invisible: true }, alex: { color: 3, invisible: true }, nolan: { color: 3, invisible: false } };
+const profileOf = d => { const n = String(d.n || "").trim().toLowerCase(), p = PROTECTED[n]; return p && d.c === p.color ? n : null; };
 
 function lobbyName(raw) {
   const name = String(raw || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48);
@@ -76,17 +74,19 @@ export class Lobby {
     try { d = JSON.parse(message); } catch { return; }
     if (!d || typeof d !== "object" || Array.isArray(d)) return;
     if (d.t === "auth") {
-      const secret = this.env && this.env.DOUG_PASSWORD;
+      const who = typeof d.who === "string" && PROTECTED[d.who] ? d.who : "doug";
+      const secret = this.env && this.env[who.toUpperCase() + "_PASSWORD"];
       const ok = !!secret && typeof d.key === "string" && d.key === secret;
-      ws.serializeAttachment({ ...a, auth: ok });
+      ws.serializeAttachment({ ...a, auth: ok ? who : false });
       try { ws.send(JSON.stringify({ t: "auth", ok })); } catch {}
       return;
     }
-    if (isDoug(d) && !a.auth) {
+    const prof = profileOf(d);
+    if (prof && a.auth !== prof) {
       try { ws.send(JSON.stringify({ t: "denied" })); } catch {}
       return;
     }
-    if (!a.auth && !isAlex(d)) delete d.iv; // only a verified Doug, or Alex in blue, can be invisible
+    if (!(a.auth && PROTECTED[a.auth].invisible)) delete d.iv; // only verified profiles can be invisible
     this.last.set(a.id, d);
     const out = JSON.stringify({ t: "st", id: a.id, d });
     for (const other of this.ctx.getWebSockets()) {

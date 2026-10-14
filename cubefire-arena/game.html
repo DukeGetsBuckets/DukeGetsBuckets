@@ -153,6 +153,12 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 #waiting{position:absolute;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 14px;font-size:13px;font-weight:600;text-align:center;max-width:calc(100% - 32px)}
 #duke button.nuke{border-color:#ff4f5e;background:rgba(255,79,94,.25);color:#ffd5d9;font-size:14px;padding:7px 14px}
 #duke button.nuke:disabled{opacity:.45}
+body.pig{--accent:#ff7ac8}
+body.pig #cross i,body.pig #cross b{background:#ff9fd0}
+body.pig #ring .fg{stroke:#ff9fd0}
+body.pig #xammo{color:#ffd0ea}
+#pigTint{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 55%,rgba(255,122,200,.3));display:none}
+body.pig #pigTint{display:block}
 #nukeFlash{position:absolute;inset:0;background:radial-gradient(circle at center,#fff 0,#fff6d6 40%,#ffb627 100%);opacity:0;pointer-events:none}
 #hurt{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(255,40,60,.55));opacity:0}
 #dmgdir{position:absolute;left:50%;top:50%;width:0;height:0;opacity:0;transition:opacity .4s}
@@ -234,6 +240,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
   <div id="feed"></div>
   <div id="hurt"></div>
   <div id="nukeFlash"></div>
+  <div id="pigTint"></div>
   <div id="scope" hidden></div>
   <div id="waiting" hidden></div>
   <div id="reticle">
@@ -358,7 +365,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 <div id="pw" hidden>
   <form class="card" id="pwForm" autocomplete="off">
     <h2>Password</h2>
-    <p>Doug needs the password to play online.</p>
+    <p id="pwWho">This name needs the password to play online.</p>
     <input type="password" id="pwIn" aria-label="Password" autocomplete="off" autocapitalize="off" spellcheck="false">
     <p id="pwErr" hidden>That password isn't right.</p>
     <div class="btns">
@@ -897,6 +904,10 @@ function buildMeshes() {
     scene.add(mesh); mapMeshes.push(mesh);
   }
 }
+// Pig mode: once someone plays as Mason, this device is pig-themed for good (pink
+// guns with snouts, pink tracers, oinks, pink screen) and they stay a pig to others.
+let pigMode = load("cfa.pig") === "1";
+const PIG_PINK = 0xff7ac8;
 function loadMap(id) {
   if (id === mapId && mapMeshes.length) return;
   mapId = MAPS[id] ? id : "arena";
@@ -906,7 +917,8 @@ function loadMap(id) {
   M.build();
   buildMeshes();
   computeSpawns();
-  scene.background.setHex(M.sky); scene.fog.color.setHex(M.sky); scene.fog.near = M.fog[0]; scene.fog.far = M.fog[1];
+  scene.background.setHex(M.sky); if (pigMode) scene.background.lerp(new THREE.Color(PIG_PINK), 0.32);
+  scene.fog.color.copy(scene.background); scene.fog.near = M.fog[0]; scene.fog.far = M.fog[1];
   groundMat.color.setHex(M.ground); outerMat.color.setHex(M.outer);
   groundTex.repeat.set(W, D);
   ground.scale.set(W, D, 1); ground.position.set(W / 2, 1, D / 2);
@@ -1075,8 +1087,8 @@ function makePig(colorHex, name) {
   scene.add(g);
   return { g, head, arms, tag, name, body: vest, skin: "pig" };
 }
-function makeAvatar(colorHex, name) {
-  if (skinFor(name) === "pig") return makePig(colorHex, name);
+function makeAvatar(colorHex, name, skinName) {
+  if ((skinName || skinFor(name)) === "pig") return makePig(colorHex, name);
   const g = new THREE.Group();
   const body = lam(colorHex), dark = lam(0x2a2f37), skin = lam(0xe8c9a0);
   box(0.24, 0.75, 0.28, dark, -0.14, 0.375, 0, g); box(0.24, 0.75, 0.28, dark, 0.14, 0.375, 0, g);
@@ -1122,9 +1134,49 @@ const guns = WEAPONS.map((w, i) => {
   const f1 = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.34), flashMat); flash.add(f1);
   const f2 = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.42), flashMat); f2.rotation.y = Math.PI / 2; f2.rotation.x = Math.PI / 2; flash.add(f2);
   flash.position.set(0, 0.02, i === 0 ? -0.72 : i === 1 ? -0.8 : -0.92); flash.visible = false; g.add(flash);
-  g.userData.flash = flash; g.visible = false; vmRoot.add(g);
+  g.userData.flash = flash; g.userData.flashMat = flashMat; g.visible = false; vmRoot.add(g);
   return g;
 });
+function applyPigTheme() {
+  if (!pigMode) return;
+  document.body.classList.add("pig");
+  // On this device the game becomes "Pig Fire": pig names for the game, guns, maps and labels
+  document.title = "Pig Fire";
+  const h1 = document.querySelector(".brand h1"); if (h1) { h1.textContent = "Pig"; const sp = document.createElement("span"); sp.textContent = "fire"; h1.appendChild(sp); }
+  const tag = document.querySelector(".brand p"); if (tag) tag.textContent = "Free-for-all oink-fest. Play online with friends, or warm up against piglets.";
+  ["Oink Rifle", "Snout Gun", "Hog Sniper"].forEach((n, i) => { WEAPONS[i].name = n; });
+  const slots = document.querySelectorAll("#slots div"); slots.forEach((d, i) => { d.textContent = (i + 1) + " " + WEAPONS[i].name; });
+  MAPS.arena.name = "Pig Arena"; MAPS.farm.name = "Pig Farm"; MAPS.peaks.name = "Pig Peaks";
+  document.querySelectorAll("#mapPick button").forEach(b => { if (MAPS[b.dataset.v]) b.textContent = MAPS[b.dataset.v].name; });
+  const elimTag = document.querySelector("#elim .tag"); if (elimTag) elimTag.textContent = "Oinked";
+  const hpLbl = document.querySelector(".vitals .lbl span"); if (hpLbl) hpLbl.textContent = "Oink HP";
+  const nadeLbl = document.querySelector("#nadeHud span"); if (nadeLbl) nadeLbl.textContent = "Pig bombs";
+  const botsSub = document.querySelector("#playBots span"); if (botsSub) botsSub.textContent = "Practice against 6–8 piglets";
+  const recolor = { "262a31": 0xd77f98, "4a5260": 0xf2a0b6, "ffb627": 0xf8c3d0 };
+  guns.forEach((g, i) => {
+    if (g.userData.pig) return;
+    g.userData.pig = true;
+    g.traverse(o => { if (o.isMesh && o.material && o.material.color && recolor[o.material.color.getHexString()] != null) o.material.color.setHex(recolor[o.material.color.getHexString()]); });
+    g.userData.flashMat.color.setHex(PIG_PINK);
+    const z = g.userData.flash.position.z + 0.06, snout = lam(0xf8c3d0), hole = lam(0x5a2a38);  // a pig snout on the barrel
+    box(0.16, 0.13, 0.05, snout, 0, 0.02, z, g);
+    box(0.035, 0.05, 0.02, hole, -0.035, 0.02, z - 0.03, g); box(0.035, 0.05, 0.02, hole, 0.035, 0.02, z - 0.03, g);
+  });
+}
+function enablePig() { if (!pigMode) { pigMode = true; save("cfa.pig", "1"); scene.background.lerp(new THREE.Color(PIG_PINK), 0.32); scene.fog.color.copy(scene.background); } applyPigTheme(); }
+applyPigTheme();
+// Oink: a short squeal with a falling pitch (rate-limited)
+let oinkT = 0;
+function oink(vol = 0.35, pitch = 1) {
+  if (!ac) return;
+  const n = now(); if (n < oinkT) return; oinkT = n + 0.22;
+  const t = ac.currentTime, o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+  o.type = "sawtooth";
+  o.frequency.setValueAtTime(420 * pitch, t); o.frequency.exponentialRampToValueAtTime(260 * pitch, t + 0.16);
+  f.type = "bandpass"; f.frequency.value = 1100; f.Q.value = 2;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+  o.connect(f).connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.22);
+}
 
 // ======================================================================
 // Effects: tracers and impact sparks
@@ -1261,7 +1313,7 @@ function connectServer(name) {
   sock = s;
   s.onopen = () => {
     sockRetry = 0; setNet("live");
-    if (dougKey) s.send(JSON.stringify({ t: "auth", key: dougKey }));
+    if (authKey) s.send(JSON.stringify({ t: "auth", key: authKey, who: authWho }));
     publish(true);
   };
   s.onmessage = e => {
@@ -1276,9 +1328,9 @@ function connectServer(name) {
       renderStatus();
     } else if (m.t === "leave" && m.id) removeRemote(String(m.id));
     else if (m.t === "update") { mustRefresh = true; showRefresh(); }
-    else if (m.t === "auth") { dougAuthed = !!m.ok; if (authWait) authWait(dougAuthed); }
+    else if (m.t === "auth") { authedAs = m.ok ? authWho : null; if (authWait) authWait(!!m.ok); }
     else if (m.t === "denied" && state === "play" && mode === "online") {
-      leaveMatch(); banner("Doug needs the password to play online");
+      leaveMatch(); banner("That name and color need the password to play online");
     }
   };
   s.onclose = () => {
@@ -1391,6 +1443,7 @@ function onPeer(p) {
   r.alive = s.al !== 0;
   r.cr = s.cr === 1;
   r.iv = s.iv === 1;
+  r.sk = s.sk === "pig" ? "pig" : null;
   r.k = Math.max(0, Math.floor(num(s.k) || 0));
   r.d = Math.max(0, Math.floor(num(s.d) || 0));
   const pos = vec(s.p);
@@ -1420,7 +1473,7 @@ function onPeer(p) {
     if (h.t === myPeer && online && alive) {
       const wi = clamp(Math.floor(num(h.w) || 0), 0, 3);
       const dm = clamp(num(h.dm) || 0, 0, MAXDMG[wi]);
-      takeDamage(dm, { name: r.name, peer: r.peer, pos: r.pos }, !!h.hs);
+      takeDamage(dm, { name: r.name, peer: r.peer, pos: r.pos }, !!h.hs, h.nk === 1);
     }
   }
   r.lastHit = hits.reduce((m, h) => Math.max(m, h.s), r.lastHit);
@@ -1466,7 +1519,7 @@ function publish(force, target) {
     n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0, afk: playing && iAmAfk() ? 1 : 0, hb: Math.floor(now()),
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
-    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, k: playing ? kills : 0, d: playing ? deaths : 0,
+    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : null, k: playing ? kills : 0, d: playing ? deaths : 0,
     sh: playing ? lastShot : null, gr: playing ? lastNade : null, nk: playing ? lastNuke : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
   if (netKind === "ws") { if (sock && sock.readyState === 1) { try { sock.send(JSON.stringify(P)); } catch (e) {} } }
@@ -1490,7 +1543,8 @@ function startBots() {
   stopBots();
   bots = BOT_DEFS.slice(0, clamp(Math.round(W / 16), 5, 8)).map(([n, c], i) => {
     const b = makeEnt();
-    Object.assign(b, { name: "Bot " + n, color: c, hp: 100, alive: true, k: 0, d: 0, yaw: 0, pitch: 0, nextShot: 0, goal: null, goalT: 0, strafe: 1, strafeT: 0, respawnAt: 0, av: makeAvatar(PAL[c], "Bot " + n), bot: true, id: i });
+    const bn = (pigMode ? "Piglet " : "Bot ") + n;
+    Object.assign(b, { name: bn, color: c, hp: 100, alive: true, k: 0, d: 0, yaw: 0, pitch: 0, nextShot: 0, goal: null, goalT: 0, strafe: 1, strafeT: 0, respawnAt: 0, av: makeAvatar(PAL[c], bn), bot: true, id: i });
     b.pos.copy(farSpawn());
     return b;
   });
@@ -1503,9 +1557,10 @@ function updateBot(b, dt, t) {
   const myEye = me.pos.clone(); myEye.y += EYE;
   let see = false, dist = Infinity;
   const to = myEye.clone().sub(eye);
-  if (alive && state === "play" && !(duke.on && duke.inv)) {
+  if (alive && state === "play") {
     dist = to.length();
-    if (dist < 40) { const dir = to.clone().normalize(); see = rayVoxel(eye, dir, dist) >= dist - 0.4; }
+    const range = duke.on && duke.inv ? 10 : 40;   // invisible: bots only notice you up close
+    if (dist < range) { const dir = to.clone().normalize(); see = rayVoxel(eye, dir, dist) >= dist - 0.4; }
   }
   const fwd = new V3(-Math.sin(b.yaw), 0, -Math.cos(b.yaw)), right = new V3(Math.cos(b.yaw), 0, -Math.sin(b.yaw));
   const wish = new V3();
@@ -1548,7 +1603,7 @@ function updateBot(b, dt, t) {
 // ======================================================================
 function enemies() {
   const list = [];
-  if (mode === "online") { for (const r of remotes.values()) if (activePeer(r) && r.alive && r.hasPos && !r.iv) list.push({ kind: "peer", r, pos: r.pos }); }
+  if (mode === "online") { for (const r of remotes.values()) if (activePeer(r) && r.alive && r.hasPos) list.push({ kind: "peer", r, pos: r.pos }); }
   else for (const b of bots) if (b.alive) list.push({ kind: "bot", r: b, pos: b.pos });
   return list;
 }
@@ -1581,40 +1636,51 @@ const DOUG_COLOR = 2; // green in PAL
 // Cheat profiles: a name + armor color unlocks a set of perks. Only Doug needs the
 // password online. Colors are indexes into PAL.
 const PROFILES = {
-  doug: { color: DOUG_COLOR, perks: ["aim", "god", "snipe", "wall", "inv", "tp"] },
-  alex: { color: 3, perks: ["wall", "inv"] },     // blue
-  range: { color: 4, perks: ["wall", "snipe"] },  // purple
-  nolan: { color: 3, perks: ["nuke"] },           // blue: one nuke per match
+  doug: { color: DOUG_COLOR, perks: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], nukeWait: 0, password: true },
+  alex: { color: 3, perks: ["wall", "inv"], password: true },     // blue
+  range: { color: 4, perks: ["wall"] },           // purple
+  nolan: { color: 3, perks: ["wall", "nuke"], nukeWait: 180, password: true }, // blue: walls + a nuke every 3 minutes
 };
 const PERK_DEFAULT = { aim: true, god: true, snipe: true, wall: true, inv: false };
 const PERK_BUTTON = { aim: "dkAim", god: "dkGod", snipe: "dkSnipe", wall: "dkWall", inv: "dkInv", tp: "dkTp", nuke: "dkNuke" };
 const hasPerk = k => duke.on && duke.perks.includes(k);
-const DOUG_HASH = "744120d75bb6e2e92c194f056307d6da7c113823649a6ef5ddcc9ff660e1043d";
+// SHA-256 fingerprints, used only where there's no game server (claude.ai, peer-to-peer).
+// Online through the game server, passwords are checked against the server's secrets.
+const PASSWORD_HASH = {
+  doug: "744120d75bb6e2e92c194f056307d6da7c113823649a6ef5ddcc9ff660e1043d",
+  // Alex's and Nolan's passwords are short, so no fingerprint is kept here (it could be
+  // cracked); they only unlock online through the game server.
+};
 const duke = { on: false, profile: null, perks: [], aim: false, god: false, snipe: false, wall: false, inv: false };
-let dougKey = "", dougAuthed = false, authWait = null;
-const isDougIdentity = () => cleanName(nick.value).toLowerCase() === "doug" && myColor === DOUG_COLOR;
+let authKey = "", authWho = "", authedAs = null, authWait = null;
+// Which password-protected profile the menu's name and color pick, if any
+const passwordProfile = () => {
+  const nm = cleanName(nick.value).toLowerCase(), prof = PROFILES[nm];
+  return prof && prof.password && myColor === prof.color ? nm : null;
+};
 async function sha256hex(text) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
-async function checkDougPassword(pw) {
+async function checkPassword(who, pw) {
   if (netKind === "ws") {
-    dougKey = pw;
+    authKey = pw; authWho = who;
     if (!sock || sock.readyState !== 1) return false;
     return new Promise(res => {
       const t = setTimeout(() => { authWait = null; res(false); }, 6000);
       authWait = ok => { clearTimeout(t); authWait = null; res(ok); };
-      sock.send(JSON.stringify({ t: "auth", key: pw }));
+      sock.send(JSON.stringify({ t: "auth", key: pw, who }));
     });
   }
-  try { return (await sha256hex(pw)) === DOUG_HASH; } catch (e) { return false; }
+  if (!PASSWORD_HASH[who]) return false;
+  try { return (await sha256hex(pw)) === PASSWORD_HASH[who]; } catch (e) { return false; }
 }
 const SNIPER_NORMAL = (({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }) => ({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }))(WEAPONS[2]);
 const SNIPER_DUKE = { auto: true, rate: 0.14, spread: 0, aimSpread: 0, quickscope: undefined, dmg: 150, head: 150, mag: 99, reload: 0.3 };
 function applyDuke() {
   const nm = myName.toLowerCase(), prof = PROFILES[nm];
   let profile = prof && myColor === prof.color ? nm : null;
-  if (profile === "doug" && !(mode === "bots" || dougAuthed)) profile = null;
+  if (profile && PROFILES[profile].password && !(mode === "bots" || authedAs === profile)) profile = null;
   if (profile !== duke.profile) {                       // new profile: reset switches to its defaults
     duke.profile = profile; duke.perks = profile ? PROFILES[profile].perks : [];
     for (const k of Object.keys(PERK_DEFAULT)) duke[k] = duke.perks.includes(k) && PERK_DEFAULT[k];
@@ -1680,15 +1746,20 @@ function teleportCycle() {
   if (!list.length) { banner("Nobody to teleport to"); return; }
   teleportTo(list[tpNext++ % list.length]);
 }
-// Nuke: one per match. Eliminates every enemy at once, with a flash everyone sees.
-let nukeUsed = false, nukeSeq = 0, lastNuke = null;
+// Nuke: eliminates every enemy at once, with a flash everyone sees. Each profile sets
+// how long it takes to recharge (Nolan: 3 minutes, Doug: none). The timer keeps
+// running between matches.
+let nukeReadyAt = 0, nukeSeq = 0, lastNuke = null;
 function fireNuke() {
-  if (!hasPerk("nuke") || nukeUsed || state !== "play" || !alive) return;
-  nukeUsed = true;
+  if (!hasPerk("nuke") || now() < nukeReadyAt || state !== "play" || !alive) return;
+  nukeReadyAt = now() + (PROFILES[duke.profile].nukeWait || 0);
   hitsOut.length = 0;                    // earlier hits were already delivered; make room for everyone
-  const list = enemies();
+  const list = mode === "online"
+    ? [...remotes.values()].filter(r => r.pl && r.alive).map(r => ({ kind: "peer", r, pos: r.pos }))
+    : bots.filter(b => b.alive).map(b => ({ kind: "bot", r: b, pos: b.pos }));
   for (const tg of list) {
-    if (tg.kind === "peer") { hitsOut.push({ t: tg.r.peer, s: ++hitSeq, w: 3, dm: MAXDMG[3], hs: 0 }); tg.r.lastHitByMe = { w: 3 }; }
+    // nk: 1 means it can't be blocked (god mode, spawn protection)
+    if (tg.kind === "peer") { hitsOut.push({ t: tg.r.peer, s: ++hitSeq, w: 3, dm: MAXDMG[3], hs: 0, nk: 1 }); tg.r.lastHitByMe = { w: 3 }; }
     else if (tg.r.alive) {
       const b = tg.r; b.hp = 0; b.alive = false; b.d++; b.respawnAt = now() + 3; kills++;
       addFeed(myName, b.name, true);
@@ -1715,8 +1786,9 @@ function nukeFlash() {
 }
 function updateNukeButton() {
   const b = $("#dkNuke"); if (!b) return;
-  b.disabled = nukeUsed;
-  b.firstChild.textContent = nukeUsed ? "Nuke used" : "Nuke";
+  const left = Math.ceil(nukeReadyAt - now());
+  b.disabled = left > 0;
+  b.firstChild.textContent = left > 0 ? "Nuke " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") : "Nuke";
 }
 function closeTpList() { const el = $("#tpList"); if (el) { el.hidden = true; el.replaceChildren(); } $("#dkTp") && $("#dkTp").setAttribute("aria-pressed", "false"); }
 function openTpList() {
@@ -1755,9 +1827,10 @@ function aimbot() {
   if (best) { yaw = best.yawT; pitch = clamp(best.pitchT, -1.52, 1.52); }
   return best;
 }
-function takeDamage(dm, src, head) {
-  if (!alive || state !== "play" || now() < spawnProt || dm <= 0) return;
-  if (duke.on && duke.god) { showDmgDir(src.pos); return; }
+function takeDamage(dm, src, head, unblockable) {
+  if (!alive || state !== "play" || dm <= 0) return;
+  if (!unblockable && now() < spawnProt) return;
+  if (!unblockable && duke.on && duke.god) { showDmgDir(src.pos); return; }
   hp -= dm; lastHurt = now();
   showDmgDir(src.pos);
   blip(head ? 180 : 140, 0.12, 0.12, "sawtooth");
@@ -1783,6 +1856,7 @@ function assistPick(coneMul) {
   const touchMul = isTouch ? 1.3 : 1;
   let best = null, bestScore = Infinity;
   for (const tg of enemies()) {
+    if (tg.r.iv) continue;
     const v = tg.pos.clone(); v.y += tg.r.cr ? 0.9 : 1.2; v.sub(o);
     const dist = v.length(); if (dist < 0.6 || dist > WEAPONS[cur].range * 0.8) continue;
     v.divideScalar(dist);
@@ -1861,7 +1935,7 @@ function fire() {
     } else if (wall < w.range) spark(end);
   }
   const muzzle = o.clone().addScaledVector(base, 0.6).addScaledVector(right, 0.16).add(new V3(0, -0.14, 0));
-  tracer(muzzle, firstEnd, 0xfff0b0, 0.09);
+  tracer(muzzle, firstEnd, pigMode ? PIG_PINK : 0xfff0b0, 0.09);
   let killedAny = false;
   for (const [tg, v] of dealt) {
     const dm = Math.min(v.dm, MAXDMG[cur]);
@@ -1886,12 +1960,13 @@ function fire() {
   guns[cur].userData.flash.visible = true; guns[cur].userData.flash.rotation.z = Math.random() * Math.PI;
   flashLight.intensity = 3; flashT = t + 0.05;
   gunSound(cur, 1);
+  if (pigMode) oink(0.3, 0.9 + Math.random() * 0.25);
   publish(true);
   if (ammo[cur] === 0) startReload(); // auto-reload on empty
 }
 let flashT = 0, dryT = 0;
 function dryFire() { const t = now(); if (t < dryT) return; dryT = t + 0.3; blip(1900, 0.03, 0.08, "square"); blip(900, 0.04, 0.06, "square", 0.04); }
-function killSound() { blip(1200, 0.12, 0.12); blip(1600, 0.18, 0.1, "square", 0.08); }
+function killSound() { blip(1200, 0.12, 0.12); blip(1600, 0.18, 0.1, "square", 0.08); if (pigMode) { oinkT = 0; oink(0.5, 1.35); } }
 let nades = NADE.count, nadeReady = 0, nadeSeq = 0, lastNade = null, shake = 0;
 const liveNades = [];
 const nadeGeo = new THREE.BoxGeometry(0.24, 0.3, 0.24), nadeMat = lam(0x3f5f2c);
@@ -2370,6 +2445,7 @@ function renderHud(t) {
   if (!alive && state === "play") $("#deathSub").textContent = "Respawning in " + Math.max(1, Math.ceil(respawnAt - t));
   $("#tFire").classList.toggle("on", touchCombo);
   $("#tCrouch").classList.toggle("on", crouch);
+  if (duke.on && hasPerk("nuke")) updateNukeButton();
   $("#nadeN").textContent = nades; $("#tNadeN").textContent = nades;
   $("#tNade").style.opacity = nades > 0 ? 1 : 0.45;
   const board = $("#board"); board.hidden = !boardOpen;
@@ -2384,6 +2460,13 @@ function renderHud(t) {
 // Menu and settings
 // ======================================================================
 const nick = $("#nick"); nick.value = myName;
+// Once someone has played as Mason, they stay Mason (and the pig) on this device
+function lockMason() {
+  if (!pigMode) return;
+  myName = "Mason"; nick.value = "Mason"; nick.disabled = true; nick.title = "This device plays as Mason";
+  save("cfa.name", myName);
+}
+lockMason();
 const codeIn = $("#code"); codeIn.value = partyCode.toUpperCase();
 const sw = $("#swatches");
 PAL.forEach((c, i) => {
@@ -2411,7 +2494,9 @@ function startGame(m) {
   myName = cleanName(nick.value) || myName;
   partyCode = cleanCode(codeIn.value);
   save("cfa.name", myName); save("cfa.color", myColor); save("cfa.code", partyCode);
-  mode = m; kills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null; nukeUsed = false;
+  mode = m; kills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null;
+  if (myName.toLowerCase() === "mason") enablePig();
+  lockMason();
   applyDuke();
   if (!$("#notice").hidden) { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); } // seen it; clear the screen for play
   state = "play";
@@ -2424,7 +2509,11 @@ function startGame(m) {
 }
 $("#playOnline").addEventListener("click", () => {
   if (netState === "offline") { banner("Online play isn't available on this page"); return; }
-  if (isDougIdentity() && !dougAuthed) { $("#pwErr").hidden = true; $("#pwIn").value = ""; $("#pw").hidden = false; $("#pwIn").focus(); return; }
+  const who = passwordProfile();
+  if (who && authedAs !== who) {
+    $("#pwWho").textContent = who[0].toUpperCase() + who.slice(1) + " needs the password to play online.";
+    $("#pwErr").hidden = true; $("#pwIn").value = ""; $("#pw").hidden = false; $("#pwIn").focus(); return;
+  }
   startGame("online");
 });
 $("#pwCancel").addEventListener("click", () => { $("#pw").hidden = true; });
@@ -2441,10 +2530,11 @@ $("#pwForm").addEventListener("submit", async e => {
   e.preventDefault();
   const go = $("#pwGo"); go.disabled = true; go.textContent = "Checking…";
   myName = cleanName(nick.value) || myName;
-  const ok = await checkDougPassword($("#pwIn").value);
+  const who = passwordProfile();
+  const ok = !!who && await checkPassword(who, $("#pwIn").value);
   go.disabled = false; go.textContent = "Join online";
-  if (!ok) { dougKey = ""; dougAuthed = false; $("#pwErr").hidden = false; $("#pwIn").select(); return; }
-  dougAuthed = true; $("#pw").hidden = true;
+  if (!ok) { authKey = ""; authWho = ""; authedAs = null; $("#pwErr").hidden = false; $("#pwIn").select(); return; }
+  authedAs = who; $("#pw").hidden = true;
   startGame("online");
 });
 $("#playBots").addEventListener("click", () => startGame("bots"));
@@ -2549,8 +2639,9 @@ function tick() {
   const kk = 1 - Math.exp(-14 * dt);
   for (const r of remotes.values()) {
     const show = mode === "online" && activePeer(r) && r.hasPos && r.alive && !r.iv;
-    if (r.av && r.av.skin !== skinFor(r.name)) { disposeAvatar(r.av); r.av = null; }
-    if (show && !r.av) r.av = makeAvatar(PAL[r.color], r.name);
+    const wantSkin = r.sk === "pig" ? "pig" : skinFor(r.name);
+    if (r.av && r.av.skin !== wantSkin) { disposeAvatar(r.av); r.av = null; }
+    if (show && !r.av) r.av = makeAvatar(PAL[r.color], r.name, wantSkin);
     if (!r.av) continue;
     r.av.g.visible = show;
     if (!show) continue;
