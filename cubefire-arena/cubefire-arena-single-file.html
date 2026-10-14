@@ -163,6 +163,9 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 .touch #elim{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 #banner{position:absolute;left:0;right:0;top:28%;text-align:center;font:400 clamp(18px,4vw,30px) var(--display);color:var(--accent);text-shadow:0 2px 0 rgba(0,0,0,.5);opacity:0;transition:opacity .25s;padding:0 16px}
 #waiting{position:absolute;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 14px;font-size:13px;font-weight:600;text-align:center;max-width:calc(100% - 32px)}
+#duke button.nuke{border-color:#ff4f5e;background:rgba(255,79,94,.25);color:#ffd5d9;font-size:14px;padding:7px 14px}
+#duke button.nuke:disabled{opacity:.45}
+#nukeFlash{position:absolute;inset:0;background:radial-gradient(circle at center,#fff 0,#fff6d6 40%,#ffb627 100%);opacity:0;pointer-events:none}
 #hurt{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(255,40,60,.55));opacity:0}
 #dmgdir{position:absolute;left:50%;top:50%;width:0;height:0;opacity:0;transition:opacity .4s}
 #dmgdir i{position:absolute;left:-60px;top:-150px;width:120px;height:26px;background:radial-gradient(ellipse at center bottom,rgba(255,79,94,.95),transparent 70%)}
@@ -242,6 +245,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
   <div class="mini" id="mini"><h2><i></i><span id="miniTitle">Arena</span></h2><div id="miniRows"></div></div>
   <div id="feed"></div>
   <div id="hurt"></div>
+  <div id="nukeFlash"></div>
   <div id="scope" hidden></div>
   <div id="waiting" hidden></div>
   <div id="reticle">
@@ -259,6 +263,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
     <button type="button" id="dkWall" aria-pressed="true">Walls<small>N</small></button>
     <button type="button" id="dkInv" aria-pressed="false">Invisible<small>I</small></button>
     <button type="button" id="dkTp" aria-pressed="false">Teleport<small>T</small></button>
+    <button type="button" id="dkNuke" class="nuke">Nuke<small>B</small></button>
     <div id="tpList" hidden></div>
   </div>
   <div id="elim" aria-live="polite"><div class="tag">Eliminated</div><div class="body"><div class="who" id="elimWho"></div><div class="how" id="elimHow"></div></div></div>
@@ -1069,7 +1074,34 @@ function nameSprite(text) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: true, transparent: true }));
   s.scale.set(2.8, 0.4, 1); return s;
 }
+// Custom skins by player name (everyone sees them)
+const SKINS = { mason: "pig" };
+const skinFor = name => SKINS[String(name || "").toLowerCase()] || "default";
+// Pig skin: pink pig with a snout, ears and a curly tail, wearing an armor-colored vest
+function makePig(colorHex, name) {
+  const g = new THREE.Group();
+  const pink = lam(0xf2a0b6), light = lam(0xf8c3d0), hoof = lam(0x5a3a3f), black = lam(0x1b1b1f), vest = lam(colorHex), dark = lam(0x2a2f37);
+  box(0.24, 0.6, 0.28, pink, -0.14, 0.45, 0, g); box(0.24, 0.6, 0.28, pink, 0.14, 0.45, 0, g);
+  box(0.25, 0.15, 0.29, hoof, -0.14, 0.075, 0, g); box(0.25, 0.15, 0.29, hoof, 0.14, 0.075, 0, g);
+  box(0.66, 0.64, 0.4, pink, 0, 1.06, 0, g);
+  box(0.68, 0.34, 0.42, vest, 0, 1.12, 0, g);                                   // vest in armor color
+  box(0.06, 0.06, 0.12, pink, 0, 0.92, 0.25, g); box(0.06, 0.12, 0.06, pink, 0.05, 0.98, 0.3, g); // curly tail
+  const head = new THREE.Group(); head.position.set(0, 1.37, 0); g.add(head);
+  box(0.5, 0.46, 0.5, pink, 0, 0.23, 0, head);
+  box(0.26, 0.18, 0.1, light, 0, 0.16, -0.29, head);                           // snout
+  box(0.05, 0.07, 0.02, black, -0.06, 0.16, -0.345, head); box(0.05, 0.07, 0.02, black, 0.06, 0.16, -0.345, head);
+  box(0.07, 0.07, 0.02, black, -0.13, 0.32, -0.255, head); box(0.07, 0.07, 0.02, black, 0.13, 0.32, -0.255, head); // eyes
+  const earL = box(0.14, 0.16, 0.06, pink, -0.18, 0.5, -0.05, head); earL.rotation.z = 0.5;
+  const earR = box(0.14, 0.16, 0.06, pink, 0.18, 0.5, -0.05, head); earR.rotation.z = -0.5;
+  const arms = new THREE.Group(); arms.position.set(0, 1.25, 0); g.add(arms);
+  box(0.18, 0.18, 0.5, pink, 0.38, 0, -0.18, arms); box(0.18, 0.18, 0.5, pink, -0.22, 0, -0.26, arms);
+  box(0.1, 0.12, 0.7, dark, 0.2, 0.04, -0.5, arms);
+  const tag = nameSprite(name); tag.position.set(0, 2.2, 0); g.add(tag);
+  scene.add(g);
+  return { g, head, arms, tag, name, body: vest, skin: "pig" };
+}
 function makeAvatar(colorHex, name) {
+  if (skinFor(name) === "pig") return makePig(colorHex, name);
   const g = new THREE.Group();
   const body = lam(colorHex), dark = lam(0x2a2f37), skin = lam(0xe8c9a0);
   box(0.24, 0.75, 0.28, dark, -0.14, 0.375, 0, g); box(0.24, 0.75, 0.28, dark, 0.14, 0.375, 0, g);
@@ -1083,7 +1115,7 @@ function makeAvatar(colorHex, name) {
   box(0.1, 0.12, 0.7, dark, 0.2, 0.04, -0.5, arms);
   const tag = nameSprite(name); tag.position.set(0, 2.2, 0); g.add(tag);
   scene.add(g);
-  return { g, head, arms, tag, name, body };
+  return { g, head, arms, tag, name, body, skin: "default" };
 }
 function setAvatarName(a, name) {
   if (a.name === name) return;
@@ -1393,16 +1425,18 @@ function onPeer(p) {
   }
   if (Array.isArray(s.r)) { r.yaw = num(s.r[0]) || 0; r.pitch = clamp(num(s.r[1]) || 0, -1.6, 1.6); }
 
-  const hits = Array.isArray(s.hits) ? s.hits.slice(0, 8).filter(h => h && typeof h === "object" && num(h.s) !== null) : [];
+  const hits = Array.isArray(s.hits) ? s.hits.slice(0, 24).filter(h => h && typeof h === "object" && num(h.s) !== null) : [];
   const dth = s.dth && typeof s.dth === "object" && num(s.dth.s) !== null ? s.dth : null;
   const sh = s.sh && typeof s.sh === "object" && num(s.sh.s) !== null ? s.sh : null;
   const gr = s.gr && typeof s.gr === "object" && num(s.gr.s) !== null ? s.gr : null;
+  const nk = s.nk && typeof s.nk === "object" && num(s.nk.s) !== null ? s.nk : null;
   if (!r.init) {
     r.init = true;
     r.lastHit = hits.reduce((m, h) => Math.max(m, h.s), 0);
     r.lastDeath = dth ? dth.s : 0;
     r.lastShot = sh ? sh.s : 0;
     r.lastNade = gr ? gr.s : 0;
+    r.lastNuke = nk ? nk.s : 0;
     return;
   }
   const online = state === "play" && mode === "online";
@@ -1426,6 +1460,10 @@ function onPeer(p) {
       } else if (typeof dth.by === "string" && remotes.has(dth.by)) killer = remotes.get(dth.by).name;
       addFeed(killer, r.name, dth.by === myPeer);
     }
+  }
+  if (nk && nk.s > (r.lastNuke || 0)) {
+    r.lastNuke = nk.s;
+    if (online) { nukeFlash(); banner(r.name + " dropped a nuke!"); }
   }
   if (gr && gr.s > (r.lastNade || 0)) {
     r.lastNade = gr.s;
@@ -1454,7 +1492,7 @@ function publish(force, target) {
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
     al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, k: playing ? kills : 0, d: playing ? deaths : 0,
-    sh: playing ? lastShot : null, gr: playing ? lastNade : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
+    sh: playing ? lastShot : null, gr: playing ? lastNade : null, nk: playing ? lastNuke : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
   if (netKind === "ws") { if (sock && sock.readyState === 1) { try { sock.send(JSON.stringify(P)); } catch (e) {} } }
   else if (netKind === "room" && roomTarget) roomTarget.presence(P).catch(() => {});
@@ -1565,11 +1603,19 @@ function respawn() {
 // (it's a secret on the server, never in this code). Where there is no game server
 // (claude.ai, peer-to-peer) the password is checked against its SHA-256 fingerprint.
 const DOUG_COLOR = 2; // green in PAL
-// Alex in blue gets only wall hacks and invisibility, and needs no password.
-const ALEX_COLOR = 3; // blue in PAL
-const ALEX_ONLY = ["wall", "inv"];
+// Cheat profiles: a name + armor color unlocks a set of perks. Only Doug needs the
+// password online. Colors are indexes into PAL.
+const PROFILES = {
+  doug: { color: DOUG_COLOR, perks: ["aim", "god", "snipe", "wall", "inv", "tp"] },
+  alex: { color: 3, perks: ["wall", "inv"] },     // blue
+  range: { color: 4, perks: ["wall", "snipe"] },  // purple
+  nolan: { color: 3, perks: ["nuke"] },           // blue: one nuke per match
+};
+const PERK_DEFAULT = { aim: true, god: true, snipe: true, wall: true, inv: false };
+const PERK_BUTTON = { aim: "dkAim", god: "dkGod", snipe: "dkSnipe", wall: "dkWall", inv: "dkInv", tp: "dkTp", nuke: "dkNuke" };
+const hasPerk = k => duke.on && duke.perks.includes(k);
 const DOUG_HASH = "744120d75bb6e2e92c194f056307d6da7c113823649a6ef5ddcc9ff660e1043d";
-const duke = { on: false, aim: true, god: true, snipe: true, wall: true, inv: false };
+const duke = { on: false, profile: null, perks: [], aim: false, god: false, snipe: false, wall: false, inv: false };
 let dougKey = "", dougAuthed = false, authWait = null;
 const isDougIdentity = () => cleanName(nick.value).toLowerCase() === "doug" && myColor === DOUG_COLOR;
 async function sha256hex(text) {
@@ -1591,13 +1637,15 @@ async function checkDougPassword(pw) {
 const SNIPER_NORMAL = (({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }) => ({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }))(WEAPONS[2]);
 const SNIPER_DUKE = { auto: true, rate: 0.14, spread: 0, aimSpread: 0, quickscope: undefined, dmg: 150, head: 150, mag: 99, reload: 0.3 };
 function applyDuke() {
-  const nm = myName.toLowerCase();
-  const isDoug = nm === "doug" && myColor === DOUG_COLOR && (mode === "bots" || dougAuthed);
-  const isAlex = !isDoug && nm === "alex" && myColor === ALEX_COLOR;
-  if (isAlex && !duke.limited) { duke.aim = duke.god = duke.snipe = false; }        // Alex: walls + invisible only
-  if (isDoug && duke.limited) { duke.aim = duke.god = duke.snipe = true; }          // back to Doug's full set
-  duke.on = isDoug || isAlex; duke.limited = isAlex;
-  for (const id of ["dkAim", "dkGod", "dkSnipe", "dkTp"]) $("#" + id).hidden = duke.limited;
+  const nm = myName.toLowerCase(), prof = PROFILES[nm];
+  let profile = prof && myColor === prof.color ? nm : null;
+  if (profile === "doug" && !(mode === "bots" || dougAuthed)) profile = null;
+  if (profile !== duke.profile) {                       // new profile: reset switches to its defaults
+    duke.profile = profile; duke.perks = profile ? PROFILES[profile].perks : [];
+    for (const k of Object.keys(PERK_DEFAULT)) duke[k] = duke.perks.includes(k) && PERK_DEFAULT[k];
+  }
+  duke.on = !!profile;
+  for (const [k, id] of Object.entries(PERK_BUTTON)) $("#" + id).hidden = !duke.perks.includes(k);
   Object.assign(WEAPONS[2], duke.on && duke.snipe ? SNIPER_DUKE : SNIPER_NORMAL);
   ammo[2] = WEAPONS[2].mag; buildPips();
   $("#duke").hidden = !duke.on;
@@ -1607,6 +1655,7 @@ function applyDuke() {
   $("#dkWall").setAttribute("aria-pressed", String(duke.wall));
   $("#dkInv").setAttribute("aria-pressed", String(duke.inv));
   if (!duke.on) closeTpList();
+  updateNukeButton();
 }
 for (const [id, k] of [["dkAim", "aim"], ["dkGod", "god"], ["dkSnipe", "snipe"], ["dkWall", "wall"], ["dkInv", "inv"]]) {
   document.addEventListener("click", e => { if (!isTouchUI() && e.target.closest && e.target.closest("#" + id)) toggleDuke(k); });
@@ -1614,7 +1663,7 @@ for (const [id, k] of [["dkAim", "aim"], ["dkGod", "god"], ["dkSnipe", "snipe"],
 document.addEventListener("click", e => { if (!isTouchUI() && e.target.closest && e.target.closest("#dkTp")) openTpList(); });
 function isTouchUI() { return document.body.classList.contains("touch"); }
 function toggleDuke(k) {
-  if (!duke.on || (duke.limited && !ALEX_ONLY.includes(k))) return;
+  if (!hasPerk(k)) return;
   duke[k] = !duke[k];
   applyDuke();
   const label = { aim: "Aimbot", god: "God mode", snipe: "Auto sniper", wall: "Wall hacks", inv: "Invisible" }[k];
@@ -1651,14 +1700,52 @@ function teleportTo(tg) {
   }
 }
 function teleportCycle() {
-  if (!duke.on || duke.limited) return;
+  if (!hasPerk("tp")) return;
   const list = enemies();
   if (!list.length) { banner("Nobody to teleport to"); return; }
   teleportTo(list[tpNext++ % list.length]);
 }
+// Nuke: one per match. Eliminates every enemy at once, with a flash everyone sees.
+let nukeUsed = false, nukeSeq = 0, lastNuke = null;
+function fireNuke() {
+  if (!hasPerk("nuke") || nukeUsed || state !== "play" || !alive) return;
+  nukeUsed = true;
+  hitsOut.length = 0;                    // earlier hits were already delivered; make room for everyone
+  const list = enemies();
+  for (const tg of list) {
+    if (tg.kind === "peer") { hitsOut.push({ t: tg.r.peer, s: ++hitSeq, w: 3, dm: MAXDMG[3], hs: 0 }); tg.r.lastHitByMe = { w: 3 }; }
+    else if (tg.r.alive) {
+      const b = tg.r; b.hp = 0; b.alive = false; b.d++; b.respawnAt = now() + 3; kills++;
+      addFeed(myName, b.name, true);
+    }
+    explode({ pos: tg.pos.clone().add(new V3(0, 1, 0)), owner: null });
+  }
+  lastNuke = { s: ++nukeSeq };
+  nukeFlash();
+  banner(list.length ? "NUKE! " + list.length + " eliminated" : "NUKE! Nobody was around");
+  publish(true);
+  updateNukeButton();
+}
+function nukeFlash() {
+  const el = $("#nukeFlash");
+  el.style.transition = "none"; el.style.opacity = "1";
+  requestAnimationFrame(() => { el.style.transition = "opacity 1.6s ease-out"; el.style.opacity = "0"; });
+  shake = Math.max(shake, 1.6);
+  if (ac) {
+    const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+    o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(22, t + 1.6);
+    g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
+    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 1.9);
+  }
+}
+function updateNukeButton() {
+  const b = $("#dkNuke"); if (!b) return;
+  b.disabled = nukeUsed;
+  b.firstChild.textContent = nukeUsed ? "Nuke used" : "Nuke";
+}
 function closeTpList() { const el = $("#tpList"); if (el) { el.hidden = true; el.replaceChildren(); } $("#dkTp") && $("#dkTp").setAttribute("aria-pressed", "false"); }
 function openTpList() {
-  if (!duke.on || duke.limited) return;
+  if (!hasPerk("tp")) return;
   const el = $("#tpList");
   if (!el.hidden) { closeTpList(); return; }
   const list = enemies();
@@ -1670,6 +1757,11 @@ function openTpList() {
     el.appendChild(b);
   }
   el.hidden = false; $("#dkTp").setAttribute("aria-pressed", "true");
+}
+// Auto sniper trigger: is the crosshair right on an enemy with a clear shot?
+function crosshairOnEnemy() {
+  const o = eyePos(), d = aimDir(), wall = rayVoxel(o, d, WEAPONS[2].range);
+  return enemies().some(tg => { const h = rayPlayer(o, d, tg.pos, 0.15, tg.r.cr); return h && h.t < wall; });
 }
 // Aimbot: lock straight onto the head of the closest visible enemy in front of you
 function aimbot() {
@@ -2029,6 +2121,7 @@ window.addEventListener("keydown", e => {
   if (!e.repeat && e.code === "KeyN") toggleDuke("wall");
   if (!e.repeat && e.code === "KeyI") toggleDuke("inv");
   if (!e.repeat && e.code === "KeyT") teleportCycle();
+  if (!e.repeat && e.code === "KeyB") fireNuke();
   if (e.code === "KeyE") aimKey = true;
   if (e.code === "KeyC") crouch = true;
   if (e.code === "KeyR") startReload();
@@ -2097,6 +2190,7 @@ if (isTouch) {
     dkWall: { down() { toggleDuke("wall"); } },
     dkInv: { down() { toggleDuke("inv"); } },
     dkTp: { down() { openTpList(); } },
+    dkNuke: { down() { fireNuke(); } },
   };
   const btnEls = Object.keys(BTN).map(id => $("#" + id));
   function buttonAt(x, y) {
@@ -2342,7 +2436,7 @@ function startGame(m) {
   myName = cleanName(nick.value) || myName;
   partyCode = cleanCode(codeIn.value);
   save("cfa.name", myName); save("cfa.color", myColor); save("cfa.code", partyCode);
-  mode = m; kills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null;
+  mode = m; kills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null; nukeUsed = false;
   applyDuke();
   if (!$("#notice").hidden) { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); } // seen it; clear the screen for play
   state = "play";
@@ -2441,7 +2535,10 @@ function tick() {
         assistTg = null; assistPrev = null;
         const locked = aimbot();
         if (locked && duke.snipe && cur === 2 && t >= nextFire && !reloading) fire(); // auto sniper fires on lock
-      } else if (input) aimAssist(dt); else { assistTg = null; assistPrev = null; }
+      } else if (input) {
+        aimAssist(dt);
+        if (duke.on && duke.snipe && cur === 2 && t >= nextFire && !reloading && crosshairOnEnemy()) fire();
+      } else { assistTg = null; assistPrev = null; }
       if (reloading && t >= reloadEnd) { reloading = false; ammo[cur] = WEAPONS[cur].mag; blip(700, 0.05, 0.07); }
       if (snipePending) {
         const w = WEAPONS[cur];
@@ -2477,6 +2574,7 @@ function tick() {
   const kk = 1 - Math.exp(-14 * dt);
   for (const r of remotes.values()) {
     const show = mode === "online" && activePeer(r) && r.hasPos && r.alive && !r.iv;
+    if (r.av && r.av.skin !== skinFor(r.name)) { disposeAvatar(r.av); r.av = null; }
     if (show && !r.av) r.av = makeAvatar(PAL[r.color], r.name);
     if (!r.av) continue;
     r.av.g.visible = show;
