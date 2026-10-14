@@ -1086,7 +1086,7 @@ function nameSprite(text) {
 }
 // Custom skins by player name (everyone sees them)
 const SKINS = { mason: "pig" };
-const skinFor = name => SKINS[String(name || "").toLowerCase()] || "default";
+const skinFor = (name, color) => color === 6 ? "default" : SKINS[String(name || "").toLowerCase()] || "default"; // white armor = no pig
 // Pig skin: pink pig with a snout, ears and a curly tail, wearing an armor-colored vest
 function makePig(colorHex, name) {
   const g = new THREE.Group();
@@ -1717,6 +1717,7 @@ const PROFILES = {
   alex: { color: 3, perks: ["wall", "inv"], password: true },     // blue
   range: { color: 4, perks: ["wall"] },           // purple
   nolan: { color: 3, perks: ["wall", "nuke"], nukeWait: 180, password: true }, // blue: walls + a nuke every 3 minutes
+  luca: { color: 4, perks: ["wall", "aim", "inv"], password: true }, // purple: walls, aimbot, invisibility
 };
 const PERK_DEFAULT = { aim: true, god: true, snipe: true, wall: true, inv: false };
 const PERK_BUTTON = { aim: "dkAim", god: "dkGod", snipe: "dkSnipe", wall: "dkWall", inv: "dkInv", tp: "dkTp", nuke: "dkNuke" };
@@ -1725,7 +1726,7 @@ const hasPerk = k => duke.on && duke.perks.includes(k);
 // Online through the game server, passwords are checked against the server's secrets.
 const PASSWORD_HASH = {
   doug: "744120d75bb6e2e92c194f056307d6da7c113823649a6ef5ddcc9ff660e1043d",
-  // Alex's and Nolan's passwords are short, so no fingerprint is kept here (it could be
+  // Alex's, Nolan's and Luca's passwords are short, so no fingerprint is kept here (it could be
   // cracked); they only unlock online through the game server.
 };
 const duke = { on: false, profile: null, perks: [], aim: false, god: false, snipe: false, wall: false, inv: false };
@@ -2636,12 +2637,21 @@ function lockMason() {
   save("cfa.name", myName);
 }
 lockMason();
+// Mason picking white armor leaves Pig Fire: the pig theme, mud guns and name lock all go
+const PIG_EXIT_COLOR = 6; // white in PAL
+function leavePig() {
+  save("cfa.pig", "0"); save("cfa.color", myColor);
+  location.reload();
+}
 const codeIn = $("#code"); codeIn.value = partyCode.toUpperCase();
 const sw = $("#swatches");
 PAL.forEach((c, i) => {
   const b = document.createElement("button"); b.type = "button"; b.style.background = c;
   b.setAttribute("aria-label", "Color " + (i + 1)); b.setAttribute("aria-pressed", String(i === myColor));
-  b.addEventListener("click", () => { myColor = i; [...sw.children].forEach((x, j) => x.setAttribute("aria-pressed", String(j === i))); });
+  b.addEventListener("click", () => {
+    myColor = i; [...sw.children].forEach((x, j) => x.setAttribute("aria-pressed", String(j === i)));
+    if (pigMode && i === PIG_EXIT_COLOR) leavePig();
+  });
   sw.appendChild(b);
 });
 const sens = $("#sens"); sens.value = String(sensVal); $("#sensOut").textContent = String(sensVal);
@@ -2664,7 +2674,7 @@ function startGame(m) {
   partyCode = cleanCode(codeIn.value);
   save("cfa.name", myName); save("cfa.color", myColor); save("cfa.code", partyCode);
   mode = m; kills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null;
-  if (myName.toLowerCase() === "mason") enablePig();
+  if (myName.toLowerCase() === "mason" && myColor !== PIG_EXIT_COLOR) enablePig();
   lockMason();
   applyDuke();
   if (!$("#notice").hidden) { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); } // seen it; clear the screen for play
@@ -2808,7 +2818,7 @@ function tick() {
   const kk = 1 - Math.exp(-14 * dt);
   for (const r of remotes.values()) {
     const show = mode === "online" && activePeer(r) && r.hasPos && r.alive && !r.iv;
-    const wantSkin = r.sk === "pig" ? "pig" : skinFor(r.name);
+    const wantSkin = r.sk === "pig" ? "pig" : skinFor(r.name, r.color);
     if (r.av && r.av.skin !== wantSkin) { disposeAvatar(r.av); r.av = null; }
     if (show && !r.av) r.av = makeAvatar(PAL[r.color], r.name, wantSkin);
     if (!r.av) continue;

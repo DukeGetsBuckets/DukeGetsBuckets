@@ -5,7 +5,7 @@
 //
 // Some name + armor color combinations have extra powers. Online they must first send
 // {t: "auth", key, who} with the password in that profile's Worker secret
-// (DOUG_PASSWORD, ALEX_PASSWORD, NOLAN_PASSWORD; set with `wrangler secret put`). Anyone else using a
+// (DOUG_PASSWORD, ALEX_PASSWORD, NOLAN_PASSWORD, LUCA_PASSWORD; set with `wrangler secret put`). Anyone else using a
 // protected name and color is refused.
 
 const MAX_PLAYERS = 16;
@@ -14,7 +14,7 @@ const MAX_PLAYERS = 16;
 const MIN_BUILD = 5;
 const MAX_MESSAGE = 6000;
 // protected profiles: name -> armor color, and which can turn invisible
-const PROTECTED = { doug: { color: 2, invisible: true }, alex: { color: 3, invisible: true }, nolan: { color: 3, invisible: false } };
+const PROTECTED = { doug: { color: 2, invisible: true }, alex: { color: 3, invisible: true }, nolan: { color: 3, invisible: false }, luca: { color: 4, invisible: true } };
 const profileOf = d => { const n = String(d.n || "").trim().toLowerCase(), p = PROTECTED[n]; return p && d.c === p.color ? n : null; };
 
 function lobbyName(raw) {
