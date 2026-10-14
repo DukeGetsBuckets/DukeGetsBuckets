@@ -211,6 +211,14 @@ body.pig #pigTint{display:block}
 #tDash{right:118px;bottom:calc(46px + env(safe-area-inset-bottom,0px));width:64px;height:64px;--cd:1;background:conic-gradient(rgba(54,214,195,.5) calc(var(--cd) * 360deg),rgba(0,0,0,.4) 0)}
 #tCrouch.on{background:rgba(255,182,39,.45)}
 .tb.down{filter:brightness(1.5);transform:scale(.94)}
+#tMud{right:270px;bottom:calc(186px + env(safe-area-inset-bottom,0px));width:52px;height:52px;font-size:11px;background:rgba(122,84,48,.6)}
+#mudSplat{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 1.2s ease-out;background:
+  radial-gradient(circle at 22% 30%,rgba(92,60,30,.92) 0 9%,transparent 10%),
+  radial-gradient(circle at 70% 24%,rgba(110,74,38,.88) 0 7%,transparent 8%),
+  radial-gradient(circle at 58% 70%,rgba(84,55,28,.9) 0 12%,transparent 13%),
+  radial-gradient(circle at 30% 78%,rgba(104,70,36,.85) 0 6%,transparent 7%),
+  radial-gradient(circle at 85% 60%,rgba(96,63,32,.85) 0 5%,transparent 6%)}
+.dnum.mud{color:#c08a55}
 #tNade{right:212px;bottom:calc(222px + env(safe-area-inset-bottom,0px));width:52px;height:52px;font-size:10px;line-height:1.1;text-align:center;background:rgba(95,140,60,.45)}
 #tNade b{display:block;font-size:15px}
 #tReload{right:212px;bottom:calc(150px + env(safe-area-inset-bottom,0px));width:52px;height:52px}
@@ -241,6 +249,7 @@ body.pig #pigTint{display:block}
   <div id="hurt"></div>
   <div id="nukeFlash"></div>
   <div id="pigTint"></div>
+  <div id="mudSplat"></div>
   <div id="scope" hidden></div>
   <div id="waiting" hidden></div>
   <div id="reticle">
@@ -272,6 +281,7 @@ body.pig #pigTint{display:block}
     <div class="wname" id="wname">Rifle</div>
     <div class="ammo" id="ammo"><b id="ammoNum">30</b><span id="ammoMag">/ 30</span></div>
     <div class="pips" id="pips"></div>
+    <div class="nades" id="mudHud" hidden><span>Mud</span><span class="key">M</span></div>
     <div class="nades" id="nadeHud"><span>Grenades</span><b id="nadeN">2</b><span class="key">G</span></div>
   </div>
   <div id="dnums"></div>
@@ -285,6 +295,7 @@ body.pig #pigTint{display:block}
   <button class="tb" id="tJump" type="button">Jump</button>
   <button class="tb" id="tDash" type="button">Dash</button>
   <button class="tb" id="tCrouch" type="button">Duck</button>
+  <button class="tb" id="tMud" type="button" hidden>Mud</button>
   <button class="tb" id="tNade" type="button" aria-label="Throw grenade">Nade<b id="tNadeN">2</b></button>
   <button class="tb" id="tReload" type="button" aria-label="Reload">R</button>
   <button class="tb" id="tPause" type="button" aria-label="Pause">II</button>
@@ -1152,6 +1163,7 @@ function applyPigTheme() {
   const hpLbl = document.querySelector(".vitals .lbl span"); if (hpLbl) hpLbl.textContent = "Oink HP";
   const nadeLbl = document.querySelector("#nadeHud span"); if (nadeLbl) nadeLbl.textContent = "Pig bombs";
   const botsSub = document.querySelector("#playBots span"); if (botsSub) botsSub.textContent = "Practice against 6–8 piglets";
+  $("#mudHud").hidden = false; $("#tMud").hidden = false;                       // Mason's mud gun
   const recolor = { "262a31": 0xd77f98, "4a5260": 0xf2a0b6, "ffb627": 0xf8c3d0 };
   guns.forEach((g, i) => {
     if (g.userData.pig) return;
@@ -1458,6 +1470,7 @@ function onPeer(p) {
   const sh = s.sh && typeof s.sh === "object" && num(s.sh.s) !== null ? s.sh : null;
   const gr = s.gr && typeof s.gr === "object" && num(s.gr.s) !== null ? s.gr : null;
   const nk = s.nk && typeof s.nk === "object" && num(s.nk.s) !== null ? s.nk : null;
+  const md = s.md && typeof s.md === "object" && num(s.md.s) !== null ? s.md : null;
   if (!r.init) {
     r.init = true;
     r.lastHit = hits.reduce((m, h) => Math.max(m, h.s), 0);
@@ -1465,6 +1478,7 @@ function onPeer(p) {
     r.lastShot = sh ? sh.s : 0;
     r.lastNade = gr ? gr.s : 0;
     r.lastNuke = nk ? nk.s : 0;
+    r.lastMud = md ? md.s : 0;
     return;
   }
   const online = state === "play" && mode === "online";
@@ -1474,6 +1488,7 @@ function onPeer(p) {
       const wi = clamp(Math.floor(num(h.w) || 0), 0, 3);
       const dm = clamp(num(h.dm) || 0, 0, MAXDMG[wi]);
       takeDamage(dm, { name: r.name, peer: r.peer, pos: r.pos }, !!h.hs, h.nk === 1);
+      if (h.mud === 1) mudSplat();
     }
   }
   r.lastHit = hits.reduce((m, h) => Math.max(m, h.s), r.lastHit);
@@ -1488,6 +1503,11 @@ function onPeer(p) {
       } else if (typeof dth.by === "string" && remotes.has(dth.by)) killer = remotes.get(dth.by).name;
       addFeed(killer, r.name, dth.by === myPeer);
     }
+  }
+  if (md && md.s > (r.lastMud || 0)) {
+    r.lastMud = md.s;
+    const o = vec(md.o), v = Array.isArray(md.v) && md.v.length === 3 && md.v.every(n => num(n) !== null) ? new V3(clamp(md.v[0], -60, 60), clamp(md.v[1], -60, 60), clamp(md.v[2], -60, 60)) : null;
+    if (o && v && activePeer(r) && online) spawnMud(o, v, false);
   }
   if (nk && nk.s > (r.lastNuke || 0)) {
     r.lastNuke = nk.s;
@@ -1520,7 +1540,7 @@ function publish(force, target) {
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
     al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : null, k: playing ? kills : 0, d: playing ? deaths : 0,
-    sh: playing ? lastShot : null, gr: playing ? lastNade : null, nk: playing ? lastNuke : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
+    sh: playing ? lastShot : null, gr: playing ? lastNade : null, nk: playing ? lastNuke : null, md: playing ? lastMud : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
   if (netKind === "ws") { if (sock && sock.readyState === 1) { try { sock.send(JSON.stringify(P)); } catch (e) {} } }
   else if (netKind === "room" && roomTarget) roomTarget.presence(P).catch(() => {});
@@ -2079,6 +2099,67 @@ function updateDmgNumbers(dt) {
     d.el.style.opacity = String(clamp(1 - (d.t - 0.5) / 0.4, 0, 1));
   }
 }
+// ---- Mason's mud gun: fast mud balls that do 1 damage and splatter the victim's screen
+const MUD = { speed: 30, lift: 1.2, grav: 14, dmg: 1, cooldown: 0.28, life: 3 };
+const liveMud = [], mudGeo = new THREE.SphereGeometry(0.16, 8, 6), mudMat = lam(0x6b4423);
+let mudReady = 0, mudSeq = 0, lastMud = null;
+function spawnMud(o, v, mine) {
+  const mesh = new THREE.Mesh(mudGeo, mudMat); mesh.position.copy(o); scene.add(mesh);
+  liveMud.push({ pos: o.clone(), vel: v.clone(), t: 0, mesh, mine });
+}
+function shootMud() {
+  const t = now();
+  if (!pigMode || !alive || paused || state !== "play" || t < mudReady) return;
+  mudReady = t + MUD.cooldown;
+  const d = aimDir(), o = eyePos().addScaledVector(d, 0.6), v = d.multiplyScalar(MUD.speed); v.y += MUD.lift;
+  spawnMud(o, v, true);
+  lastMud = { s: ++mudSeq, o: [r2(o.x), r2(o.y), r2(o.z)], v: [r2(v.x), r2(v.y), r2(v.z)] };
+  squelch(0.25); publish(true);
+}
+function squelch(vol) {
+  if (!ac) return;
+  const t = ac.currentTime, src = ac.createBufferSource(); src.buffer = noiseBuf;
+  const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(200, t + 0.15);
+  const g = ac.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  src.connect(f).connect(g).connect(ac.destination); src.start(t); src.stop(t + 0.2);
+}
+function mudSplat() {
+  const el = $("#mudSplat");
+  el.style.transition = "none"; el.style.opacity = "1";
+  setTimeout(() => { el.style.transition = "opacity 1.4s ease-out"; el.style.opacity = "0"; }, 900);
+  squelch(0.4);
+}
+function updateMud(dt) {
+  for (let i = liveMud.length - 1; i >= 0; i--) {
+    const m = liveMud[i]; let done = false;
+    m.t += dt;
+    for (let k = 0; k < 4 && !done; k++) {
+      const h = dt / 4;
+      m.vel.y -= MUD.grav * h; m.pos.addScaledVector(m.vel, h);
+      if (solid(Math.floor(m.pos.x), Math.floor(m.pos.y), Math.floor(m.pos.z))) { done = true; break; }
+      if (m.mine) for (const tg of enemies()) {
+        const top = tg.pos.y + (tg.r.cr ? 1.4 : 1.85);
+        if (Math.abs(m.pos.x - tg.pos.x) < 0.45 && Math.abs(m.pos.z - tg.pos.z) < 0.45 && m.pos.y > tg.pos.y && m.pos.y < top) {
+          dmgNumber(m.pos, MUD.dmg, "mud");
+          if (tg.kind === "peer") {
+            hitsOut.push({ t: tg.r.peer, s: ++hitSeq, w: 0, dm: MUD.dmg, hs: 0, mud: 1 });
+            while (hitsOut.length > 6) hitsOut.shift();
+            tg.r.lastHitByMe = { w: 0 };
+          } else {
+            const b = tg.r; b.hp -= MUD.dmg;
+            if (b.hp <= 0 && b.alive) { b.alive = false; b.d++; b.respawnAt = now() + 3; kills++; addFeed(myName, b.name, true); showElim(b.name, null); killSound(); }
+          }
+          flashHit(false); publish(true); done = true; break;
+        }
+      }
+    }
+    m.mesh.position.copy(m.pos);
+    if (done || m.t > MUD.life) {
+      if (done) { spark(m.pos.clone(), 0x6b4423, 0.2); spark(m.pos.clone().add(new V3(0.15, 0.1, 0)), 0x8a5a2e, 0.14); }
+      scene.remove(m.mesh); liveMud.splice(i, 1);
+    }
+  }
+}
 function dash() {
   const t = now();
   if (!alive || paused || t < dashReady) return;
@@ -2165,6 +2246,7 @@ window.addEventListener("keydown", e => {
   if (e.code === "Digit3") switchWeapon(2);
   if ((e.code === "KeyQ" || e.code === "KeyX") && !e.repeat) dash();
   if (e.code === "KeyG" && !e.repeat) throwGrenade();
+  if (e.code === "KeyM") shootMud();
   if (!e.repeat && e.code === "KeyH") toggleDuke("aim");
   if (!e.repeat && e.code === "KeyJ") toggleDuke("god");
   if (!e.repeat && e.code === "KeyK") toggleDuke("snipe");
@@ -2233,6 +2315,7 @@ if (isTouch) {
     tCrouch: { down() { crouch = !crouch; } },
     tReload: { down() { startReload(); } },
     tNade: { down() { throwGrenade(); } },
+    tMud: { down() { shootMud(); } },
     tPause: { down() { showPause(true); } },
     dkAim: { down() { toggleDuke("aim"); } },
     dkGod: { down() { toggleDuke("god"); } },
@@ -2670,6 +2753,7 @@ function tick() {
   $("#hurt").style.opacity = hurt;
 
   updateNades(dt);
+  updateMud(dt);
   updateEsp();
   updateFx(dt);
   updateDmgNumbers(dt);
