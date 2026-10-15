@@ -143,6 +143,16 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 .slots{display:flex;gap:4px}
 .slots div{border:1px solid var(--line);background:var(--panel);padding:3px 8px;font-size:12px;font-weight:600;border-radius:3px;color:var(--muted)}
 .slots div.on{color:#1a1205;background:var(--accent);border-color:var(--accent)}
+#duke{position:absolute;left:50%;top:calc(52px + env(safe-area-inset-top,0px));transform:translateX(-50%);display:flex;gap:6px;pointer-events:auto}
+#duke button{border:1px solid #ff7ac8;background:rgba(255,122,200,.16);color:#ffd0ea;border-radius:4px;padding:5px 9px;font:700 12px var(--ui);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+#duke button[aria-pressed="true"]{background:#ff7ac8;color:#2a0718}
+#duke button small{font-weight:600;opacity:.7;margin-left:4px}
+#duke{flex-wrap:wrap;justify-content:center;max-width:calc(100% - 32px)}
+#tpList{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);display:grid;gap:4px;background:var(--panel);border:1px solid #ff7ac8;border-radius:6px;padding:8px;min-width:200px;max-height:50vh;overflow-y:auto}
+#tpList p{margin:0 0 2px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+#tpList button{text-align:left}
+.touch #duke{top:calc(64px + env(safe-area-inset-top,0px))}
+.touch #duke button{padding:9px 12px}
 #elim{position:absolute;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) scale(.92);display:flex;align-items:stretch;background:var(--panel);border:1px solid var(--line);border-radius:4px;overflow:hidden;opacity:0;transition:opacity .2s,transform .2s;max-width:calc(100% - 32px)}
 #elim.show{opacity:1;transform:translateX(-50%) scale(1)}
 #elim .tag{background:var(--hot);color:#fff;font:400 13px var(--display);letter-spacing:.06em;padding:8px 10px;display:grid;place-items:center}
@@ -153,6 +163,8 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 .touch #elim{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 #banner{position:absolute;left:0;right:0;top:28%;text-align:center;font:400 clamp(18px,4vw,30px) var(--display);color:var(--accent);text-shadow:0 2px 0 rgba(0,0,0,.5);opacity:0;transition:opacity .25s;padding:0 16px}
 #waiting{position:absolute;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 14px;font-size:13px;font-weight:600;text-align:center;max-width:calc(100% - 32px)}
+#duke button.nuke{border-color:#ff4f5e;background:rgba(255,79,94,.25);color:#ffd5d9;font-size:14px;padding:7px 14px}
+#duke button.nuke:disabled{opacity:.45}
 body.pig{--accent:#ff7ac8}
 body.pig #cross i,body.pig #cross b{background:#ff9fd0}
 body.pig #ring .fg{stroke:#ff9fd0}
@@ -185,6 +197,12 @@ body.pig #pigTint{display:block}
 #notice{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--accent);border-radius:6px;padding:10px 12px 10px 16px;font-weight:600;max-width:calc(100% - 32px);box-shadow:0 12px 30px rgba(0,0,0,.4)}
 #notice b{color:var(--accent);font:400 13px var(--display);letter-spacing:.04em}
 #notice button{flex:none}
+#pw{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.7);padding:16px;z-index:5}
+#pw .card{gap:12px}
+#pw h2{font:400 26px var(--display);margin:0}
+#pw p{margin:0;color:var(--muted)}
+#pw input{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:4px;padding:11px 12px;color:var(--ink);font:600 17px var(--ui);-webkit-user-select:text;user-select:text}
+#pwErr{color:var(--hot)!important}
 #pause{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.6);padding:16px;overflow-y:auto}
 #pause h2{font:400 28px var(--display);margin:0}
 #pause p{margin:0;color:var(--muted)}
@@ -252,6 +270,16 @@ body.pig #pigTint{display:block}
   </div>
   <div id="dmgdir"><i></i></div>
   <div id="banner"></div>
+  <div id="duke" hidden>
+    <button type="button" id="dkAim" aria-pressed="true">Aimbot<small>H</small></button>
+    <button type="button" id="dkGod" aria-pressed="true">God<small>J</small></button>
+    <button type="button" id="dkSnipe" aria-pressed="true">Auto sniper<small>K</small></button>
+    <button type="button" id="dkWall" aria-pressed="true">Walls<small>N</small></button>
+    <button type="button" id="dkInv" aria-pressed="false">Invisible<small>I</small></button>
+    <button type="button" id="dkTp" aria-pressed="false">Teleport<small>T</small></button>
+    <button type="button" id="dkNuke" class="nuke">Nuke<small>B</small></button>
+    <div id="tpList" hidden></div>
+  </div>
   <div id="elim" aria-live="polite"><div class="tag">Eliminated</div><div class="body"><div class="who" id="elimWho"></div><div class="how" id="elimHow"></div></div></div>
   <div class="vitals">
     <div class="lbl"><b id="hpNum">100</b><span>Health</span></div>
@@ -354,6 +382,18 @@ body.pig #pigTint{display:block}
 </div>
 
 <div id="notice" role="status" hidden><b>Update</b><span id="noticeText"></span><button class="btn primary" type="button" id="noticeOk">Got it</button></div>
+
+<div id="pw" hidden>
+  <form class="card" id="pwForm" autocomplete="off">
+    <h2>Code</h2>
+    <input type="password" id="pwIn" aria-label="Code" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <p id="pwErr" hidden>That isn't right.</p>
+    <div class="btns">
+      <button class="btn primary" type="submit" id="pwGo">OK</button>
+      <button class="btn" type="button" id="pwCancel">Cancel</button>
+    </div>
+  </form>
+</div>
 
 <div id="pause" hidden>
   <div class="card">
@@ -1305,7 +1345,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 7;
+const BUILD = 8;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -1347,6 +1387,7 @@ function connectServer(name) {
   sock = s;
   s.onopen = () => {
     sockRetry = 0; setNet("live");
+    if (authKey) s.send(JSON.stringify({ t: "auth", key: authKey, who: authWho }));
     publish(true);
   };
   s.onmessage = e => {
@@ -1361,6 +1402,7 @@ function connectServer(name) {
       renderStatus();
     } else if (m.t === "leave" && m.id) removeRemote(String(m.id));
     else if (m.t === "update") { mustRefresh = true; autoReload(); }
+    else if (m.t === "auth") { authedAs = m.ok ? authWho : null; if (state === "play") applyDuke(); }
   };
   s.onclose = () => {
     if (sock !== s) return;
@@ -1471,6 +1513,7 @@ function onPeer(p) {
   r.pl = s.pl === 1 && (s.m === undefined || s.m === mapId);
   r.alive = s.al !== 0;
   r.cr = s.cr === 1;
+  r.iv = s.iv === 1;
   r.sk = s.sk === "pig" ? "pig" : null;
   r.k = Math.max(0, Math.floor(num(s.k) || 0));
   r.d = Math.max(0, Math.floor(num(s.d) || 0));
@@ -1485,6 +1528,7 @@ function onPeer(p) {
   const dth = s.dth && typeof s.dth === "object" && num(s.dth.s) !== null ? s.dth : null;
   const sh = s.sh && typeof s.sh === "object" && num(s.sh.s) !== null ? s.sh : null;
   const gr = s.gr && typeof s.gr === "object" && num(s.gr.s) !== null ? s.gr : null;
+  const nk = s.nk && typeof s.nk === "object" && num(s.nk.s) !== null ? s.nk : null;
   const md = s.md && typeof s.md === "object" && num(s.md.s) !== null ? s.md : null;
   if (!r.init) {
     r.init = true;
@@ -1492,6 +1536,7 @@ function onPeer(p) {
     r.lastDeath = dth ? dth.s : 0;
     r.lastShot = sh ? sh.s : 0;
     r.lastNade = gr ? gr.s : 0;
+    r.lastNuke = nk ? nk.s : 0;
     r.lastMud = md ? md.s : 0;
     return;
   }
@@ -1501,7 +1546,7 @@ function onPeer(p) {
     if (h.t === myPeer && online && alive) {
       const wi = clamp(Math.floor(num(h.w) || 0), 0, 3);
       const dm = clamp(num(h.dm) || 0, 0, MAXDMG[wi]);
-      takeDamage(dm, { name: r.name, peer: r.peer, pos: r.pos }, !!h.hs);
+      takeDamage(dm, { name: r.name, peer: r.peer, pos: r.pos }, !!h.hs, h.nk === 1);
       if (h.mud === 1) mudSplat();
     }
   }
@@ -1528,15 +1573,16 @@ function onPeer(p) {
       if (wi >= 0) gunSound(wi, clamp(1 - o.distanceTo(me.pos) / 60, 0, 0.7) * 0.5);
     }
   }
+  if (nk && nk.s > (r.lastNuke || 0)) r.lastNuke = nk.s;
   if (gr && gr.s > (r.lastNade || 0)) {
     r.lastNade = gr.s;
     const o = vec(gr.o), v = Array.isArray(gr.v) && gr.v.length === 3 && gr.v.every(n => num(n) !== null) ? new V3(clamp(gr.v[0], -40, 40), clamp(gr.v[1], -40, 40), clamp(gr.v[2], -40, 40)) : null;
-    if (o && v && activePeer(r) && online) spawnNade(o, v, null);
+    if (o && v && activePeer(r) && !r.iv && online) spawnNade(o, v, null);
   }
   if (sh && sh.s > r.lastShot) {
     r.lastShot = sh.s;
     const o = vec(sh.o), e = vec(sh.e);
-    if (o && e && activePeer(r) && online) {
+    if (o && e && activePeer(r) && !r.iv && online) {
       tracer(o, e, 0xffc6a0);
       const wi = clamp(Math.floor(num(sh.w) || 0), 0, 2);
       gunSound(wi, clamp(1 - o.distanceTo(me.pos) / 60, 0, 0.7));
@@ -1554,8 +1600,8 @@ function publish(force, target) {
     n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0, afk: playing && iAmAfk() ? 1 : 0, hb: Math.floor(now()),
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
-    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, sk: pigMode ? "pig" : null, k: playing ? kills : 0, d: playing ? deaths : 0,
-    sh: playing ? lastShot : null, gr: playing ? lastNade : null, md: playing ? lastMud : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
+    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : null, k: playing ? kills : 0, d: playing ? deaths : 0,
+    sh: playing ? lastShot : null, gr: playing ? lastNade : null, nk: playing ? lastNuke : null, md: playing ? lastMud : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
   if (netKind === "ws") { if (sock && sock.readyState === 1) { try { sock.send(JSON.stringify(P)); } catch (e) {} } }
   else if (netKind === "room" && roomTarget) roomTarget.presence(P).catch(() => {});
@@ -1594,7 +1640,8 @@ function updateBot(b, dt, t) {
   const to = myEye.clone().sub(eye);
   if (alive && state === "play") {
     dist = to.length();
-    if (dist < 40) { const dir = to.clone().normalize(); see = rayVoxel(eye, dir, dist) >= dist - 0.4; }
+    const range = duke.on && duke.inv ? 10 : 40;   // invisible: bots only notice you up close
+    if (dist < range) { const dir = to.clone().normalize(); see = rayVoxel(eye, dir, dist) >= dist - 0.4; }
   }
   const fwd = new V3(-Math.sin(b.yaw), 0, -Math.cos(b.yaw)), right = new V3(Math.cos(b.yaw), 0, -Math.sin(b.yaw));
   const wish = new V3();
@@ -1662,9 +1709,173 @@ function respawn() {
   $("#death").hidden = true;
   publish(true);
 }
-function takeDamage(dm, src, head) {
+// ---- Doug mode: secret. Nothing on screen mentions it. A device is unlocked by tapping
+// the game's title 5 times on the menu and entering the code; after that, playing as
+// "Doug" in green armor turns the perks on. Online, the game server checks the code too
+// (it's a secret on the server); anyone else named Doug in green just plays normally.
+const DOUG_COLOR = 2; // green in PAL
+// Cheat profiles: a name + armor color unlocks a set of perks. Colors are indexes into PAL.
+const PROFILES = {
+  doug: { color: DOUG_COLOR, perks: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], nukeWait: 0, password: true },
+};
+const PERK_DEFAULT = { aim: true, god: true, snipe: true, wall: true, inv: false };
+const PERK_BUTTON = { aim: "dkAim", god: "dkGod", snipe: "dkSnipe", wall: "dkWall", inv: "dkInv", tp: "dkTp", nuke: "dkNuke" };
+const hasPerk = k => duke.on && duke.perks.includes(k);
+// SHA-256 fingerprint of the code, for unlocking a device (the server checks online play).
+const PASSWORD_HASH = {
+  doug: "744120d75bb6e2e92c194f056307d6da7c113823649a6ef5ddcc9ff660e1043d",
+};
+const duke = { on: false, profile: null, perks: [], aim: false, god: false, snipe: false, wall: false, inv: false };
+let authKey = load("cfa.dk") || "", authWho = authKey ? "doug" : "", authedAs = null, dkUnlocked = false;
+async function sha256hex(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+async function codeOk(pw) {
+  try { return !!pw && (await sha256hex(pw)) === PASSWORD_HASH.doug; } catch (e) { return false; }
+}
+codeOk(authKey).then(ok => { dkUnlocked = ok; if (!ok && authKey) { authKey = ""; authWho = ""; } });
+const SNIPER_NORMAL = (({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }) => ({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }))(WEAPONS[2]);
+const SNIPER_DUKE = { auto: true, rate: 0.14, spread: 0, aimSpread: 0, quickscope: undefined, dmg: 150, head: 150, mag: 99, reload: 0.3 };
+function applyDuke() {
+  const nm = myName.toLowerCase(), prof = PROFILES[nm];
+  let profile = prof && myColor === prof.color ? nm : null;
+  // needs an unlocked device, and online through the game server, the server's OK too
+  if (profile && !(dkUnlocked && (mode === "bots" || netKind !== "ws" || authedAs === profile))) profile = null;
+  if (profile !== duke.profile) {                       // new profile: reset switches to its defaults
+    duke.profile = profile; duke.perks = profile ? PROFILES[profile].perks : [];
+    for (const k of Object.keys(PERK_DEFAULT)) duke[k] = duke.perks.includes(k) && PERK_DEFAULT[k];
+  }
+  duke.on = !!profile;
+  for (const [k, id] of Object.entries(PERK_BUTTON)) $("#" + id).hidden = !duke.perks.includes(k);
+  Object.assign(WEAPONS[2], duke.on && duke.snipe ? SNIPER_DUKE : SNIPER_NORMAL);
+  ammo[2] = WEAPONS[2].mag; buildPips();
+  $("#duke").hidden = !duke.on;
+  $("#dkAim").setAttribute("aria-pressed", String(duke.aim));
+  $("#dkGod").setAttribute("aria-pressed", String(duke.god));
+  $("#dkSnipe").setAttribute("aria-pressed", String(duke.snipe));
+  $("#dkWall").setAttribute("aria-pressed", String(duke.wall));
+  $("#dkInv").setAttribute("aria-pressed", String(duke.inv));
+  if (!duke.on) closeTpList();
+  updateNukeButton();
+}
+for (const [id, k] of [["dkAim", "aim"], ["dkGod", "god"], ["dkSnipe", "snipe"], ["dkWall", "wall"], ["dkInv", "inv"]]) {
+  document.addEventListener("click", e => { if (!isTouchUI() && e.target.closest && e.target.closest("#" + id)) toggleDuke(k); });
+}
+document.addEventListener("click", e => { if (!isTouchUI() && e.target.closest && e.target.closest("#dkTp")) openTpList(); });
+function isTouchUI() { return document.body.classList.contains("touch"); }
+function toggleDuke(k) {
+  if (!hasPerk(k)) return;
+  duke[k] = !duke[k];
+  applyDuke();
+  if (k === "inv") publish(true);
+}
+// Wall hacks: a yellow box around every enemy, drawn on top of walls
+const espGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.9, 1.95, 0.9));
+const espMat = new THREE.LineBasicMaterial({ color: 0xffe14a, depthTest: false, depthWrite: false, transparent: true });
+const espBoxes = [];
+function updateEsp() {
+  const list = state === "play" && duke.on && duke.wall ? enemies() : [];
+  while (espBoxes.length < list.length) { const l = new THREE.LineSegments(espGeo, espMat); l.renderOrder = 999; scene.add(l); espBoxes.push(l); }
+  espBoxes.forEach((l, i) => {
+    const tg = list[i]; l.visible = !!tg;
+    if (tg) { l.position.set(tg.pos.x, tg.pos.y + (tg.r.cr ? 0.75 : 0.975), tg.pos.z); l.scale.y = tg.r.cr ? 0.77 : 1; }
+  });
+}
+// Teleport: land just behind someone, facing them
+let tpNext = 0;
+function teleportTo(tg) {
+  if (!tg || !alive || state !== "play") return;
+  const ty = tg.r.yaw || 0, p = new V3();
+  for (const dist of [2, 1.3, 3]) for (const a of [0, 0.7, -0.7, 1.4, -1.4, Math.PI]) {
+    p.set(tg.pos.x + Math.sin(ty + a) * dist, tg.pos.y, tg.pos.z + Math.cos(ty + a) * dist);
+    if (!collides(p)) return land(p);
+  }
+  p.set(tg.pos.x, tg.pos.y + 2.1, tg.pos.z);
+  if (!collides(p)) land(p);
+  function land(at) {
+    me.pos.copy(at); me.vel.set(0, 0, 0);
+    yaw = Math.atan2(-(tg.pos.x - at.x), -(tg.pos.z - at.z)); pitch = 0;
+    closeTpList(); publish(true);
+  }
+}
+function teleportCycle() {
+  if (!hasPerk("tp")) return;
+  const list = enemies();
+  if (!list.length) return;
+  teleportTo(list[tpNext++ % list.length]);
+}
+// Nuke: eliminates every enemy at once, with a flash everyone sees. Each profile sets
+// how long it takes to recharge. The timer keeps
+// running between matches.
+let nukeReadyAt = 0, nukeSeq = 0, lastNuke = null;
+function fireNuke() {
+  if (!hasPerk("nuke") || now() < nukeReadyAt || state !== "play" || !alive) return;
+  nukeReadyAt = now() + (PROFILES[duke.profile].nukeWait || 0);
+  hitsOut.length = 0;                    // earlier hits were already delivered; make room for everyone
+  const list = mode === "online"
+    ? [...remotes.values()].filter(r => r.pl && r.alive).map(r => ({ kind: "peer", r, pos: r.pos }))
+    : bots.filter(b => b.alive).map(b => ({ kind: "bot", r: b, pos: b.pos }));
+  for (const tg of list) {
+    // nk: 1 means it can't be blocked (god mode, spawn protection)
+    if (tg.kind === "peer") { hitsOut.push({ t: tg.r.peer, s: ++hitSeq, w: 3, dm: MAXDMG[3], hs: 0, nk: 1 }); tg.r.lastHitByMe = { w: 3 }; }
+    else if (tg.r.alive) {
+      const b = tg.r; b.hp = 0; b.alive = false; b.d++; b.respawnAt = now() + 3; kills++;
+      addFeed(myName, b.name, true);
+    }
+    explode({ pos: tg.pos.clone().add(new V3(0, 1, 0)), owner: null });
+  }
+  lastNuke = { s: ++nukeSeq };
+  publish(true);
+  updateNukeButton();
+}
+function updateNukeButton() {
+  const b = $("#dkNuke"); if (!b) return;
+  const left = Math.ceil(nukeReadyAt - now());
+  b.disabled = left > 0;
+  b.firstChild.textContent = left > 0 ? "Nuke " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") : "Nuke";
+}
+function closeTpList() { const el = $("#tpList"); if (el) { el.hidden = true; el.replaceChildren(); } $("#dkTp") && $("#dkTp").setAttribute("aria-pressed", "false"); }
+function openTpList() {
+  if (!hasPerk("tp")) return;
+  const el = $("#tpList");
+  if (!el.hidden) { closeTpList(); return; }
+  const list = enemies();
+  const head = document.createElement("p"); head.textContent = list.length ? "Teleport to" : "Nobody to teleport to";
+  el.replaceChildren(head);
+  for (const tg of list) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = tg.r.name;
+    b.addEventListener("click", () => teleportTo(tg));
+    el.appendChild(b);
+  }
+  el.hidden = false; $("#dkTp").setAttribute("aria-pressed", "true");
+}
+// Auto sniper trigger: is the crosshair right on an enemy with a clear shot?
+function crosshairOnEnemy() {
+  const o = eyePos(), d = aimDir(), wall = rayVoxel(o, d, WEAPONS[2].range);
+  return enemies().some(tg => { const h = rayPlayer(o, d, tg.pos, 0.15, tg.r.cr); return h && h.t < wall; });
+}
+// Aimbot: lock straight onto the head of the closest visible enemy in front of you
+function aimbot() {
+  const o = eyePos(), f = aimDir();
+  let best = null, bestScore = Infinity;
+  for (const tg of enemies()) {
+    const v = tg.pos.clone(); v.y += tg.r.cr ? 1.2 : 1.6; v.sub(o);
+    const dist = v.length(); if (dist < 0.5 || dist > 200) continue;
+    v.divideScalar(dist);
+    if (rayVoxel(o, v, dist) < dist - 0.5) continue;
+    const ang = Math.acos(clamp(f.dot(v), -1, 1));
+    if (ang > 1.3) continue;
+    const score = ang + dist * 0.002;
+    if (score < bestScore) { bestScore = score; best = { yawT: Math.atan2(-v.x, -v.z), pitchT: Math.asin(clamp(v.y, -1, 1)) }; }
+  }
+  if (best) { yaw = best.yawT; pitch = clamp(best.pitchT, -1.52, 1.52); }
+  return best;
+}
+function takeDamage(dm, src, head, unblockable) {
   if (!alive || state !== "play" || dm <= 0) return;
-  if (now() < spawnProt) return;
+  if (!unblockable && now() < spawnProt) return;
+  if (!unblockable && duke.on && duke.god) { showDmgDir(src.pos); return; }
   hp -= dm; lastHurt = now();
   showDmgDir(src.pos);
   blip(head ? 180 : 140, 0.12, 0.12, "sawtooth");
@@ -1690,6 +1901,7 @@ function assistPick(coneMul) {
   const touchMul = isTouch ? 1.3 : 1;
   let best = null, bestScore = Infinity;
   for (const tg of enemies()) {
+    if (tg.r.iv) continue;
     const v = tg.pos.clone(); v.y += tg.r.cr ? 0.9 : 1.2; v.sub(o);
     const dist = v.length(); if (dist < 0.6 || dist > WEAPONS[cur].range * 0.8) continue;
     v.divideScalar(dist);
@@ -2089,6 +2301,13 @@ window.addEventListener("keydown", e => {
   if ((e.code === "KeyQ" || e.code === "KeyX") && !e.repeat) dash();
   if (e.code === "KeyG" && !e.repeat) throwGrenade();
   if (e.code === "KeyM") shootMud();
+  if (!e.repeat && e.code === "KeyH") toggleDuke("aim");
+  if (!e.repeat && e.code === "KeyJ") toggleDuke("god");
+  if (!e.repeat && e.code === "KeyK") toggleDuke("snipe");
+  if (!e.repeat && e.code === "KeyN") toggleDuke("wall");
+  if (!e.repeat && e.code === "KeyI") toggleDuke("inv");
+  if (!e.repeat && e.code === "KeyT") teleportCycle();
+  if (!e.repeat && e.code === "KeyB") fireNuke();
   if (e.code === "KeyE") aimKey = true;
   if (e.code === "KeyC") crouch = true;
   if (e.code === "KeyR") startReload();
@@ -2152,6 +2371,13 @@ if (isTouch) {
     tNade: { down() { throwGrenade(); } },
     tMud: { down() { shootMud(); } },
     tPause: { down() { showPause(true); } },
+    dkAim: { down() { toggleDuke("aim"); } },
+    dkGod: { down() { toggleDuke("god"); } },
+    dkSnipe: { down() { toggleDuke("snipe"); } },
+    dkWall: { down() { toggleDuke("wall"); } },
+    dkInv: { down() { toggleDuke("inv"); } },
+    dkTp: { down() { openTpList(); } },
+    dkNuke: { down() { fireNuke(); } },
   };
   const btnEls = Object.keys(BTN).map(id => $("#" + id));
   function buttonAt(x, y) {
@@ -2168,7 +2394,7 @@ if (isTouch) {
     touchMove.x = dx / R; touchMove.y = dy / R;
     knob.style.transform = `translate(${dx}px,${dy}px)`;
   }
-  const inMenus = t => t && t.closest && (t.closest("#pause") || t.closest("#menu") || t.closest(".slots"));
+  const inMenus = t => t && t.closest && (t.closest("#pause") || t.closest("#menu") || t.closest(".slots") || t.closest("#tpList"));
   document.addEventListener("touchstart", e => {
     if (state !== "play" || paused || inMenus(e.target)) return;
     e.preventDefault();
@@ -2356,6 +2582,7 @@ function renderHud(t) {
   if (!alive && state === "play") $("#deathSub").textContent = "Respawning in " + Math.max(1, Math.ceil(respawnAt - t));
   $("#tFire").classList.toggle("on", touchCombo);
   $("#tCrouch").classList.toggle("on", crouch);
+  if (duke.on && hasPerk("nuke")) updateNukeButton();
   $("#nadeN").textContent = nades; $("#tNadeN").textContent = nades;
   $("#tNade").style.opacity = nades > 0 ? 1 : 0.45;
   const board = $("#board"); board.hidden = !boardOpen;
@@ -2416,6 +2643,7 @@ function startGame(m) {
   mode = m; kills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null;
   if (myName.toLowerCase() === "mason" && myColor !== PIG_EXIT_COLOR) enablePig();
   lockMason();
+  applyDuke();
   if (!$("#notice").hidden) { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); } // seen it; clear the screen for play
   state = "play";
   $("#menu").hidden = true; $("#hud").hidden = false; $("#touch").hidden = !isTouch;
@@ -2429,6 +2657,7 @@ $("#playOnline").addEventListener("click", () => {
   if (netState === "offline") { banner("Online play isn't available on this page"); return; }
   startGame("online");
 });
+$("#pwCancel").addEventListener("click", () => { $("#pw").hidden = true; });
 // The server says this copy is out of date: reload to get the new one. If a reload
 // happened in the last minute (the browser handed back the old copy), ask instead.
 function autoReload() {
@@ -2448,6 +2677,22 @@ $("#refreshBtn").addEventListener("click", () => location.reload());
 const NOTICE = { id: "all-hacks-removed", text: "All hacks have been removed, including Doug's." };
 if (load("cfa.notice") !== NOTICE.id) { $("#noticeText").textContent = NOTICE.text; $("#notice").hidden = false; }
 $("#noticeOk").addEventListener("click", () => { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); });
+// Tap the title 5 times on the menu to open the code box. An empty code locks the device again.
+let titleTaps = [];
+document.querySelector(".brand h1").addEventListener("click", () => {
+  const t = Date.now(); titleTaps = titleTaps.filter(x => t - x < 6000); titleTaps.push(t);
+  if (titleTaps.length < 5 || state !== "menu") return;
+  titleTaps = []; $("#pwErr").hidden = true; $("#pwIn").value = ""; $("#pw").hidden = false; $("#pwIn").focus();
+});
+$("#pwForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const pw = $("#pwIn").value;
+  if (!pw) { dkUnlocked = false; authKey = ""; authWho = ""; authedAs = null; save("cfa.dk", ""); $("#pw").hidden = true; return; }
+  if (!(await codeOk(pw))) { $("#pwErr").hidden = false; $("#pwIn").select(); return; }
+  dkUnlocked = true; authKey = pw; authWho = "doug"; save("cfa.dk", pw);
+  if (sock && sock.readyState === 1) sock.send(JSON.stringify({ t: "auth", key: pw, who: "doug" }));
+  $("#pw").hidden = true;
+});
 $("#playBots").addEventListener("click", () => startGame("bots"));
 $("#resume").addEventListener("click", () => { initAudio(); requestLock(); if (isTouch || noLock) showPause(false); });
 $("#leave").addEventListener("click", () => leaveMatch());
@@ -2507,8 +2752,14 @@ function tick() {
       aim += ((input && aiming ? 1 : 0) - aim) * (1 - Math.exp(-(WEAPONS[cur].adsSpeed || 14) * dt));
       if (input && aiming && !wasAiming) aimSnap();
       wasAiming = input && aiming;
-      if (input) aimAssist(dt);
-      else { assistTg = null; assistPrev = null; }
+      if (input && duke.on && duke.aim) {
+        assistTg = null; assistPrev = null;
+        const locked = aimbot();
+        if (locked && duke.snipe && cur === 2 && t >= nextFire && !reloading) fire(); // auto sniper fires on lock
+      } else if (input) {
+        aimAssist(dt);
+        if (duke.on && duke.snipe && cur === 2 && t >= nextFire && !reloading && crosshairOnEnemy()) fire();
+      } else { assistTg = null; assistPrev = null; }
       if (reloading && t >= reloadEnd) { reloading = false; ammo[cur] = WEAPONS[cur].mag; blip(700, 0.05, 0.07); }
       if (snipePending) {
         const w = WEAPONS[cur];
@@ -2543,7 +2794,7 @@ function tick() {
   // remote players (only shown in online matches)
   const kk = 1 - Math.exp(-14 * dt);
   for (const r of remotes.values()) {
-    const show = mode === "online" && activePeer(r) && r.hasPos && r.alive;
+    const show = mode === "online" && activePeer(r) && r.hasPos && r.alive && !r.iv;
     const wantSkin = r.sk === "pig" ? "pig" : skinFor(r.name, r.color);
     if (r.av && r.av.skin !== wantSkin) { disposeAvatar(r.av); r.av = null; }
     if (show && !r.av) r.av = makeAvatar(PAL[r.color], r.name, wantSkin);
@@ -2578,6 +2829,7 @@ function tick() {
 
   updateNades(dt);
   updateMud(dt);
+  updateEsp();
   updateFx(dt);
   updateDmgNumbers(dt);
   renderer.clear();
