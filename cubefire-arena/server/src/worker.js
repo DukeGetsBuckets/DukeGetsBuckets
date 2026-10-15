@@ -3,18 +3,19 @@
 // which relays each player's state to everyone else in the lobby. Every other
 // path serves the game page from ./public.
 //
-// Some name + armor color combinations have extra powers. Online they only work after
+// Some name + armor color combinations have extra powers. Online they must first send
 // {t: "auth", key, who} with the password in that profile's Worker secret
-// (DOUG_PASSWORD; set with `wrangler secret put`). Anyone else using a protected name
-// and color plays normally: their invisibility and nukes are stripped.
+// (DOUG_PASSWORD; set with `wrangler secret put`). Anyone else using a
+// protected name and color is refused.
 
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
-// removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 8;
+// removed cheats for everyone but Doug) are told to refresh and can't join until they do.
+const MIN_BUILD = 9;
 const MAX_MESSAGE = 6000;
 // protected profiles: name -> armor color, and which can turn invisible
 const PROTECTED = { doug: { color: 2, invisible: true } };
+const profileOf = d => { const n = String(d.n || "").trim().toLowerCase(), p = PROTECTED[n]; return p && d.c === p.color ? n : null; };
 
 function lobbyName(raw) {
   const name = String(raw || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48);
@@ -78,6 +79,11 @@ export class Lobby {
       const ok = !!secret && typeof d.key === "string" && d.key === secret;
       ws.serializeAttachment({ ...a, auth: ok ? who : false });
       try { ws.send(JSON.stringify({ t: "auth", ok })); } catch {}
+      return;
+    }
+    const prof = profileOf(d);
+    if (prof && a.auth !== prof) {
+      try { ws.send(JSON.stringify({ t: "denied" })); } catch {}
       return;
     }
     if (!(a.auth && PROTECTED[a.auth].invisible)) delete d.iv; // only verified profiles can be invisible
