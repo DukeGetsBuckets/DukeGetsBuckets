@@ -11,7 +11,7 @@
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats for everyone but Doug) are told to refresh and can't join until they do.
-const MIN_BUILD = 9;
+const MIN_BUILD = 10;
 const MAX_MESSAGE = 6000;
 // protected profiles: name -> armor color, and which can turn invisible
 const PROTECTED = { doug: { color: 2, invisible: true } };

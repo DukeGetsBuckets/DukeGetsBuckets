@@ -390,7 +390,7 @@ body.pig #pigTint{display:block}
     <h2>Password</h2>
     <p id="pwWho">This name needs the password to play online.</p>
     <input type="password" id="pwIn" aria-label="Password" autocomplete="off" autocapitalize="off" spellcheck="false">
-    <p id="pwErr" hidden>That password isn't right.</p>
+    <p id="pwErr" hidden></p>
     <div class="btns">
       <button class="btn primary" type="submit" id="pwGo">Join online</button>
       <button class="btn" type="button" id="pwCancel">Cancel</button>
@@ -1335,7 +1335,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 9;
+const BUILD = 10;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -1394,7 +1394,11 @@ function connectServer(name) {
     else if (m.t === "update") { mustRefresh = true; autoReload(); }
     else if (m.t === "auth") { authedAs = m.ok ? authWho : null; if (authWait) authWait(!!m.ok); }
     else if (m.t === "denied" && state === "play" && mode === "online") {
-      leaveMatch(); banner("That name and color need the password to play online");
+      // signed in already: the server lost it (a reconnect), so sign in again instead of leaving
+      if (authKey && authWho === passwordProfileOf(myName)) {
+        const t = now();
+        if (t > reauthAt) { reauthAt = t + 1; s.send(JSON.stringify({ t: "auth", key: authKey, who: authWho })); }
+      } else { leaveMatch(); banner("That name and color need the password to play online"); }
     }
   };
   s.onclose = () => {
@@ -1725,27 +1729,30 @@ const PASSWORD_HASH = {
 };
 const duke = { on: false, profile: null, perks: [], aim: false, god: false, snipe: false, wall: false, inv: false };
 let authKey = "", authWho = "", authedAs = null, authWait = null;
-// Which password-protected profile the menu's name and color pick, if any
-const passwordProfile = () => {
-  const nm = cleanName(nick.value).toLowerCase(), prof = PROFILES[nm];
+// Which password-protected profile a name and the chosen color pick, if any
+const passwordProfileOf = name => {
+  const nm = cleanName(name).toLowerCase(), prof = PROFILES[nm];
   return prof && prof.password && myColor === prof.color ? nm : null;
 };
+const passwordProfile = () => passwordProfileOf(nick.value);
+let reauthAt = 0;
 async function sha256hex(text) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
+// Resolves "ok", "wrong", or "offline" (the game server didn't answer in time)
 async function checkPassword(who, pw) {
   if (netKind === "ws") {
     authKey = pw; authWho = who;
-    if (!sock || sock.readyState !== 1) return false;
     return new Promise(res => {
-      const t = setTimeout(() => { authWait = null; res(false); }, 6000);
-      authWait = ok => { clearTimeout(t); authWait = null; res(ok); };
-      sock.send(JSON.stringify({ t: "auth", key: pw, who }));
+      const t = setTimeout(() => { authWait = null; res("offline"); }, 9000);
+      authWait = ok => { clearTimeout(t); authWait = null; res(ok ? "ok" : "wrong"); };
+      // if the connection is down for a moment, it sends the password itself when it's back
+      if (sock && sock.readyState === 1) sock.send(JSON.stringify({ t: "auth", key: pw, who }));
     });
   }
-  if (!PASSWORD_HASH[who]) return false;
-  try { return (await sha256hex(pw)) === PASSWORD_HASH[who]; } catch (e) { return false; }
+  if (!PASSWORD_HASH[who]) return "wrong";
+  try { return (await sha256hex(pw)) === PASSWORD_HASH[who] ? "ok" : "wrong"; } catch (e) { return "wrong"; }
 }
 const SNIPER_NORMAL = (({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }) => ({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }))(WEAPONS[2]);
 const SNIPER_DUKE = { auto: true, rate: 0.14, spread: 0, aimSpread: 0, quickscope: undefined, dmg: 150, head: 150, mag: 99, reload: 0.3 };
@@ -2714,10 +2721,14 @@ $("#pwForm").addEventListener("submit", async e => {
   const go = $("#pwGo"); go.disabled = true; go.textContent = "Checking…";
   myName = cleanName(nick.value) || myName;
   const who = passwordProfile();
-  const ok = !!who && await checkPassword(who, $("#pwIn").value);
+  const res = who ? await checkPassword(who, $("#pwIn").value) : "wrong";
   go.disabled = false; go.textContent = "Join online";
-  if (!ok) { authKey = ""; authWho = ""; authedAs = null; $("#pwErr").hidden = false; $("#pwIn").select(); return; }
-  authedAs = who; $("#pw").hidden = true;
+  if (res !== "ok") {
+    authKey = ""; authWho = ""; authedAs = null;
+    $("#pwErr").textContent = res === "offline" ? "Couldn't reach the game server. Try again." : "That password isn't right.";
+    $("#pwErr").hidden = false; $("#pwIn").select(); return;
+  }
+  authedAs = who; $("#pwIn").blur(); $("#pw").hidden = true;                // blur closes the iPad keyboard
   startGame("online");
 });
 $("#playBots").addEventListener("click", () => startGame("bots"));
