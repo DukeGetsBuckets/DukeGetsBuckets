@@ -3,19 +3,14 @@
 // which relays each player's state to everyone else in the lobby. Every other
 // path serves the game page from ./public.
 //
-// Some name + armor color combinations have extra powers. Online they must first send
-// {t: "auth", key, who} with the password in that profile's Worker secret
-// (DOUG_PASSWORD; set with `wrangler secret put`). Anyone else using a
-// protected name and color is refused.
+// The game has no cheats: the server strips the old invisibility and nuke fields from
+// every message, in case a modified copy still sends them.
 
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
-// removed cheats for everyone but Doug) are told to refresh and can't join until they do.
-const MIN_BUILD = 6;
+// removed cheats) are told to refresh and can't join until they do.
+const MIN_BUILD = 7;
 const MAX_MESSAGE = 6000;
-// protected profiles: name -> armor color, and which can turn invisible
-const PROTECTED = { doug: { color: 2, invisible: true } };
-const profileOf = d => { const n = String(d.n || "").trim().toLowerCase(), p = PROTECTED[n]; return p && d.c === p.color ? n : null; };
 
 function lobbyName(raw) {
   const name = String(raw || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48);
@@ -56,7 +51,7 @@ export class Lobby {
     const [client, server] = Object.values(pair);
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 10);
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ id, auth: false });
+    server.serializeAttachment({ id });
     const peers = [];
     for (const ws of sockets) {
       const a = ws.deserializeAttachment();
@@ -73,24 +68,9 @@ export class Lobby {
     let d;
     try { d = JSON.parse(message); } catch { return; }
     if (!d || typeof d !== "object" || Array.isArray(d)) return;
-    if (d.t === "auth") {
-      const who = typeof d.who === "string" && PROTECTED[d.who] ? d.who : "doug";
-      const secret = this.env && this.env[who.toUpperCase() + "_PASSWORD"];
-      const ok = !!secret && typeof d.key === "string" && d.key === secret;
-      ws.serializeAttachment({ ...a, auth: ok ? who : false });
-      try { ws.send(JSON.stringify({ t: "auth", ok })); } catch {}
-      return;
-    }
-    const prof = profileOf(d);
-    if (prof && a.auth !== prof) {
-      try { ws.send(JSON.stringify({ t: "denied" })); } catch {}
-      return;
-    }
-    if (!(a.auth && PROTECTED[a.auth].invisible)) delete d.iv; // only verified profiles can be invisible
-    if (a.auth !== "doug") {                                     // only Doug can nuke
-      delete d.nk;
-      if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => !(h && (h.nk || h.w === 3)));
-    }
+    if (d.t === "auth") return;                                  // passwords are gone
+    delete d.iv; delete d.nk;                                    // no invisibility, no nukes
+    if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => !(h && h.nk));
     this.last.set(a.id, d);
     const out = JSON.stringify({ t: "st", id: a.id, d });
     for (const other of this.ctx.getWebSockets()) {
