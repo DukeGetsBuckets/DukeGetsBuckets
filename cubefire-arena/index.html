@@ -1335,7 +1335,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 5;
+const BUILD = 6;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -1710,14 +1710,10 @@ function respawn() {
 // (it's a secret on the server, never in this code). Where there is no game server
 // (claude.ai, peer-to-peer) the password is checked against its SHA-256 fingerprint.
 const DOUG_COLOR = 2; // green in PAL
-// Cheat profiles: a name + armor color unlocks a set of perks. Only Doug needs the
+// Cheat profiles: a name + armor color unlocks a set of perks. Only Doug has one, and he needs the
 // password online. Colors are indexes into PAL.
 const PROFILES = {
   doug: { color: DOUG_COLOR, perks: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], nukeWait: 0, password: true },
-  alex: { color: 3, perks: ["wall", "inv"], password: true },     // blue
-  range: { color: 4, perks: ["wall"] },           // purple
-  nolan: { color: 3, perks: ["wall", "nuke"], nukeWait: 180, password: true }, // blue: walls + a nuke every 3 minutes
-  luca: { color: 4, perks: ["wall", "aim", "inv"], password: true }, // purple: walls, aimbot, invisibility
 };
 const PERK_DEFAULT = { aim: true, god: true, snipe: true, wall: true, inv: false };
 const PERK_BUTTON = { aim: "dkAim", god: "dkGod", snipe: "dkSnipe", wall: "dkWall", inv: "dkInv", tp: "dkTp", nuke: "dkNuke" };
@@ -1726,8 +1722,6 @@ const hasPerk = k => duke.on && duke.perks.includes(k);
 // Online through the game server, passwords are checked against the server's secrets.
 const PASSWORD_HASH = {
   doug: "744120d75bb6e2e92c194f056307d6da7c113823649a6ef5ddcc9ff660e1043d",
-  // Alex's, Nolan's and Luca's passwords are short, so no fingerprint is kept here (it could be
-  // cracked); they only unlock online through the game server.
 };
 const duke = { on: false, profile: null, perks: [], aim: false, god: false, snipe: false, wall: false, inv: false };
 let authKey = "", authWho = "", authedAs = null, authWait = null;
@@ -1825,7 +1819,7 @@ function teleportCycle() {
   teleportTo(list[tpNext++ % list.length]);
 }
 // Nuke: eliminates every enemy at once, with a flash everyone sees. Each profile sets
-// how long it takes to recharge (Nolan: 3 minutes, Doug: none). The timer keeps
+// how long it takes to recharge. The timer keeps
 // running between matches.
 let nukeReadyAt = 0, nukeSeq = 0, lastNuke = null;
 function fireNuke() {
@@ -2702,7 +2696,7 @@ function showRefresh() {
 }
 $("#refreshBtn").addEventListener("click", () => location.reload());
 // One-time update notice; each device sees it until it's dismissed
-const NOTICE = { id: "duke-hacks-removed", text: "Duke's hacks have been removed." };
+const NOTICE = { id: "only-doug-hacks", text: "Hacks have been removed for everyone except Doug." };
 if (load("cfa.notice") !== NOTICE.id) { $("#noticeText").textContent = NOTICE.text; $("#notice").hidden = false; }
 $("#noticeOk").addEventListener("click", () => { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); });
 $("#pwForm").addEventListener("submit", async e => {

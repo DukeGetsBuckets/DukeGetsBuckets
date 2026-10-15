@@ -5,16 +5,16 @@
 //
 // Some name + armor color combinations have extra powers. Online they must first send
 // {t: "auth", key, who} with the password in that profile's Worker secret
-// (DOUG_PASSWORD, ALEX_PASSWORD, NOLAN_PASSWORD, LUCA_PASSWORD; set with `wrangler secret put`). Anyone else using a
+// (DOUG_PASSWORD; set with `wrangler secret put`). Anyone else using a
 // protected name and color is refused.
 
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
-// removed Duke cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 5;
+// removed cheats for everyone but Doug) are told to refresh and can't join until they do.
+const MIN_BUILD = 6;
 const MAX_MESSAGE = 6000;
 // protected profiles: name -> armor color, and which can turn invisible
-const PROTECTED = { doug: { color: 2, invisible: true }, alex: { color: 3, invisible: true }, nolan: { color: 3, invisible: false }, luca: { color: 4, invisible: true } };
+const PROTECTED = { doug: { color: 2, invisible: true } };
 const profileOf = d => { const n = String(d.n || "").trim().toLowerCase(), p = PROTECTED[n]; return p && d.c === p.color ? n : null; };
 
 function lobbyName(raw) {
@@ -87,6 +87,10 @@ export class Lobby {
       return;
     }
     if (!(a.auth && PROTECTED[a.auth].invisible)) delete d.iv; // only verified profiles can be invisible
+    if (a.auth !== "doug") {                                     // only Doug can nuke
+      delete d.nk;
+      if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => !(h && (h.nk || h.w === 3)));
+    }
     this.last.set(a.id, d);
     const out = JSON.stringify({ t: "st", id: a.id, d });
     for (const other of this.ctx.getWebSockets()) {
