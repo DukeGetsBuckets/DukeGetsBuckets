@@ -15,7 +15,7 @@
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 12;
+const MIN_BUILD = 13;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -180,7 +180,10 @@ const SKINS = {
   rare: ["ninja", "knight", "astro", "robot", "pirate", "cowboy"],
   super: ["golden", "lava", "galaxy", "diamond", "rainbow"],
 };
-const ALL_SKINS = [...SKINS.common, ...SKINS.rare, ...SKINS.super];
+const ALL_SKINS = [...SKINS.common, ...SKINS.rare, ...SKINS.super];   // the wheel's skins
+// Rank rewards: owned automatically once the account's rank points reach the number
+const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200], ["diamondwarden", 1800], ["masterphantom", 2500], ["champion", 3500]];
+const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["super", 0.05], ["rare", 0.25], ["common", 0.7]];
 const START_TICKETS = 3, PTS_PER_TICKET = 10;
 const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
@@ -213,7 +216,8 @@ export class Accounts {
   data(u) { try { return JSON.parse(u.data) || {}; } catch { return {}; } }
   saveData(name, d) { this.sql.exec("UPDATE users SET data = ? WHERE name = ?", JSON.stringify(d), name); }
   view(u, d) {
-    return { name: u.display, tickets: d.tickets || 0, owned: d.owned || [], equipped: d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today() };
+    if (u.name === "doug") return { name: u.display, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k)], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false };
+    return { name: u.display, tickets: d.tickets || 0, owned: [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0))], equipped: d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today() };
   }
   async session(name) {
     const token = hex(crypto.getRandomValues(new Uint8Array(24)));
@@ -237,11 +241,31 @@ export class Accounts {
       if (password.length < 4 || password.length > 64) throw new UserError("Passwords are 4-64 characters");
       const f = this.fails.get(name);
       if (f && f.until > Date.now()) throw new UserError("Too many tries. Wait a minute and try again");
+      // The "Doug" account (every skin, unlimited spins) only opens with Doug's password
+      // (the DOUG_PASSWORD secret); it's created the first time Doug signs in.
+      if (name === "doug") {
+        const secret = this.env && this.env.DOUG_PASSWORD;
+        if (!secret || password !== secret) {
+          const g = this.fails.get(name) || { n: 0, until: 0 }; g.n++;
+          if (g.n >= 8) { g.n = 0; g.until = Date.now() + 60000; }
+          this.fails.set(name, g);
+          throw new UserError(op === "signup" ? "That name is taken" : "Wrong name or password");
+        }
+        this.fails.delete(name);
+        let u = this.user(name);
+        if (!u) {
+          const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
+          this.sql.exec("INSERT INTO users (name, display, salt, hash, data, created) VALUES (?, ?, ?, ?, ?, ?)", name, "Doug", salt, await hashPw(password, salt),
+            JSON.stringify({ owned: [], equipped: null, tickets: 0, bank: 0, rank: Math.max(0, Math.min(5000, Math.floor(Number(body.rank) || 0))), lastDaily: "" }), Date.now());
+          u = this.user(name);
+        }
+        return { token: await this.session(name), account: this.view(u, this.data(u)) };
+      }
       if (op === "signup") {
         if (this.user(name)) throw new UserError("That name is taken");
         const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
         const rank = Math.max(0, Math.min(5000, Math.floor(Number(body.rank) || 0)));
-        const d = { owned: [], equipped: null, tickets: START_TICKETS, bank: 0, rank, lastDaily: "" };
+        const d = { owned: [], equipped: null, tickets: START_TICKETS, bank: 0, rank, best: rank, lastDaily: "" };
         this.sql.exec("INSERT INTO users (name, display, salt, hash, data, created) VALUES (?, ?, ?, ?, ?, ?)", name, display, salt, await hashPw(password, salt), JSON.stringify(d), Date.now());
         const u = this.user(name);
         return { token: await this.session(name), account: this.view(u, d) };
@@ -271,12 +295,19 @@ export class Accounts {
       d.tickets = (d.tickets || 0) + Math.floor(d.bank / PTS_PER_TICKET) + wins;
       d.bank %= PTS_PER_TICKET;
       if (body.rank != null) d.rank = Math.max(0, Math.min(99999, Math.floor(Number(body.rank) || 0)));
+      d.best = Math.max(d.best || 0, d.rank || 0);                    // rank skins stay yours for good
       this.saveData(u.name, d); return { account: this.view(u, d) };
     }
     if (op === "equip") {
       const skin = body.skin == null ? null : String(body.skin);
-      if (skin && !(d.owned || []).includes(skin)) throw new UserError("You don't have that skin yet");
+      if (skin && !this.view(u, d).owned.includes(skin)) throw new UserError("You don't have that skin yet");
       d.equipped = skin; this.saveData(u.name, d); return { account: this.view(u, d) };
+    }
+    if (op === "spin" && u.name === "doug") {          // Doug: free spins, any skin
+      let r = Math.random(), rarity = "common";
+      for (const [k, p] of ODDS) { if (r < p) { rarity = k; break; } r -= p; }
+      const list = SKINS[rarity];
+      return { skin: list[Math.floor(Math.random() * list.length)], rarity, account: this.view(u, d) };
     }
     if (op === "spin") {
       const owned = new Set(d.owned || []);
