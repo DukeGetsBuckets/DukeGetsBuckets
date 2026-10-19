@@ -247,6 +247,38 @@ body.pig #pigTint{display:block}
 .rankrow.here em{color:var(--accent)}
 .rankrow.locked{opacity:.6}
 .linkbtn{border:1px solid var(--line);background:rgba(255,255,255,.06);border-radius:4px;padding:4px 10px;font-weight:700;font-size:12px;letter-spacing:.04em;margin-left:auto}
+#locker{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.78);padding:16px;z-index:6;overflow-y:auto}
+#locker .card{width:min(860px,100%);gap:14px}
+#locker h2{font:400 26px var(--display);margin:0;display:flex;align-items:center;gap:12px}
+#locker h2 button{margin-left:auto;font:600 14px var(--ui);padding:8px 14px}
+.lk-cols{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:18px;align-items:start}
+.lk-box{border:1px solid var(--line);border-radius:6px;background:rgba(255,255,255,.04);padding:12px 14px;display:grid;gap:10px}
+.lk-box p{margin:0}
+.lk-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lk-row input{flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:4px;padding:9px 11px;color:var(--ink);font:600 15px var(--ui);-webkit-user-select:text;user-select:text}
+.lk-err{color:var(--hot);font-size:13px;font-weight:600}
+.tickets{font:400 22px var(--display);color:var(--accent)}
+.wheelwrap{position:relative;width:240px;height:240px;margin:0 auto}
+.wheelwrap canvas{width:240px;height:240px;display:block}
+.wheelwrap::after{content:"";position:absolute;left:50%;top:-6px;transform:translateX(-50%);border:12px solid transparent;border-top:20px solid var(--ink);filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))}
+.odds{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;font-weight:700}
+.r0{color:#b7c3cf}.r1{color:#4fb0ff}.r2{color:#d17bff}
+.prize{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;align-items:center;border:1px solid var(--accent);border-radius:6px;padding:8px 10px;background:rgba(255,182,39,.08)}
+.prize img{width:72px;height:90px;object-fit:contain}
+.prize b{font:400 18px var(--display);display:block}
+.lk-preview{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px;align-items:center}
+.lk-preview canvas{width:150px;height:190px;border-radius:6px;background:radial-gradient(circle at 50% 35%,rgba(255,255,255,.12),rgba(255,255,255,.02))}
+.lk-preview b{font:400 20px var(--display);display:block}
+.skingrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.skin{display:grid;justify-items:center;gap:2px;border:1px solid var(--line);border-radius:6px;background:rgba(255,255,255,.04);padding:6px 4px 7px;font-size:12px;font-weight:700;text-align:center;position:relative}
+.skin img{width:64px;height:80px;object-fit:contain}
+.skin small{font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.skin.locked img{filter:brightness(0) opacity(.45)}
+.skin.locked{color:var(--muted)}
+.skin.on{border-color:var(--accent);background:rgba(255,182,39,.14)}
+.skin.on::after{content:"Wearing";position:absolute;top:4px;right:4px;font-size:9px;letter-spacing:.06em;text-transform:uppercase;background:var(--accent);color:#1a1205;border-radius:3px;padding:1px 4px}
+.skin.none{place-content:center;min-height:118px}
+@media (max-width:700px){.lk-cols{grid-template-columns:minmax(0,1fr)}}
 #pw{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.7);padding:16px;z-index:5}
 #pw .card{gap:12px}
 #pw h2{font:400 26px var(--display);margin:0}
@@ -357,7 +389,7 @@ body.pig #pigTint{display:block}
 
 <div id="touch" hidden>
   <div id="stick"><i id="knob"></i></div>
-  <button class="tb" id="tFire" type="button">Fire<small>+ aim</small></button>
+  <button class="tb" id="tFire" type="button">Fire<small>let go to shoot</small></button>
   <button class="tb" id="tJump" type="button">Jump</button>
   <button class="tb" id="tDash" type="button">Dash</button>
   <button class="tb" id="tCrouch" type="button">Duck</button>
@@ -400,6 +432,7 @@ body.pig #pigTint{display:block}
       <div class="classes" id="classPick" role="group" aria-labelledby="classLbl"></div>
       <p class="fine" id="classDesc"></p>
     </div>
+    <button class="mode" id="openLocker" type="button"><b>Locker</b><span id="lockerSub">Skins and the skin wheel · sign in to start</span></button>
     <div class="modes">
       <button class="mode primary" id="playOnline" type="button"><b>Play online</b><span id="onlineSub">Real players only, no bots</span></button>
       <button class="mode" id="playBots" type="button"><b>Bot match</b><span>Practice against 6–8 bots</span></button>
@@ -422,7 +455,7 @@ body.pig #pigTint{display:block}
       <li><b>Space</b>Jump</li>
       <li><b>Shift</b>Run</li>
       <li><b>Q / X</b>Dash</li>
-      <li><b>Click</b>Shoot</li>
+      <li><b>Hold click</b>Aim · let go to shoot</li>
       <li><b>Right-click / E</b>Aim</li>
       <li><b>C</b>Crouch</li>
       <li><b>R</b>Reload</li>
@@ -430,7 +463,7 @@ body.pig #pigTint{display:block}
       <li><b>G</b>Throw grenade</li>
       <li><b>Tab</b>Scoreboard · <b>P</b>Pause</li>
     </ul>
-    <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
+    <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and let go to shoot. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
     <p class="fine">Online matches are played in 3-minute rounds once 2 players are in; if you join mid-round you spectate until the next one. Ranked: +25 for each elimination (+5 for a headshot), +50 for winning a round, −15 for each death.</p>
     <p class="fine">Friends who type the same party code land in the same private match. Leave it blank to join the open arena.</p>
   </div>
@@ -445,6 +478,29 @@ body.pig #pigTint{display:block}
 </div>
 
 <div id="notice" role="status" hidden><b>Update</b><span id="noticeText"></span><button class="btn primary" type="button" id="noticeOk">Got it</button></div>
+
+<div id="locker" hidden>
+  <div class="card" role="dialog" aria-labelledby="lockerTitle">
+    <h2 id="lockerTitle">Locker <button class="btn" type="button" id="lockerClose">Close</button></h2>
+    <div class="lk-cols">
+      <div class="lk-col">
+        <div class="lk-box" id="acctBox"></div>
+        <div class="lk-box" id="wheelBox" hidden>
+          <div class="lk-row"><span class="lbl-sm">Skin wheel</span><span class="tickets" id="tickets" style="margin-left:auto"></span></div>
+          <div class="wheelwrap"><canvas id="wheel" width="480" height="480"></canvas></div>
+          <div class="lk-row"><button class="btn primary" type="button" id="spinBtn">Spin · 1 ticket</button><button class="btn" type="button" id="dailyBtn">Free daily spin</button></div>
+          <div id="prize"></div>
+          <div class="odds"><span class="r0">Common 70%</span><span class="r1">Rare 25%</span><span class="r2">Super rare 5%</span></div>
+          <p class="fine">Earn tickets: one for every 10 points of eliminations (online eliminations are worth 2, bot ones 1), one for each round you win, and one free spin a day. The wheel always gives you a skin you don't have yet.</p>
+        </div>
+      </div>
+      <div class="lk-col lk-box">
+        <div class="lk-preview"><canvas id="skinPreview" width="300" height="380"></canvas><div><span class="lbl-sm">Wearing</span><b id="wearName">Standard</b><span id="wearRarity" class="fine"></span><p class="fine" id="wearNote"></p></div></div>
+        <div class="skingrid" id="skinGrid"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="ranks" hidden>
   <div class="card" role="dialog" aria-labelledby="ranksTitle">
@@ -477,6 +533,7 @@ body.pig #pigTint{display:block}
     <div class="btns">
       <button class="btn primary" id="resume" type="button">Resume</button>
       <button class="btn" id="pauseRanks" type="button">Ranks</button>
+      <button class="btn" id="pauseLocker" type="button">Locker</button>
       <button class="btn" id="leave" type="button">Leave match</button>
     </div>
   </div>
@@ -1123,12 +1180,12 @@ function rayPlayer(o, d, p, grow, crouched) {
 // minimum share]. fov: zoom while aiming. len: how long the gun looks in other players' hands.
 // mud: how it throws mud in Pig Fire. pig: its Pig Fire name.
 const WEAPONS = [
-  { id: "rifle", name: "Assault Rifle", aa: { cone: 1.4, pull: 1.7, track: 1.15, snap: 1.3, magnet: 1.6, slow: 0.75 }, rate: 0.1, dmg: 18, head: 34, mag: 30, reload: 1.6, spread: 0.016, aimSpread: 0.004, pellets: 1, range: 140, auto: true, recoil: 0.013, recoilX: 0.35, fov: 58, falloff: [45, 110, 0.7], len: 1, snd: "rifle", mud: { speed: 40, lift: 0.6, grav: 8 }, pig: "Oink Rifle" },
+  { id: "rifle", name: "Assault Rifle", aa: { cone: 1.4, pull: 1.7, track: 1.15, snap: 1.3, magnet: 1.6, slow: 0.75 }, rate: 0.1, dmg: 18, head: 34, mag: 30, reload: 1.6, spread: 0.016, aimSpread: 0.004, pellets: 1, range: 140, auto: true, burst: 3, recoil: 0.013, recoilX: 0.35, fov: 58, falloff: [45, 110, 0.7], len: 1, snd: "rifle", mud: { speed: 40, lift: 0.6, grav: 8 }, pig: "Oink Rifle" },
   { id: "shotgun", name: "Pump Shotgun", aa: { cone: 1, pull: 1, track: 1, snap: 1, magnet: 1, slow: 1 }, rate: 0.8, dmg: 16, head: 23, mag: 6, reload: 1.9, spread: 0.062, aimSpread: 0.042, pellets: 9, range: 48, auto: false, recoil: 0.055, recoilX: 0.3, fov: 64, falloff: [14, 44, 0.45], len: 1.05, pump: true, snd: "shotgun", mud: { speed: 30, lift: 0.8, grav: 11 }, pig: "Snout Gun" },
   { id: "sniper", name: "Sniper Rifle", aa: { cone: 0.5, pull: 0.4, track: 0.6, snap: 0.4, magnet: 0.4, slow: 1.4 }, rate: 1.2, dmg: 100, head: 150, adsSpeed: 26, quickscope: 0.5, mag: 5, reload: 2.3, spread: 0.07, aimSpread: 0, pellets: 1, range: 220, auto: false, recoil: 0.075, recoilX: 0.2, fov: 20, scope: true, bolt: true, len: 1.35, snd: "sniper", mud: { speed: 58, lift: 0, grav: 1.5 }, pig: "Hog Sniper" },
-  { id: "smg", name: "SMG", aa: { cone: 1.3, pull: 1.6, track: 1.2, snap: 1.2, magnet: 1.4, slow: 0.8 }, rate: 0.068, dmg: 13, head: 23, mag: 35, reload: 1.4, spread: 0.028, aimSpread: 0.012, pellets: 1, range: 90, auto: true, recoil: 0.009, recoilX: 0.6, fov: 62, falloff: [18, 55, 0.6], len: 0.75, snd: "smg", mud: { speed: 36, lift: 0.7, grav: 9 }, pig: "Piglet SMG" },
-  { id: "paint", name: "Paintball Gun", aa: { cone: 1.1, pull: 1.2, track: 1, snap: 1, magnet: 1, slow: 0.9 }, rate: 0.16, dmg: 34, head: 50, mag: 20, reload: 1.8, spread: 0.012, aimSpread: 0.004, pellets: 1, range: 120, auto: true, recoil: 0.006, recoilX: 0.2, fov: 60, proj: { speed: 62, grav: 9 }, len: 0.95, snd: "paint", mud: { speed: 46, lift: 0.4, grav: 7 }, pig: "Mud Marker" },
-  { id: "minigun", name: "Minigun", aa: { cone: 1.2, pull: 1.4, track: 1.1, snap: 0.9, magnet: 1.2, slow: 0.8 }, rate: 0.05, dmg: 11, head: 17, mag: 120, reload: 4, spread: 0.04, aimSpread: 0.026, pellets: 1, range: 110, auto: true, recoil: 0.005, recoilX: 0.9, fov: 66, falloff: [30, 90, 0.6], spin: 0.5, move: 0.86, len: 1.15, snd: "minigun", mud: { speed: 44, lift: 0.5, grav: 8 }, pig: "Hog Hose" },
+  { id: "smg", name: "SMG", aa: { cone: 1.3, pull: 1.6, track: 1.2, snap: 1.2, magnet: 1.4, slow: 0.8 }, rate: 0.068, dmg: 13, head: 23, mag: 35, reload: 1.4, spread: 0.028, aimSpread: 0.012, pellets: 1, range: 90, auto: true, burst: 4, recoil: 0.009, recoilX: 0.6, fov: 62, falloff: [18, 55, 0.6], len: 0.75, snd: "smg", mud: { speed: 36, lift: 0.7, grav: 9 }, pig: "Piglet SMG" },
+  { id: "paint", name: "Paintball Gun", aa: { cone: 1.1, pull: 1.2, track: 1, snap: 1, magnet: 1, slow: 0.9 }, rate: 0.16, dmg: 34, head: 50, mag: 20, reload: 1.8, spread: 0.012, aimSpread: 0.004, pellets: 1, range: 120, auto: true, burst: 3, recoil: 0.006, recoilX: 0.2, fov: 60, proj: { speed: 62, grav: 9 }, len: 0.95, snd: "paint", mud: { speed: 46, lift: 0.4, grav: 7 }, pig: "Mud Marker" },
+  { id: "minigun", name: "Minigun", aa: { cone: 1.2, pull: 1.4, track: 1.1, snap: 0.9, magnet: 1.2, slow: 0.8 }, rate: 0.05, dmg: 11, head: 17, mag: 120, reload: 4, spread: 0.04, aimSpread: 0.026, pellets: 1, range: 110, auto: true, burst: 14, recoil: 0.005, recoilX: 0.9, fov: 66, falloff: [30, 90, 0.6], spin: 0.5, move: 0.86, len: 1.15, snd: "minigun", mud: { speed: 44, lift: 0.5, grav: 8 }, pig: "Hog Hose" },
   { id: "dmr", name: "Marksman Rifle", aa: { cone: 0.8, pull: 0.8, track: 0.8, snap: 0.7, magnet: 0.7, slow: 1.1 }, rate: 0.3, dmg: 42, head: 84, mag: 10, reload: 2, spread: 0.012, aimSpread: 0.0015, pellets: 1, range: 200, auto: false, recoil: 0.03, recoilX: 0.2, fov: 38, len: 1.2, snd: "dmr", mud: { speed: 54, lift: 0.1, grav: 3 }, pig: "Boar Marksman" },
   { id: "pistol", name: "Pistol", aa: { cone: 1, pull: 1.1, track: 1, snap: 1, magnet: 1, slow: 0.9 }, rate: 0.16, dmg: 21, head: 40, mag: 12, reload: 1.25, spread: 0.014, aimSpread: 0.005, pellets: 1, range: 80, auto: false, recoil: 0.022, recoilX: 0.3, fov: 64, falloff: [20, 60, 0.6], len: 0.45, snd: "pistol", mud: { speed: 38, lift: 0.6, grav: 9 }, pig: "Trotter Pistol" },
 ];
@@ -1222,8 +1279,82 @@ const tagKey = (name, pts) => name + "|" + (pts == null ? "" : rankOf(pts).label
 // Custom skins by player name (everyone sees them)
 const SKINS = { mason: "pig" };
 const skinFor = (name, color) => color === 6 ? "default" : SKINS[String(name || "").toLowerCase()] || "default"; // white armor = no pig
+// Skins from the skin wheel. rarity: 0 common, 1 rare, 2 super rare. Colors for each
+// part of the body; glow: emissive color (super rares glow); gun: tint for your own gun;
+// extra(add, head, body) adds details; anim(av, t) animates the skin for everyone.
+const RARITY = [{ name: "Common", color: "#b7c3cf" }, { name: "Rare", color: "#4fb0ff" }, { name: "Super rare", color: "#d17bff" }];
+const SKIN_DEFS = {
+  camo: { name: "Jungle Camo", rarity: 0, legs: 0x3b4526, body: 0x56683a, helmet: 0x4a5a30,
+    extra(add) { for (const [x, y, w, h, c] of [[-0.16, 1.18, 0.16, 0.12, 0x2f3b20], [0.12, 0.96, 0.2, 0.1, 0x6f7f45], [0.15, 1.24, 0.12, 0.1, 0x2f3b20], [-0.1, 0.9, 0.14, 0.08, 0x6f7f45]]) add(w, h, 0.02, c, x, y, -0.18); } },
+  desert: { name: "Desert Storm", rarity: 0, legs: 0x8a7148, body: 0xc8a96a, helmet: 0xb59560,
+    extra(add, head) { add(0.4, 0.09, 0.03, 0x2a2f37, 0, 0.36, -0.245, head); add(0.12, 0.07, 0.02, 0xffc46b, -0.1, 0.36, -0.262, head); add(0.12, 0.07, 0.02, 0xffc46b, 0.1, 0.36, -0.262, head); } },
+  arctic: { name: "Arctic", rarity: 0, legs: 0xb8c4cc, body: 0xe9eef2, helmet: 0xf4f7fa, visor: 0x6fc3ff },
+  nightops: { name: "Night Ops", rarity: 0, legs: 0x16181c, body: 0x22252b, helmet: 0x1a1c20, visor: 0x3cff7a, visorGlow: 0x1f8a3f },
+  hivis: { name: "Hi-Vis", rarity: 0, legs: 0x2a3550, body: 0xff7a1a, helmet: 0xffd21f,
+    extra(add) { add(0.64, 0.06, 0.36, 0xdfe6ec, 0, 0.98, 0); add(0.64, 0.06, 0.36, 0xdfe6ec, 0, 1.2, 0); } },
+  cherry: { name: "Cherry Stripe", rarity: 0, legs: 0x3a1418, body: 0xe23a46, helmet: 0xe23a46,
+    extra(add) { add(0.1, 0.62, 0.36, 0xf5f0ea, 0, 1.06, 0); } },
+  ocean: { name: "Deep Sea", rarity: 0, legs: 0x14304f, body: 0x1f5fa8, helmet: 0x1f5fa8,
+    extra(add) { add(0.64, 0.07, 0.36, 0x36d6c3, 0, 1.1, 0); add(0.64, 0.04, 0.36, 0x36d6c3, 0, 0.94, 0); } },
+  grape: { name: "Grape Soda", rarity: 0, legs: 0x2e1a46, body: 0x7b3fb8, helmet: 0x9b5fe0 },
+  ninja: { name: "Ninja", rarity: 1, legs: 0x15161a, body: 0x1e2026, arms: 0x1e2026, head: 0x1e2026, helmet: 0x1e2026, visor: 0xe8c9a0, gun: 0x2a2a30,
+    extra(add, head) { add(0.5, 0.08, 0.5, 0xd8323c, 0, 0.36, 0, head); add(0.06, 0.06, 0.26, 0xd8323c, -0.06, 0.32, 0.36, head); add(0.06, 0.06, 0.22, 0xd8323c, 0.06, 0.3, 0.34, head); add(0.64, 0.06, 0.36, 0xd8323c, 0, 0.82, 0); } },
+  knight: { name: "Knight", rarity: 1, legs: 0x8d96a0, body: 0xb9c2cc, arms: 0xa3acb7, head: 0xb9c2cc, helmet: 0xb9c2cc, visor: 0x15171b, gun: 0xc9d1da,
+    extra(add, head) { add(0.08, 0.2, 0.3, 0xd23a3a, 0, 0.58, 0.02, head); add(0.3, 0.3, 0.04, 0xd8b25a, 0, 1.08, -0.19); add(0.06, 0.2, 0.05, 0xb9c2cc, 0, 1.08, -0.215); } },
+  astro: { name: "Astronaut", rarity: 1, legs: 0xdfe5ea, body: 0xf4f7fa, arms: 0xf4f7fa, helmet: 0xf4f7fa, visor: 0xe0a33a, gun: 0xe9eef2,
+    extra(add, head) { add(0.56, 0.56, 0.56, 0x9fd6ff, 0, 0.24, 0, head, { opacity: 0.35 }); add(0.44, 0.5, 0.2, 0xdfe5ea, 0, 1.08, 0.26); add(0.1, 0.1, 0.02, 0xff5d5d, -0.14, 1.2, -0.18); add(0.1, 0.1, 0.02, 0x43b7ff, 0.14, 1.2, -0.18); } },
+  robot: { name: "Robot", rarity: 1, legs: 0x5d646d, body: 0x8a939c, arms: 0x737b85, head: 0x9aa3ad, helmet: 0x8a939c, visor: 0x15171b, gun: 0x8a939c,
+    extra(add, head) { add(0.1, 0.07, 0.02, 0x3ff3ff, -0.11, 0.26, -0.25, head, { glow: 0x3ff3ff }); add(0.1, 0.07, 0.02, 0x3ff3ff, 0.11, 0.26, -0.25, head, { glow: 0x3ff3ff }); add(0.03, 0.22, 0.03, 0x5d646d, 0, 0.6, 0, head); add(0.07, 0.07, 0.07, 0xff4f5e, 0, 0.72, 0, head, { glow: 0xff4f5e }); add(0.3, 0.2, 0.02, 0x5d646d, 0, 1.08, -0.18); } },
+  pirate: { name: "Pirate", rarity: 1, legs: 0x2a2f37, body: 0xa8282e, arms: 0xa8282e, helmet: 0x15161a, visor: 0xe8c9a0, gun: 0x7a4a26,
+    extra(add, head) { add(0.72, 0.06, 0.6, 0x15161a, 0, 0.47, 0, head); add(0.4, 0.16, 0.4, 0x15161a, 0, 0.56, 0, head); add(0.1, 0.1, 0.02, 0x15161a, -0.11, 0.27, -0.245, head); add(0.64, 0.07, 0.36, 0xd8b25a, 0, 0.86, 0); } },
+  cowboy: { name: "Cowboy", rarity: 1, legs: 0x2f4d7a, body: 0x8a5a2e, arms: 0xd9c9a8, helmet: 0x6b4423, gun: 0x6b4423,
+    extra(add, head) { add(0.8, 0.05, 0.8, 0x6b4423, 0, 0.47, 0, head); add(0.42, 0.18, 0.42, 0x6b4423, 0, 0.58, 0, head); add(0.48, 0.14, 0.04, 0xc8323c, 0, 0.1, -0.24, head); add(0.2, 0.08, 0.04, 0xd8b25a, 0, 0.82, -0.18); } },
+  golden: { name: "Golden Legend", rarity: 2, legs: 0xb8860b, body: 0xffc93c, arms: 0xffc93c, head: 0xffd76a, helmet: 0xffc93c, visor: 0x2a1a00, glow: 0x5a3c00, gun: 0xffc93c,
+    extra(add, head) { for (const x of [-0.18, -0.06, 0.06, 0.18]) add(0.08, 0.14, 0.08, 0xffe28a, x, 0.56, -0.18, head, { glow: 0x8a6a00 }); add(0.5, 0.06, 0.5, 0xffe28a, 0, 0.5, 0, head, { glow: 0x8a6a00 }); } },
+  lava: { name: "Lava Lord", rarity: 2, legs: 0x1a1210, body: 0x241713, arms: 0x241713, head: 0x2d1d18, helmet: 0x1a1210, visor: 0xff6a00, visorGlow: 0xff6a00, gun: 0x3a1a10,
+    extra(add) { for (const [x, y] of [[-0.18, 1.2], [0.05, 1.0], [0.2, 1.22], [-0.05, 1.3], [0.15, 0.85], [-0.2, 0.92]]) add(0.07 + Math.abs(x) * 0.2, 0.05, 0.02, 0xff7a1a, x, y, -0.18, null, { glow: 0xff5a00, pulse: true }); },
+    anim(av, t) { const k = 0.6 + 0.4 * Math.sin(t * 3); for (const m of av.pulse) m.emissiveIntensity = k; } },
+  galaxy: { name: "Galaxy", rarity: 2, legs: 0x120a2a, body: 0x2a1050, arms: 0x2a1050, head: 0x3a1a6a, helmet: 0x2a1050, visor: 0x9ff3ff, visorGlow: 0x5fd0ff, glow: 0x1a0a40, gun: 0x5a2aa0,
+    extra(add, head) { const r = rng32(5); for (let i = 0; i < 14; i++) add(0.03, 0.03, 0.02, 0xffffff, (r() - .5) * 0.56, 0.78 + r() * 0.56, -0.18, null, { glow: 0xffffff }); for (let i = 0; i < 4; i++) add(0.03, 0.03, 0.02, 0xffffff, (r() - .5) * 0.4, 0.4 + r() * 0.1, -0.235, head, { glow: 0xffffff }); },
+    anim(av, t) { av.bodyMat.emissive.setHSL(0.72 + 0.06 * Math.sin(t * 0.8), 0.8, 0.12); } },
+  diamond: { name: "Diamond", rarity: 2, legs: 0x5fbcd6, body: 0x8ff0ff, arms: 0x8ff0ff, head: 0xbff7ff, helmet: 0x8ff0ff, visor: 0x0f4a5a, glow: 0x0f5a6a, gun: 0x8ff0ff,
+    extra(add, head) { add(0.1, 0.24, 0.1, 0xdfffff, 0, 0.62, 0, head, { glow: 0x3fd0e0, rot: 0.785 }); add(0.08, 0.16, 0.08, 0xdfffff, -0.38, 1.46, 0, null, { glow: 0x3fd0e0, rot: 0.785 }); add(0.08, 0.16, 0.08, 0xdfffff, 0.38, 1.46, 0, null, { glow: 0x3fd0e0, rot: 0.785 }); } },
+  rainbow: { name: "Rainbow", rarity: 2, legs: 0x2a2f37, body: 0xff5d5d, arms: 0xff5d5d, helmet: 0xff5d5d, glow: 0x202020, gun: 0xff7ac8,
+    anim(av, t) { av.bodyMat.color.setHSL((t * 0.25) % 1, 0.85, 0.58); av.helmetMat.color.setHSL((t * 0.25 + 0.15) % 1, 0.85, 0.58); av.armsMat.color.setHSL((t * 0.25 + 0.3) % 1, 0.85, 0.58); } },
+};
+const SKIN_IDS = Object.keys(SKIN_DEFS);
+// A skinned player: the standard body built in the skin's colors, plus its details
+function makeSkinned(id, colorHex, name, pts, parent) {
+  const S = SKIN_DEFS[id], g = new THREE.Group(), pulse = [];
+  const mat = (c, o) => {
+    const m = new THREE.MeshLambertMaterial({ color: c });
+    const glow = o && o.glow != null ? o.glow : S.glow;
+    if (glow != null) m.emissive = new THREE.Color(glow);
+    if (o && o.opacity) { m.transparent = true; m.opacity = o.opacity; m.depthWrite = false; }
+    if (o && o.pulse) pulse.push(m);
+    return m;
+  };
+  const legsM = mat(S.legs), bodyM = mat(S.body), armsM = mat(S.arms != null ? S.arms : S.body), headM = mat(S.head != null ? S.head : 0xe8c9a0, { glow: S.glow != null ? S.glow : null }), helmetM = mat(S.helmet != null ? S.helmet : S.body);
+  const visorM = mat(S.visor != null ? S.visor : 0x2a2f37, { glow: S.visorGlow != null ? S.visorGlow : S.glow }), gunM = mat(S.gun != null ? S.gun : 0x2a2f37);
+  box(0.24, 0.75, 0.28, legsM, -0.14, 0.375, 0, g); box(0.24, 0.75, 0.28, legsM, 0.14, 0.375, 0, g);
+  box(0.62, 0.62, 0.34, bodyM, 0, 1.06, 0, g);
+  const beltM = new THREE.MeshLambertMaterial({ color: colorHex });
+  box(0.64, 0.08, 0.36, beltM, 0, 0.78, 0, g);                                        // belt in your armor color
+  const head = new THREE.Group(); head.position.set(0, 1.37, 0); g.add(head);
+  box(0.46, 0.46, 0.46, headM, 0, 0.23, 0, head);
+  box(0.48, 0.14, 0.48, helmetM, 0, 0.42, 0, head);
+  box(0.36, 0.1, 0.02, visorM, 0, 0.26, -0.235, head);
+  const arms = new THREE.Group(); arms.position.set(0, 1.25, 0); g.add(arms);
+  box(0.18, 0.18, 0.5, armsM, 0.36, 0, -0.18, arms); box(0.18, 0.18, 0.5, armsM, -0.2, 0, -0.26, arms);
+  const gun = box(0.1, 0.12, 0.7, gunM, 0.2, 0.04, -0.5, arms);
+  if (S.extra) S.extra((w, h, d, c, x, y, z, par, o) => { const m = box(w, h, d, mat(c, o), x, y, z, par || g); if (o && o.rot) m.rotation.y = o.rot; return m; }, head, g);
+  let tag = null;
+  if (name != null) { tag = nameSprite(name, pts); tag.position.set(0, TAG_Y, 0); g.add(tag); }
+  parent.add(g);
+  return { g, head, arms, gun, tag, name, tagKey: tagKey(name, pts), body: beltM, skin: id, bodyMat: bodyM, helmetMat: helmetM, armsMat: armsM, pulse, anim: S.anim || null };
+}
 // Pig skin: pink pig with a snout, ears and a curly tail, wearing an armor-colored vest
-function makePig(colorHex, name, pts) {
+function makePig(colorHex, name, pts, parent = scene) {
   const g = new THREE.Group();
   const pink = lam(0xf2a0b6), light = lam(0xf8c3d0), hoof = lam(0x5a3a3f), black = lam(0x1b1b1f), vest = lam(colorHex), dark = lam(0x2a2f37);
   // legs hang from hip pivots so they can swing when the pig runs
@@ -1246,12 +1377,15 @@ function makePig(colorHex, name, pts) {
   const arms = new THREE.Group(); arms.position.set(0, 1.25, 0); g.add(arms);
   box(0.18, 0.18, 0.5, pink, 0.38, 0, -0.18, arms); box(0.18, 0.18, 0.5, pink, -0.22, 0, -0.26, arms);
   const gun = box(0.1, 0.12, 0.7, dark, 0.2, 0.04, -0.5, arms);
-  const tag = nameSprite(name, pts); tag.position.set(0, TAG_Y, 0); g.add(tag);
-  scene.add(g);
+  let tag = null;
+  if (name != null) { tag = nameSprite(name, pts); tag.position.set(0, TAG_Y, 0); g.add(tag); }
+  parent.add(g);
   return { g, head, arms, gun, tag, name, tagKey: tagKey(name, pts), body: vest, skin: "pig", legs, ears: [earL, earR], tail, run: 0, spd: 0, last: null };
 }
-function makeAvatar(colorHex, name, skinName, pts) {
-  if ((skinName || skinFor(name)) === "pig") return makePig(colorHex, name, pts);
+function makeAvatar(colorHex, name, skinName, pts, parent = scene) {
+  const sk = skinName || skinFor(name);
+  if (sk === "pig") return makePig(colorHex, name, pts, parent);
+  if (SKIN_DEFS[sk]) return makeSkinned(sk, colorHex, name, pts, parent);
   const g = new THREE.Group();
   const body = lam(colorHex), dark = lam(0x2a2f37), skin = lam(0xe8c9a0);
   box(0.24, 0.75, 0.28, dark, -0.14, 0.375, 0, g); box(0.24, 0.75, 0.28, dark, 0.14, 0.375, 0, g);
@@ -1263,8 +1397,9 @@ function makeAvatar(colorHex, name, skinName, pts) {
   const arms = new THREE.Group(); arms.position.set(0, 1.25, 0); g.add(arms);
   box(0.18, 0.18, 0.5, body, 0.36, 0, -0.18, arms); box(0.18, 0.18, 0.5, body, -0.2, 0, -0.26, arms);
   const gun = box(0.1, 0.12, 0.7, dark, 0.2, 0.04, -0.5, arms);
-  const tag = nameSprite(name, pts); tag.position.set(0, TAG_Y, 0); g.add(tag);
-  scene.add(g);
+  let tag = null;
+  if (name != null) { tag = nameSprite(name, pts); tag.position.set(0, TAG_Y, 0); g.add(tag); }
+  parent.add(g);
   return { g, head, arms, gun, tag, name, tagKey: tagKey(name, pts), body, skin: "default" };
 }
 // Pig running animation, driven by how fast the pig is moving
@@ -1294,7 +1429,7 @@ function setAvatarGun(a, wi) {
   a.gunLen = len; a.gun.scale.z = len; a.gun.position.z = -0.15 - 0.35 * len;
 }
 function disposeAvatar(a) {
-  scene.remove(a.g);
+  if (a.g.parent) a.g.parent.remove(a.g);
   a.g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
 }
 
@@ -1657,7 +1792,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 11;
+const BUILD = 12;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -1835,7 +1970,7 @@ function onPeer(p) {
   r.alive = s.al !== 0;
   r.cr = s.cr === 1;
   r.iv = s.iv === 1;
-  r.sk = s.sk === "pig" ? "pig" : null;
+  r.sk = s.sk === "pig" || SKIN_DEFS[s.sk] ? s.sk : null;
   r.k = Math.max(0, Math.floor(num(s.k) || 0));
   r.d = Math.max(0, Math.floor(num(s.d) || 0));
   r.rk = clamp(Math.floor(num(s.rk) || 0), 0, 99999);
@@ -1931,7 +2066,7 @@ function publish(force, target) {
     n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0, afk: playing && iAmAfk() ? 1 : 0, hb: Math.floor(now()),
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
-    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : null, k: playing ? kills : 0, d: playing ? deaths : 0, rk: rankPts, sp: playing && spectating ? 1 : 0,
+    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : mySkin(), k: playing ? kills : 0, d: playing ? deaths : 0, rk: rankPts, sp: playing && spectating ? 1 : 0,
     sh: playing ? lastShot : null, gr: playing ? lastNade : null, nk: playing ? lastNuke : null, md: playing ? lastMud : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
   if (netKind === "ws") { if (sock && sock.readyState === 1) { try { sock.send(JSON.stringify(P)); } catch (e) {} } }
@@ -2047,7 +2182,7 @@ function buildLoadout(fresh) {
   const main = W_ID[classOf(classId).gun];
   loadout = [main, PISTOL];
   if (hasPerk("snipe") && main !== SNIPER) loadout.push(SNIPER);
-  if (fresh || !loadout.includes(cur)) { cur = loadout[0]; reloading = false; snipeHeld = false; snipePending = 0; }
+  if (fresh || !loadout.includes(cur)) { cur = loadout[0]; reloading = false; triggerHeld = false; shotQueue = 0; }
   renderSlots(); buildPips();
 }
 
@@ -2084,14 +2219,14 @@ function onRoundPhase(prev, ph) {
     banner("Round " + (round.n + 1) + " starts in " + Math.ceil(roundLeft()));
   } else if (ph === "live") {
     spectating = false;
-    kills = 0; deaths = 0; streak = 0; respawn();
+    kills = 0; lastKills = 0; deaths = 0; streak = 0; respawn();
     banner("Round " + round.n + " · Fight!"); blip(880, 0.12, 0.12); blip(1320, 0.25, 0.12, "square", 0.12);
   } else if (ph === "end") {
     const st = standings(), top = st[0];
     if (prev === "live" && top && top.k > 0) {
       const winners = st.filter(p => p.k === top.k);
       banner(winners.length === 1 ? top.name + " wins round " + round.n + "!" : "Round " + round.n + " is a tie!");
-      if (winners.some(p => p.me) && !spectating) addRank(RP.win);
+      if (winners.some(p => p.me) && !spectating) { addRank(RP.win); pendWins++; }
     } else banner("Round over");
     resetAim();
   } else if (ph === "wait") {
@@ -2107,7 +2242,7 @@ function startSpectate() {
 function specTargets() { return [...remotes.values()].filter(r => activePeer(r) && r.alive && r.hasPos && !r.iv && !r.sp); }
 function addRank(delta) {
   const before = rankOf(rankPts).label, old = rankPts;
-  rankPts = Math.max(0, rankPts + delta); save("cfa.rank", rankPts);
+  rankPts = Math.max(0, rankPts + delta); save("cfa.rank", rankPts); rankDirty = true;
   const change = rankPts - old;
   if (change) {
     const el = $("#rpPop"); el.textContent = (change > 0 ? "+" : "−") + Math.abs(change) + " RP"; el.className = change > 0 ? "up" : "down";
@@ -2848,7 +2983,7 @@ function startReload() {
 function switchSlot(i) { if (loadout[i] != null) equip(loadout[i]); }
 function equip(id) {
   if (id === cur || !alive) return;
-  cur = id; reloading = false; snipeHeld = false; snipePending = 0; spin = 0; ejectAt = 0;
+  cur = id; reloading = false; triggerHeld = false; shotQueue = 0; spin = 0; ejectAt = 0;
   nextFire = Math.max(nextFire, now() + 0.25); recoilKick = -1.5;
   buildPips();
   mech(2000, 0.1);
@@ -2858,16 +2993,17 @@ function equip(id) {
 // Input
 // ======================================================================
 const keys = new Set();
-let firing = false, fireQueued = false, aiming = false, wasAiming = false, locked = false, noLock = false, boardOpen = false;
+let firing = false, aiming = false, wasAiming = false, locked = false, noLock = false, boardOpen = false;
 // Aiming has several sources; each frame `aiming` is true if any of them is held.
-let aimRMB = false, aimKey = false, touchAim = false, snipeHeld = false, snipePending = 0;
-function resetAim() { aimRMB = aimKey = touchAim = snipeHeld = false; snipePending = 0; aiming = false; firing = false; }
-// The sniper never fires on press: pressing scopes in, letting go takes the shot.
-function pressSnipe() { snipeHeld = true; }
-function releaseSnipe(cancel) {
-  if (!snipeHeld) return;
-  snipeHeld = false;
-  if (!cancel && state === "play" && !paused && alive) snipePending = now() + 0.35;
+let aimRMB = false, aimKey = false, touchAim = false, triggerHeld = false, shotQueue = 0, shotAt = 0;
+function resetAim() { aimRMB = aimKey = touchAim = triggerHeld = false; shotQueue = 0; aiming = false; firing = false; }
+// Every gun shoots on release: holding the trigger aims (and spins up the minigun),
+// letting go fires. Automatic guns fire a short burst (their `burst`).
+function pressTrigger() { triggerHeld = true; }
+function releaseTrigger(cancel) {
+  if (!triggerHeld) return;
+  triggerHeld = false;
+  if (!cancel && state === "play" && !paused && alive) { shotQueue = WEAPONS[cur].burst || 1; shotAt = now(); }
 }
 const isTouch = !!(window.matchMedia && (matchMedia("(pointer: coarse)").matches || (navigator.maxTouchPoints > 0 && !matchMedia("(pointer: fine)").matches)));
 const touchMove = { x: 0, y: 0 };
@@ -2953,11 +3089,11 @@ document.addEventListener("mousemove", e => {
 canvas.addEventListener("mousedown", e => {
   if (state !== "play" || isTouch) return;
   if (paused || (!locked && !noLock)) { requestLock(); return; }
-  if (e.button === 0) { if (WEAPONS[cur].quickscope) pressSnipe(); else { firing = true; fireQueued = true; } }
+  if (e.button === 0) pressTrigger();
   if (e.button === 2) aimRMB = true;
 });
 window.addEventListener("mouseup", e => {
-  if (e.button === 0) { firing = false; releaseSnipe(state !== "play" || paused); }
+  if (e.button === 0) releaseTrigger(state !== "play" || paused);
   if (e.button === 2) aimRMB = false;
 });
 canvas.addEventListener("contextmenu", e => e.preventDefault());
@@ -2970,13 +3106,10 @@ if (isTouch) {
   const stick = $("#stick"), knob = $("#knob");
   const fingers = new Map();
   const BTN = {
-    // Hold to aim and shoot. The sniper only scopes while held and fires when you let go.
+    // Hold to aim, let go to shoot (every gun)
     tFire: {
-      down() {
-        touchCombo = true;
-        if (WEAPONS[cur].quickscope) pressSnipe(); else { touchAim = true; firing = true; fireQueued = true; }
-      },
-      up(cancel) { releaseSnipe(cancel); touchAim = false; firing = false; touchCombo = false; },
+      down() { touchCombo = true; pressTrigger(); },
+      up(cancel) { releaseTrigger(cancel); touchCombo = false; },
     },
     tJump: { down() { touchJump = true; jumpHeld = true; }, up() { jumpHeld = false; } },
     tDash: { down() { dash(); } },
@@ -3311,7 +3444,7 @@ function startGame(m) {
   myName = cleanName(nick.value) || myName;
   partyCode = cleanCode(codeIn.value);
   save("cfa.name", myName); save("cfa.color", myColor); save("cfa.code", partyCode);
-  mode = m; kills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null; spectating = false; joinPending = false;
+  mode = m; kills = 0; lastKills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null; spectating = false; joinPending = false;
   if (myName.toLowerCase() === "mason" && myColor !== PIG_EXIT_COLOR) { enablePig(); renderSlots(); renderClassPick(); }
   guns[W_ID.paint].userData.ballMat.color.set(PAL[myColor]);              // paint in your armor color
   lockMason();
@@ -3355,6 +3488,223 @@ function showRefresh() {
   $("#refresh").hidden = false;
 }
 $("#refreshBtn").addEventListener("click", () => location.reload());
+// ======================================================================
+// Accounts and the locker. An account (name + password, kept on the game server) holds
+// your skins, the skin you wear, wheel tickets and your rank, so they follow you to any
+// device. Spin the wheel for skins; earn tickets by playing.
+// ======================================================================
+const API = (() => {
+  const local = location.host === SERVER_HOST || /^(localhost|127\.0\.0\.1):87\d\d$/.test(location.host);
+  return local ? "" : "https://" + SERVER_HOST;
+})();
+let acctToken = load("cfa.tok") || "", acct = null;
+try { acct = acctToken ? JSON.parse(load("cfa.acct") || "null") : null; } catch (e) { acct = null; }
+function mySkin() { return acct && acct.equipped && SKIN_DEFS[acct.equipped] ? acct.equipped : null; }
+async function api(op, body) {
+  let res;
+  try { res = await fetch(API + "/api/" + op, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(body || {}), token: acctToken }) }); }
+  catch (e) { throw new Error("Can't reach the game server. Accounts work on the game's own link."); }
+  let j = {}; try { j = await res.json(); } catch (e) {}
+  if (!res.ok || j.error) {
+    if (j.error === "Please sign in again") signOutLocal();
+    throw new Error(j.error || "Something went wrong");
+  }
+  if (j.token) { acctToken = j.token; save("cfa.tok", acctToken); }
+  if (j.account) setAcct(j.account);
+  return j;
+}
+function setAcct(a) {
+  acct = a; save("cfa.acct", JSON.stringify(a));
+  if (typeof a.rank === "number" && a.rank !== rankPts) { rankPts = a.rank; save("cfa.rank", rankPts); renderRank(); }
+  applyGunFinish(); renderLocker(); publish(true);
+}
+function signOutLocal() { acct = null; acctToken = ""; save("cfa.tok", ""); save("cfa.acct", ""); applyGunFinish(); renderLocker(); publish(true); }
+// Points toward tickets (online eliminations 2, bot ones 1) and round wins, sent every so often
+let pendPts = 0, pendWins = 0, rankDirty = false, lastKills = 0, flushing = false;
+function trackProgress() {
+  if (kills > lastKills) pendPts += (kills - lastKills) * (mode === "online" ? 2 : 1);
+  lastKills = kills;
+}
+async function flushProgress() {
+  if (!acctToken || flushing || (!pendPts && !pendWins && !rankDirty)) return;
+  const pts = Math.min(pendPts, 100), wins = Math.min(pendWins, 3);
+  pendPts -= pts; pendWins -= wins; rankDirty = false; flushing = true;
+  try { await api("progress", { pts, wins, rank: rankPts }); } catch (e) { pendPts += pts; pendWins += wins; }
+  flushing = false;
+}
+setInterval(flushProgress, 20000);
+// Your gun takes on the color of rare and super rare skins
+function applyGunFinish() {
+  const S = SKIN_DEFS[mySkin()], tint = S && S.gun != null && !pigMode ? new THREE.Color(S.gun) : null;
+  for (const g of guns) {
+    if (g.userData.pig) continue;
+    g.traverse(o => {
+      if (!o.isMesh || !o.material || !o.material.color || o.material === g.userData.flashMat) return;
+      const m = o.material;
+      if (!m.userData.base) m.userData.base = m.color.clone();
+      m.color.copy(m.userData.base); if (tint) m.color.lerp(tint, 0.55);
+    });
+  }
+}
+// ---- 3D previews: a small separate renderer draws skin pictures and the turning preview
+let pv = null;
+function previewKit() {
+  if (pv) return pv;
+  const r = new THREE.WebGLRenderer({ canvas: $("#skinPreview"), antialias: true, alpha: true, preserveDrawingBuffer: true });
+  r.setPixelRatio(1); r.setSize(300, 380, false);
+  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.05));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(1, 2, -2); sc.add(sun);
+  const cam = new THREE.PerspectiveCamera(32, 300 / 380, 0.1, 20); cam.position.set(0, 1.25, -4.3); cam.lookAt(0, 1.05, 0);
+  pv = { r, sc, cam, av: null, thumbs: {}, id: undefined };
+  return pv;
+}
+function skinThumb(id) {
+  const k = previewKit(); if (k.thumbs[id]) return k.thumbs[id];
+  const keep = k.av; if (keep) keep.g.visible = false;
+  const a = makeAvatar(PAL[myColor], null, id || "default", null, k.sc); a.g.rotation.y = -0.35;
+  if (a.anim) a.anim(a, 1.3);
+  k.cam.position.z = -3.4; k.r.render(k.sc, k.cam); k.cam.position.z = -4.3;   // a little closer for the small pictures
+  k.thumbs[id] = k.r.domElement.toDataURL("image/png");
+  disposeAvatar(a); if (keep) keep.g.visible = true;
+  return k.thumbs[id];
+}
+function updatePreview(dt, t) {
+  if ($("#locker").hidden) return;
+  const k = previewKit(), id = mySkin();
+  if (k.id !== id || !k.av) { if (k.av) disposeAvatar(k.av); k.av = makeAvatar(PAL[myColor], null, id || "default", null, k.sc); k.id = id; }
+  k.av.g.rotation.y += dt * 0.9; if (k.av.anim) k.av.anim(k.av, t);
+  k.r.render(k.sc, k.cam);
+}
+// ---- the wheel: 12 slices, colored by rarity
+const WHEEL = [0, 0, 1, 0, 0, 2, 0, 1, 0, 0, 1, 0];
+let wheelRot = 0, wheelSpinning = false;
+function drawWheel() {
+  const c = $("#wheel"), g = c.getContext("2d"), R = 230, n = WHEEL.length;
+  g.clearRect(0, 0, 480, 480); g.save(); g.translate(240, 240); g.rotate(wheelRot);
+  const fill = ["#5b6773", "#1f7ae0", "#9b3ff0"], light = ["#7a8896", "#43a0ff", "#c27bff"];
+  for (let i = 0; i < n; i++) {
+    const a0 = -Math.PI / 2 + (i - 0.5) * (Math.PI * 2 / n), a1 = a0 + Math.PI * 2 / n;
+    g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, R, a0, a1); g.closePath();
+    g.fillStyle = i % 2 ? fill[WHEEL[i]] : light[WHEEL[i]]; g.fill();
+    g.strokeStyle = "rgba(10,14,20,.6)"; g.lineWidth = 3; g.stroke();
+    g.save(); g.rotate((a0 + a1) / 2); g.fillStyle = "#fff"; g.font = "700 22px 'Chakra Petch', sans-serif"; g.textAlign = "right"; g.textBaseline = "middle";
+    g.fillText(["COMMON", "RARE", "SUPER"][WHEEL[i]], R - 16, 0); g.restore();
+  }
+  g.beginPath(); g.arc(0, 0, 34, 0, Math.PI * 2); g.fillStyle = "#0b1016"; g.fill(); g.lineWidth = 4; g.strokeStyle = "#f3efe4"; g.stroke();
+  g.restore();
+}
+function spinTo(rarity, done) {
+  const n = WHEEL.length, slots = WHEEL.map((r, i) => r === rarity ? i : -1).filter(i => i >= 0);
+  const i = slots[Math.floor(Math.random() * slots.length)];
+  const start = wheelRot, turns = Math.PI * 2 * 6;
+  // slice i sits at the pointer (top) when the wheel is turned by -i slices
+  let target = -i * (Math.PI * 2 / n) + (Math.random() - .5) * (Math.PI * 2 / n) * 0.6;
+  target += Math.ceil((start + turns - target) / (Math.PI * 2)) * Math.PI * 2;
+  const t0 = performance.now(), dur = 4200;
+  let lastSlice = Math.floor(start / (Math.PI * 2 / n));
+  wheelSpinning = true;
+  const step = () => {
+    const k = clamp((performance.now() - t0) / dur, 0, 1), e = 1 - Math.pow(1 - k, 4);
+    wheelRot = start + (target - start) * e; drawWheel();
+    const sl = Math.floor(wheelRot / (Math.PI * 2 / n)); if (sl !== lastSlice) { lastSlice = sl; blip(1400, 0.02, 0.05); }
+    if (k < 1) requestAnimationFrame(step); else { wheelSpinning = false; done(); }
+  };
+  requestAnimationFrame(step);
+}
+// ---- locker screen
+function renderLocker() {
+  if (!$("#openLocker")) return;
+  $("#lockerSub").textContent = acct ? `Signed in as ${acct.name} · ${acct.owned.length}/${SKIN_IDS.length} skins · ${acct.tickets} spins` : "Skins and the skin wheel · sign in to start";
+  if ($("#locker").hidden) return;
+  const box = $("#acctBox"); box.replaceChildren();
+  const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); for (const k of kids || []) e.append(k); return e; };
+  if (!acct) {
+    const name = el("input", { type: "text", placeholder: "Account name", maxLength: 16, autocomplete: "username" });
+    const pw = el("input", { type: "password", placeholder: "Password", maxLength: 64, autocomplete: "current-password" });
+    name.setAttribute("autocapitalize", "off"); name.setAttribute("spellcheck", "false"); name.id = "acctName"; pw.id = "acctPw";
+    const err = el("p", { className: "lk-err", hidden: true });
+    const go = async (op, btn) => {
+      err.hidden = true; btn.disabled = true;
+      try { await api(op, { name: name.value, password: pw.value, rank: rankPts }); }
+      catch (e) { err.textContent = e.message; err.hidden = false; }
+      btn.disabled = false;
+    };
+    const signIn = el("button", { type: "button", className: "btn primary", textContent: "Sign in" });
+    const make = el("button", { type: "button", className: "btn", textContent: "Create account" });
+    signIn.id = "acctSignIn"; make.id = "acctCreate";
+    signIn.addEventListener("click", () => go("login", signIn)); make.addEventListener("click", () => go("signup", make));
+    box.append(el("span", { className: "lbl-sm", textContent: "Account" }),
+      el("p", { className: "fine", textContent: "Make an account to win skins on the wheel and keep them, with your rank, on every device. Use a password you don't use anywhere else." }),
+      el("div", { className: "lk-row" }, [name]), el("div", { className: "lk-row" }, [pw]), el("div", { className: "lk-row" }, [signIn, make]), err);
+  } else {
+    const out = el("button", { type: "button", className: "btn", textContent: "Sign out" });
+    out.addEventListener("click", async () => { try { await api("logout"); } catch (e) {} signOutLocal(); });
+    box.append(el("div", { className: "lk-row" }, [el("span", { className: "lbl-sm", textContent: "Signed in as" }), el("b", { textContent: acct.name }), out]));
+  }
+  $("#wheelBox").hidden = !acct;
+  if (acct) {
+    $("#tickets").textContent = acct.tickets + (acct.tickets === 1 ? " spin" : " spins");
+    $("#spinBtn").disabled = wheelSpinning || acct.tickets < 1 || acct.owned.length >= SKIN_IDS.length;
+    $("#dailyBtn").hidden = !acct.daily;
+    if (!wheelSpinning) drawWheel();
+  }
+  // wearing + every skin
+  const id = mySkin(), S = SKIN_DEFS[id];
+  $("#wearName").textContent = pigMode ? "Pig (Pig Fire)" : S ? S.name : "Standard";
+  $("#wearRarity").textContent = S && !pigMode ? RARITY[S.rarity].name : "";
+  $("#wearRarity").style.color = S ? RARITY[S.rarity].color : "";
+  $("#wearNote").textContent = pigMode ? "Pig Fire players always look like a pig." : acct ? "Tap a skin you own to wear it. Everyone sees it online." : "Sign in to wear skins.";
+  const grid = $("#skinGrid"); grid.replaceChildren();
+  const none = el("button", { type: "button", className: "skin none" + (!id ? " on" : ""), textContent: "No skin" });
+  none.addEventListener("click", () => equipSkin(null)); grid.appendChild(none);
+  for (const rar of [2, 1, 0]) for (const sid of SKIN_IDS.filter(k => SKIN_DEFS[k].rarity === rar)) {
+    const owned = !!acct && acct.owned.includes(sid), D = SKIN_DEFS[sid];
+    const b = el("button", { type: "button", className: "skin" + (owned ? "" : " locked") + (sid === id ? " on" : "") }, [el("img", { src: skinThumb(sid), alt: "" }), el("span", { textContent: D.name }), el("small", { className: "r" + D.rarity, textContent: RARITY[D.rarity].name })]);
+    b.dataset.skin = sid; b.title = owned ? "Wear " + D.name : "Win it on the wheel";
+    b.addEventListener("click", () => { if (owned) equipSkin(sid); });
+    grid.appendChild(b);
+  }
+}
+async function equipSkin(sid) {
+  if (!acct) return;
+  try { await api("equip", { skin: sid }); } catch (e) { banner(e.message); }
+}
+function openLocker() {
+  $("#locker").hidden = false; renderLocker();
+  if (acctToken) api("me").catch(() => {});
+  flushProgress();
+}
+$("#openLocker").addEventListener("click", openLocker);
+$("#pauseLocker").addEventListener("click", openLocker);
+$("#lockerClose").addEventListener("click", () => { $("#locker").hidden = true; });
+$("#locker").addEventListener("click", e => { if (e.target.id === "locker") $("#locker").hidden = true; });
+$("#dailyBtn").addEventListener("click", async () => { try { await api("daily"); } catch (e) { banner(e.message); } });
+$("#spinBtn").addEventListener("click", async () => {
+  if (wheelSpinning || !acct) return;
+  $("#spinBtn").disabled = true; $("#prize").replaceChildren();
+  let r;
+  const keep = acct;
+  try { r = await api("spin"); } catch (e) { $("#prize").textContent = e.message; $("#spinBtn").disabled = false; return; }
+  const rarity = r.rarity === "super" ? 2 : r.rarity === "rare" ? 1 : 0, won = r.account;
+  acct = { ...won, owned: keep.owned, equipped: keep.equipped };   // don't reveal the prize until the wheel stops
+  wheelSpinning = true; renderLocker();
+  spinTo(rarity, () => {
+    setAcct(won);
+    const D = SKIN_DEFS[r.skin], card = document.createElement("div"); card.className = "prize";
+    const img = document.createElement("img"); img.src = skinThumb(r.skin); img.alt = "";
+    const txt = document.createElement("div"), nm = document.createElement("b"), rr = document.createElement("span"), wear = document.createElement("button");
+    nm.textContent = D.name; rr.textContent = RARITY[rarity].name + "!"; rr.className = "r" + rarity; rr.style.fontWeight = "700";
+    wear.type = "button"; wear.className = "btn primary"; wear.textContent = "Wear it"; wear.style.marginTop = "6px";
+    wear.addEventListener("click", () => equipSkin(r.skin));
+    txt.append(nm, rr, document.createElement("br"), wear); card.append(img, txt);
+    $("#prize").replaceChildren(card);
+    if (rarity === 2) { blip(880, 0.15, 0.12); blip(1320, 0.15, 0.12, "square", 0.12); blip(1760, 0.3, 0.12, "square", 0.24); }
+    else blip(rarity ? 1320 : 990, 0.2, 0.1);
+  });
+});
+renderLocker(); applyGunFinish();
+if (acctToken) api("me").catch(() => {});
+
 // One-time update notice; each device sees it until it's dismissed
 const NOTICE = { id: "all-hacks-removed", text: "All hacks have been removed, including Doug's." };
 if (load("cfa.notice") !== NOTICE.id) { $("#noticeText").textContent = NOTICE.text; $("#notice").hidden = false; }
@@ -3386,7 +3736,7 @@ function leaveMatch() {
   $(".card").insertBefore($("#settings"), $("#keysHelp"));
   $("#hud").hidden = true; $("#touch").hidden = true; $("#menu").hidden = false;
   stopBots();
-  publish(true); renderStatus();
+  publish(true); renderStatus(); flushProgress();
 }
 
 // ======================================================================
@@ -3430,7 +3780,8 @@ function tick() {
       moveEnt(me, dt);
       if (onPad(me)) { launchPad(me); dashFov = Math.max(dashFov, 0.7); blip(300, 0.05, 0.1, "sine"); blip(600, 0.08, 0.08, "sine", 0.04); blip(1100, 0.1, 0.06, "sine", 0.09); }
 
-      aiming = aimRMB || aimKey || touchAim || snipeHeld || snipePending > 0;
+      aiming = aimRMB || aimKey || touchAim || triggerHeld || shotQueue > 0;
+      firing = triggerHeld || shotQueue > 0;
       aim += ((input && aiming ? 1 : 0) - aim) * (1 - Math.exp(-(WEAPONS[cur].adsSpeed || 14) * dt));
       if (input && aiming && !wasAiming) aimSnap();
       wasAiming = input && aiming;
@@ -3444,20 +3795,22 @@ function tick() {
       } else { assistTg = null; assistPrev = null; }
       // minigun: spins up while the trigger is held, winds down when let go
       if (WEAPONS[cur].spin) {
-        const want = input && firing && !reloading, before = spin;
+        const want = input && (triggerHeld || shotQueue > 0) && !reloading, before = spin;
         spin = clamp(spin + (want ? dt / WEAPONS[cur].spin : -dt * 1.2), 0, 1);
         if (want && before === 0) { blip(90, 0.4, 0.05, "sawtooth"); blip(180, 0.4, 0.04, "sawtooth", 0.15); }
       }
       // recoil settles back down, slower while you keep the trigger held
       if (recoilP > 0) { const back = recoilP * (1 - Math.exp(-(firing && WEAPONS[cur].auto ? 2.5 : 8) * dt)); pitch = clamp(pitch - back * 0.8, -1.52, 1.52); recoilP -= back; }
       if (reloading && t >= reloadEnd) { reloading = false; ammo[cur] = WEAPONS[cur].mag; blip(700, 0.05, 0.07); }
-      if (snipePending) {
+      // let go of the trigger: fire (the sniper waits a moment for the scope to settle)
+      if (shotQueue > 0) {
         const w = WEAPONS[cur];
-        if (!w.quickscope || reloading || t > snipePending + 1.5) snipePending = 0;
-        else if (t >= nextFire && (aim >= w.quickscope || t > snipePending)) { fire(); snipePending = 0; }
+        if (!input || reloading || t > shotAt + 2.5) shotQueue = 0;
+        else if (t >= nextFire && (!w.quickscope || aim >= w.quickscope || t > shotAt + 0.35) && (!w.spin || spin >= 1)) {
+          const before = ammo[cur]; fire();
+          shotQueue = ammo[cur] < before && ammo[cur] > 0 ? shotQueue - 1 : 0;
+        }
       }
-      if (input && (fireQueued || (firing && WEAPONS[cur].auto))) fire();
-      fireQueued = false;
       if (t - lastHurt > 4 && hp < 100) hp = Math.min(100, hp + 12 * dt);
       bob += Math.hypot(me.vel.x, me.vel.z) * dt * (me.onGround ? 1.4 : 0);
     } else {
@@ -3504,7 +3857,7 @@ function tick() {
   const kk = 1 - Math.exp(-14 * dt);
   for (const r of remotes.values()) {
     const show = mode === "online" && activePeer(r) && r.hasPos && r.alive && !r.iv && r !== specCur;
-    const wantSkin = r.sk === "pig" ? "pig" : skinFor(r.name, r.color);
+    const wantSkin = r.sk || skinFor(r.name, r.color);
     if (r.av && r.av.skin !== wantSkin) { disposeAvatar(r.av); r.av = null; }
     if (show && !r.av) r.av = makeAvatar(PAL[r.color], r.name, wantSkin, r.rk);
     if (!r.av) continue;
@@ -3518,6 +3871,7 @@ function tick() {
     r.av.g.scale.y += ((r.cr ? 0.75 : 1) - r.av.g.scale.y) * kk;
     r.av.g.rotation.y += wrapA(r.yaw - r.av.g.rotation.y) * kk;
     r.av.head.rotation.x = r.pitch; r.av.arms.rotation.x = r.pitch;
+    if (r.av.anim) r.av.anim(r.av, t);
   }
 
   // viewmodel
@@ -3560,6 +3914,8 @@ function tick() {
   const hurt = state === "play" ? clamp((1 - hp / 100) * 0.7 + Math.max(0, 0.6 - (t - lastHurt)), 0, 1) : 0;
   $("#hurt").style.opacity = hurt;
 
+  if (state === "play") trackProgress();
+  updatePreview(dt, t);
   updateNades(dt);
   updateMud(dt);
   updateEsp();
