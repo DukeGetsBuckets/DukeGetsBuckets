@@ -1872,7 +1872,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 15;
+const BUILD = 16;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2474,7 +2474,7 @@ const espGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.9, 1.95, 0.9));
 const espMat = new THREE.LineBasicMaterial({ color: 0xffe14a, depthTest: false, depthWrite: false, transparent: true });
 const espBoxes = [];
 function updateEsp() {
-  const list = state === "play" && duke.on && duke.wall ? enemies() : [];
+  const list = state === "play" && ((duke.on && duke.wall) || acctPerk("wall")) ? enemies() : [];
   while (espBoxes.length < list.length) { const l = new THREE.LineSegments(espGeo, espMat); l.renderOrder = 999; scene.add(l); espBoxes.push(l); }
   espBoxes.forEach((l, i) => {
     const tg = list[i]; l.visible = !!tg;
@@ -3590,6 +3590,8 @@ const API = (() => {
 })();
 let acctToken = load("cfa.tok") || "", acct = null;
 try { acct = acctToken ? JSON.parse(load("cfa.acct") || "null") : null; } catch (e) { acct = null; }
+// Perks that come with an account (the "Alex" account always has wall hacks, no switch)
+function acctPerk(k) { return !!(acct && Array.isArray(acct.perks) && acct.perks.includes(k)); }
 function mySkin() { return acct && acct.equipped && SKIN_DEFS[acct.equipped] ? acct.equipped : null; }
 async function api(op, body) {
   let res;

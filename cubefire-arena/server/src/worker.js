@@ -15,7 +15,7 @@
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 15;
+const MIN_BUILD = 16;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -186,6 +186,8 @@ const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200],
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["super", 0.05], ["rare", 0.25], ["common", 0.7]];
 const START_TICKETS = 3, PTS_PER_TICKET = 10;
+// Perks that come with particular accounts: "alex" always has wall hacks (no off switch)
+const ACCOUNT_PERKS = { alex: ["wall"] };
 const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 const today = () => new Date().toISOString().slice(0, 10);
 async function hashPw(password, salt) {
@@ -217,7 +219,7 @@ export class Accounts {
   saveData(name, d) { this.sql.exec("UPDATE users SET data = ? WHERE name = ?", JSON.stringify(d), name); }
   view(u, d) {
     if (u.name === "doug") return { name: u.display, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k)], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false };
-    return { name: u.display, tickets: d.tickets || 0, owned: [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0))], equipped: d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today() };
+    return { name: u.display, tickets: d.tickets || 0, owned: [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0))], equipped: d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), perks: ACCOUNT_PERKS[u.name] || [] };
   }
   async session(name) {
     const token = hex(crypto.getRandomValues(new Uint8Array(24)));
