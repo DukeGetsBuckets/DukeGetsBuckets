@@ -464,7 +464,7 @@ body.pig #pigTint{display:block}
       <li><b>Tab</b>Scoreboard · <b>P</b>Pause</li>
     </ul>
     <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
-    <p class="fine">Online matches are played in 3-minute rounds once 2 players are in; if you join mid-round you spectate until the next one. Ranked: +25 for each elimination (+5 for a headshot), +50 for winning a round, −15 for each death.</p>
+    <p class="fine">Online matches are played in 3-minute rounds once 2 players are in; if you join mid-round you spectate until the next one. Ranked: +25 for each elimination (+5 for a headshot), +150 for winning a round, −15 for each death. From Champion up, eliminations give 15 and deaths cost 25.</p>
     <p class="fine">Friends who type the same party code land in the same private match. Leave it blank to join the open arena.</p>
   </div>
 </div>
@@ -507,7 +507,7 @@ body.pig #pigTint{display:block}
     <h2 id="ranksTitle">Ranks</h2>
     <div class="rankme" id="rankMe"></div>
     <div class="ranklist" id="rankList"></div>
-    <p class="fine">+25 RP for each elimination (+5 for a headshot) and +50 for winning a round; −15 RP for each death. Only online rounds count. Every rank but Champion has three levels: III, II, then I.</p>
+    <p class="fine">+25 RP for each elimination (+5 for a headshot) and +150 for winning a round; −15 RP for each death. From Champion up it gets much harder: eliminations give 15 RP and deaths cost 25. Only online rounds count. Every rank but Legend has three levels: III, II, then I.</p>
     <div class="btns"><button class="btn primary" type="button" id="ranksClose">Close</button></div>
   </div>
 </div>
@@ -1235,8 +1235,15 @@ const RANKS = [
   { name: "Diamond", min: 1800, color: "#7fb7ff" },
   { name: "Master", min: 2500, color: "#c27bff" },
   { name: "Champion", min: 3500, color: "#ff5d7a" },
+  // elite ranks: far above Champion, and points come slower up here (see rpGain / rpLoss)
+  { name: "Mythic", min: 8000, color: "#ff8f3a" },
+  { name: "Legend", min: 15000, color: "#fff08a" },
 ];
-const RP = { kill: 25, head: 5, death: 15, win: 50 };
+const RP = { kill: 25, head: 5, death: 15, win: 150 };
+// From Champion up, eliminations give less and deaths cost more, so the elite ranks are hard to reach
+const ELITE = 3500;
+const rpGain = n => rankPts >= ELITE ? Math.round(n * 0.6) : n;
+const rpLoss = n => rankPts >= ELITE ? Math.round(n * 5 / 3) : n;
 // Each rank but the top one has three divisions: III, then II, then I
 function rankOf(pts) {
   pts = Math.max(0, pts || 0);
@@ -1335,6 +1342,20 @@ const SKIN_DEFS = {
   champion: { name: "Champion", rarity: 3, rank: 3500, legs: 0x3a0a16, body: 0xb81f3a, arms: 0xb81f3a, helmet: 0xb81f3a, visor: 0xffd76a, visorGlow: 0xa07a00, glow: 0x300008, gun: 0xffc93c,
     extra(add, head) { for (const x of [-0.18, -0.06, 0.06, 0.18]) add(0.08, 0.16, 0.08, 0xffd76a, x, 0.58, -0.18, head, { glow: 0x8a6a00 }); add(0.52, 0.07, 0.52, 0xffd76a, 0, 0.52, 0, head, { glow: 0x8a6a00 }); add(0.6, 0.9, 0.05, 0x7a0a1e, 0, 0.94, 0.21, null, { pulse: true, glow: 0x5a0010 }); add(0.24, 0.1, 0.42, 0xffd76a, -0.35, 1.36, 0); add(0.24, 0.1, 0.42, 0xffd76a, 0.35, 1.36, 0); },
     anim(av, t) { const k = 0.5 + 0.5 * Math.sin(t * 2.2); for (const m of av.pulse) m.emissiveIntensity = k; } },
+  mythic: { name: "Mythic Wraith", rarity: 3, rank: 8000, legs: 0x120806, body: 0x1e0d08, arms: 0x1e0d08, head: 0x1e0d08, helmet: 0x2a120a, visor: 0xff8f3a, visorGlow: 0xff6a00, glow: 0x2a0a00, gun: 0xff8f3a,
+    extra(add, head) {
+      add(0.07, 0.24, 0.07, 0xff8f3a, -0.19, 0.6, 0, head, { glow: 0xff5a00, pulse: true }).rotation.z = 0.35; add(0.07, 0.24, 0.07, 0xff8f3a, 0.19, 0.6, 0, head, { glow: 0xff5a00, pulse: true }).rotation.z = -0.35;
+      for (const [x, y] of [[-0.2, 1.24], [0, 1.14], [0.2, 1.24], [-0.1, 0.94], [0.12, 0.92]]) add(0.06, 0.12, 0.02, 0xffb26b, x, y, -0.18, null, { glow: 0xff6a00, pulse: true });
+      add(0.6, 1.0, 0.05, 0x3a1206, 0, 0.9, 0.21, null, { glow: 0x5a1800, pulse: true });
+    },
+    anim(av, t) { const k = 0.45 + 0.55 * Math.abs(Math.sin(t * 3.1)); for (const m of av.pulse) m.emissiveIntensity = k; } },
+  legend: { name: "Living Legend", rarity: 3, rank: 15000, legs: 0xd9c9a0, body: 0xfffbea, arms: 0xfffbea, head: 0xfff3d6, helmet: 0xffe28a, visor: 0xffd76a, visorGlow: 0xffb000, glow: 0x4a4020, gun: 0xfff08a,
+    extra(add, head) {
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; add(0.07, 0.04, 0.07, 0xfff08a, Math.cos(a) * 0.3, 0.74, Math.sin(a) * 0.3, head, { glow: 0xffd000, pulse: true }); }
+      for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) add(0.36 - k * 0.08, 0.12, 0.04, 0xffffff, sx * (0.32 + k * 0.12), 1.3 - k * 0.16, 0.24, null, { glow: 0x8a7a40 });
+      add(0.3, 0.3, 0.04, 0xffe28a, 0, 1.08, -0.19, null, { glow: 0xffb000, pulse: true });
+    },
+    anim(av, t) { const k = 0.6 + 0.4 * Math.sin(t * 2); for (const m of av.pulse) m.emissiveIntensity = k; } },
 };
 const RANK_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity === 3);
 const WHEEL_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity < 3);
@@ -1808,7 +1829,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 13;
+const BUILD = 14;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2033,7 +2054,7 @@ function onPeer(p) {
       let killer = "The arena";
       if (dth.by === myPeer && myPeer) {
         killer = myName; kills++;
-        if (rankedNow()) addRank(RP.kill + (r.lastHitByMe && r.lastHitByMe.hs ? RP.head : 0));
+        if (rankedNow()) addRank(rpGain(RP.kill + (r.lastHitByMe && r.lastHitByMe.hs ? RP.head : 0)));
         showElim(r.name, r.lastHitByMe); killSound();
         flashHit(true); publish(true);
       } else if (typeof dth.by === "string" && remotes.has(dth.by)) killer = remotes.get(dth.by).name;
@@ -2303,7 +2324,7 @@ function showRanks() {
   bar.className = "bar"; note.className = "next";
   fill.style.width = (nxt ? clamp((rankPts - cur.min) / (nxt.min - cur.min), 0, 1) * 100 : 100) + "%"; fill.style.background = mine.color;
   bar.appendChild(fill);
-  note.textContent = nxt ? (nxt.min - rankPts) + " RP to " + nxt.label + " · about " + Math.ceil((nxt.min - rankPts) / RP.kill) + " eliminations" : "Top rank. Nobody is higher than you.";
+  note.textContent = nxt ? (nxt.min - rankPts) + " RP to " + nxt.label + " · about " + Math.ceil((nxt.min - rankPts) / rpGain(RP.kill)) + " eliminations or " + Math.ceil((nxt.min - rankPts) / RP.win) + " round wins" : "Top rank. Nobody is higher than you.";
   me.replaceChildren(top, bar, note);
   // all ranks, lowest first
   const list = $("#rankList"); list.replaceChildren();
@@ -2531,7 +2552,7 @@ function takeDamage(dm, src, head, unblockable) {
   if (hp <= 0) die(src);
 }
 function die(src) {
-  if (rankedNow()) addRank(-RP.death);
+  if (rankedNow()) addRank(-rpLoss(RP.death));
   hp = 0; alive = false; deaths++; streak = 0;
   respawnAt = now() + 3;
   dthOut = { s: ++deathSeq, by: src.peer || null };
@@ -3735,7 +3756,7 @@ renderLocker(); applyGunFinish();
 if (acctToken) api("me").catch(() => {});
 
 // One-time update notice; each device sees it until it's dismissed
-const NOTICE = { id: "all-hacks-removed", text: "All hacks have been removed, including Doug's." };
+const NOTICE = { id: "elite-ranks", text: "New: two elite ranks above Champion, Mythic (8000 RP) and Legend (15000 RP), each with its own skin. They're much harder to reach. Winning a round now gives +150 RP." };
 if (load("cfa.notice") !== NOTICE.id) { $("#noticeText").textContent = NOTICE.text; $("#notice").hidden = false; }
 $("#noticeOk").addEventListener("click", () => { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); });
 $("#pwForm").addEventListener("submit", async e => {

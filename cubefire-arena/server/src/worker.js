@@ -15,7 +15,7 @@
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 13;
+const MIN_BUILD = 14;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -182,7 +182,7 @@ const SKINS = {
 };
 const ALL_SKINS = [...SKINS.common, ...SKINS.rare, ...SKINS.super];   // the wheel's skins
 // Rank rewards: owned automatically once the account's rank points reach the number
-const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200], ["diamondwarden", 1800], ["masterphantom", 2500], ["champion", 3500]];
+const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200], ["diamondwarden", 1800], ["masterphantom", 2500], ["champion", 3500], ["mythic", 8000], ["legend", 15000]];
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["super", 0.05], ["rare", 0.25], ["common", 0.7]];
 const START_TICKETS = 3, PTS_PER_TICKET = 10;
