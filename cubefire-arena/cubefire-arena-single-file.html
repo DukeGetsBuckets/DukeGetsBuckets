@@ -77,6 +77,8 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 .classes{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px}
 .classes button{display:grid;gap:1px;text-align:left;border:1px solid var(--line);background:rgba(255,255,255,.06);border-radius:4px;padding:7px 9px;font-weight:700;font-size:13px}
 .classes button small{font-weight:600;font-size:11px;color:var(--muted)}
+.classes.maps{grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
+.classes.maps button{text-align:center}
 .classes button[aria-pressed="true"]{background:rgba(255,182,39,.18);border-color:var(--accent);color:var(--accent)}
 .rankline{display:flex;align-items:baseline;gap:8px;font-size:13px;font-weight:600;color:var(--muted);flex-wrap:wrap}
 .rankline b{font:400 16px var(--display);letter-spacing:.03em}
@@ -421,11 +423,9 @@ body.pig #pigTint{display:block}
       <span class="lbl-sm" id="colorLbl">Armor color</span>
       <div class="swatches" id="swatches" role="group" aria-labelledby="colorLbl"></div>
     </div>
-    <div class="set-row">
+    <div class="field">
       <span class="lbl-sm" id="mapLbl">Map</span>
-      <div class="seg" id="mapPick" role="group" aria-labelledby="mapLbl">
-        <button type="button" data-v="arena">Arena</button><button type="button" data-v="farm">Farm</button><button type="button" data-v="peaks">Peaks</button>
-      </div>
+      <div class="classes maps" id="mapPick" role="group" aria-labelledby="mapLbl"></div>
     </div>
     <div class="field" id="classField">
       <span class="lbl-sm" id="classLbl">Class</span>
@@ -433,7 +433,7 @@ body.pig #pigTint{display:block}
       <p class="fine" id="classDesc"></p>
     </div>
     <div class="field" id="dougField" hidden>
-      <span class="lbl-sm">Doug's hacks <em>pick before the round</em></span>
+      <span class="lbl-sm"><span id="hackWho">Doug's hacks</span> <em>pick before the round</em></span>
       <div class="classes" id="hackPick"></div>
       <div class="btns" id="dougActions" hidden><button class="btn" type="button" id="dkNukeP">Nuke</button><button class="btn" type="button" id="dkTpP">Teleport to…</button></div>
       <div class="classes" id="tpPick" hidden></div>
@@ -452,6 +452,12 @@ body.pig #pigTint{display:block}
         <span class="lbl-sm" id="assistLbl">Aim assist</span>
         <div class="seg" id="assist" role="group" aria-labelledby="assistLbl">
           <button type="button" data-v="2">Strong</button><button type="button" data-v="1">Normal</button><button type="button" data-v="0">Off</button>
+        </div>
+      </div>
+      <div class="set-row">
+        <span class="lbl-sm" id="gfxLbl">Graphics</span>
+        <div class="seg" id="gfx" role="group" aria-labelledby="gfxLbl">
+          <button type="button" data-v="auto">Auto</button><button type="button" data-v="fast">Fast</button><button type="button" data-v="sharp">Sharp</button>
         </div>
       </div>
       <p class="fine" id="assistNote">Applies to bot matches. Online matches always use Normal aim assist so everyone is even.</p>
@@ -577,7 +583,7 @@ let W = 64, D = 64;
 const H = 24;
 let grid = new Uint8Array(W * H * D);
 const idx = (x, y, z) => x + W * (z + D * y);
-const T = { GROUND: 1, STONE: 2, BRICK: 3, WOOD: 4, METAL: 5, TRIM: 6, GRASS: 7, DIRT: 8, SNOW: 9, LEAF: 10, HAY: 11, BARN: 12, ROOF: 13, CROP: 14, PLANK: 15, SILO: 16, HOUSE: 17, PAD: 18 };
+const T = { GROUND: 1, STONE: 2, BRICK: 3, WOOD: 4, METAL: 5, TRIM: 6, GRASS: 7, DIRT: 8, SNOW: 9, LEAF: 10, HAY: 11, BARN: 12, ROOF: 13, CROP: 14, PLANK: 15, SILO: 16, HOUSE: 17, PAD: 18, SAND: 19, ADOBE: 20, CACTUS: 21, WATER: 22, CASTLE: 23, ICE: 24, TEMPLE: 25, MOSS: 26, MESA: 27 };
 function solid(x, y, z) {
   if (y < 0) return 1;
   if (x < 0 || z < 0 || x >= W || z >= D) return 1;
@@ -648,11 +654,11 @@ function centerTower(cx, cz) {
   fillBox(cx + 2, 5, cz - 1, cx + 2, 7, cz - 1, T.WOOD);
   setB(cx - 2, 9, cz - 2, T.TRIM); setB(cx + 1, 9, cz + 1, T.TRIM);
 }
-function brickHouse(p, r) {
+function brickHouse(p, r, wall = T.BRICK, roof = T.METAL) {
   const h = 3, hx1 = p.x1 - h;                                            // stairs take the last h columns
   for (let x = p.x0; x <= hx1; x++) for (let z = p.z0; z <= p.z1; z++) {
-    if (x === p.x0 || x === hx1 || z === p.z0 || z === p.z1) fillBox(x, 1, z, x, h, z, T.BRICK);
-    setB(x, h + 1, z, T.METAL);
+    if (x === p.x0 || x === hx1 || z === p.z0 || z === p.z1) fillBox(x, 1, z, x, h, z, wall);
+    setB(x, h + 1, z, roof);
   }
   const dz = ri(r, p.x0 + 1, hx1 - 2), dz2 = ri(r, p.x0 + 1, hx1 - 2);
   fillBox(dz, 1, p.z0, dz + 1, 2, p.z0, 0); fillBox(dz2, 1, p.z1, dz2 + 1, 2, p.z1, 0);   // doors
@@ -699,9 +705,9 @@ function containers(p, r) {
     else fillBox(p.x0, 3, p.z0 + 1, p.x1, 4, p.z1, colors[ri(r, 0, 3)]);
   }
 }
-function coverWall(p, r) {
-  fillBox(p.x0, 1, p.z0, p.x1, 2, p.z1, T.STONE);
-  if (r() < 0.4) setB(p.x0, 1, p.z0 - 1, T.STONE);                         // little L-shape
+function coverWall(p, r, t = T.STONE) {
+  fillBox(p.x0, 1, p.z0, p.x1, 2, p.z1, t);
+  if (r() < 0.4) setB(p.x0, 1, p.z0 - 1, t);                               // little L-shape
 }
 function cratePile(p, r) {
   const n = ri(r, 1, 4);
@@ -938,17 +944,267 @@ function buildPeaks() {
   }
 }
 
+// ---------------------------------------------------------------------
+// Shared bits for the newer maps
+// ---------------------------------------------------------------------
+// A tree standing on ground height g (top block of the ground under it)
+function tree(x, z, g, trunk, leafR, leaf = T.LEAF) {
+  if (g + trunk + leafR + 2 >= H) return;
+  fillBox(x, g + 1, z, x, g + trunk, z, T.WOOD);
+  for (let y = 0; y <= leafR; y++) {
+    const rr = leafR - y * 0.7;
+    for (let dx = -leafR; dx <= leafR; dx++) for (let dz = -leafR; dz <= leafR; dz++) {
+      if (dx * dx + dz * dz <= rr * rr + 0.5 && !grid[idx(clamp(x + dx, 0, W - 1), g + trunk + y, clamp(z + dz, 0, D - 1))]) setB(x + dx, g + trunk + y, z + dz, leaf);
+    }
+  }
+}
+// Mark single cells as used in a planner (rivers, lakes)
+function takeCells(plan, cells) { for (const [x, z] of cells) plan.take(x, z, x, z); }
+
+// ---------------------------------------------------------------------
+// Desert (112x112): an adobe town with rooftops to fight over, tall flat-topped mesas
+// with stairs, an oasis with palm trees, cacti, ruins and sandbag walls.
+// ---------------------------------------------------------------------
+function mesa(cx, cz, rad, h) {
+  for (let x = cx - rad; x <= cx + rad; x++) for (let z = cz - rad; z <= cz + rad; z++) {
+    const d = Math.hypot(x - cx, z - cz); if (d > rad + 0.3) continue;
+    for (let y = 1; y <= h; y++) setB(x, y, z, y === h ? T.SAND : (y % 3 === 0 ? T.ADOBE : T.MESA));
+  }
+  for (let k = 1; k < h; k++) fillBox(cx + rad + h - k, 1, cz, cx + rad + h - k, k, cz + 1, T.MESA);   // stairs up the +x side
+}
+function cactus(x, z, r) {
+  const h = ri(r, 2, 4); fillBox(x, 1, z, x, h, z, T.CACTUS);
+  if (h >= 3 && r() < 0.7) { const s = r() < 0.5 ? 1 : -1; setB(x + s, 2, z, T.CACTUS); setB(x + s, 3, z, T.CACTUS); }
+}
+function palm(x, z, r) {
+  const h = ri(r, 4, 6); fillBox(x, 1, z, x, h, z, T.WOOD);
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, 2], [0, -2]]) setB(x + dx, h + (Math.abs(dx + dz) === 2 ? 0 : 1), z + dz, T.LEAF);
+  setB(x, h + 1, z, T.LEAF);
+}
+function ruin(p, r) {
+  for (let x = p.x0; x <= p.x1; x++) for (let z = p.z0; z <= p.z1; z++) {
+    if ((x === p.x0 || x === p.x1 || z === p.z0 || z === p.z1) && r() < 0.75) fillBox(x, 1, z, x, ri(r, 1, 3), z, T.ADOBE);
+  }
+}
+function buildDesert() {
+  fillBox(0, 0, 0, W - 1, 0, D - 1, T.GROUND);
+  outerWall(5, T.MESA, T.ADOBE);
+  const r = rng32(3131), plan = makePlanner(2), pads = [];
+  // oasis near the middle: a pool ringed with palms
+  const ox = (W >> 1) + ri(r, -8, 8), oz = (D >> 1) + ri(r, -8, 8);
+  for (let x = ox - 4; x <= ox + 4; x++) for (let z = oz - 4; z <= oz + 4; z++) if (Math.hypot(x - ox, z - oz) <= 4.2) setB(x, 1, z, T.WATER);
+  for (let a = 0; a < 6; a++) palm(Math.round(ox + Math.cos(a) * 6.5), Math.round(oz + Math.sin(a) * 6.5), r);
+  plan.take(ox - 8, oz - 8, ox + 8, oz + 8);
+  for (let i = 0; i < 6; i++) { const rad = ri(r, 4, 6), h = ri(r, 6, 9), p = plan.place(r, 2 * rad + h + 2, 2 * rad + 1); if (p) { mesa(p.x0 + rad, p.z0 + rad, rad, h); pads.push([p.x0 - 2, p.z0 + rad]); } }
+  for (let i = 0; i < 12; i++) { const p = plan.place(r, ri(r, 6, 9) + 3, ri(r, 6, 9)); if (p) brickHouse(p, r, T.ADOBE, T.ADOBE); }
+  for (let i = 0; i < 2; i++) { const p = plan.place(r, 5, 5); if (p) waterTower(p); }
+  for (let i = 0; i < 7; i++) { const p = plan.place(r, ri(r, 5, 8), ri(r, 5, 8)); if (p) ruin(p, r); }
+  for (let i = 0; i < 4; i++) { const p = plan.place(r, 9, 3); if (p) sniperTower(p); }
+  for (let i = 0; i < 26; i++) { const len = ri(r, 3, 6), p = r() < 0.5 ? plan.place(r, len, 1) : plan.place(r, 1, len); if (p) coverWall(p, r, T.SAND); }
+  for (let i = 0; i < 45; i++) { const p = plan.place(r, 3, 3); if (p) cactus(p.x0 + 1, p.z0 + 1, r); }
+  for (let i = 0; i < 40; i++) { const p = plan.place(r, 3, 3); if (p) cratePile(p, r); }
+  for (const [x, z] of pads) padAt(x, z);
+}
+
+// ---------------------------------------------------------------------
+// Castle (120x120): a walled castle in the middle with corner towers, walkways along the
+// walls, four gates and a tall keep, a moat with bridges, and a village around it.
+// ---------------------------------------------------------------------
+function castle(cx, cz) {
+  const R = 17, wallH = 6;
+  // moat and bridges
+  for (let x = cx - R - 5; x <= cx + R + 5; x++) for (let z = cz - R - 5; z <= cz + R + 5; z++) {
+    const d = Math.max(Math.abs(x - cx), Math.abs(z - cz));
+    if (d >= R + 2 && d <= R + 4) setB(x, 1, z, Math.abs(x - cx) <= 2 || Math.abs(z - cz) <= 2 ? T.PLANK : T.WATER);
+  }
+  // two-thick curtain wall with crenellations on the outer edge
+  for (let x = cx - R; x <= cx + R; x++) for (let z = cz - R; z <= cz + R; z++) {
+    const d = Math.max(Math.abs(x - cx), Math.abs(z - cz));
+    if (d === R || d === R - 1) {
+      fillBox(x, 1, z, x, wallH, z, T.CASTLE);
+      if (d === R && (x + z) % 2 === 0) setB(x, wallH + 1, z, T.CASTLE);
+    }
+  }
+  // gates in the middle of each side
+  for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let o = -2; o <= 2; o++) for (let t = R - 1; t <= R; t++) {
+    const x = cx + (sx ? sx * t : o), z = cz + (sz ? sz * t : o);
+    fillBox(x, 1, z, x, 4, z, 0);
+  }
+  // corner towers: up to the walkway, then a walled lookout
+  for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+    const tx = cx + sx * R, tz = cz + sz * R;
+    for (let x = tx - 3; x <= tx + 3; x++) for (let z = tz - 3; z <= tz + 3; z++) {
+      fillBox(x, 1, z, x, wallH, z, T.CASTLE);
+      if ((Math.abs(x - tx) === 3 || Math.abs(z - tz) === 3) && (x + z) % 3 !== 0) fillBox(x, wallH + 1, z, x, wallH + 3, z, T.CASTLE);
+    }
+  }
+  // stairs from the courtyard up to the walkway, along the inside of each wall
+  for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (let k = 1; k <= wallH - 1; k++) {
+    const along = 5 + k, inward = R - 2;
+    const x = cx + (sx ? sx * inward : along), z = cz + (sz ? sz * inward : along);
+    const x2 = cx + (sx ? sx * (inward - 1) : along), z2 = cz + (sz ? sz * (inward - 1) : along);
+    fillBox(Math.min(x, x2), 1, Math.min(z, z2), Math.max(x, x2), k, Math.max(z, z2), T.STONE);
+  }
+  // the keep: two floors, stairs inside, crenellated roof and a lookout
+  const K = 6;
+  for (let x = cx - K; x <= cx + K; x++) for (let z = cz - K; z <= cz + K; z++) {
+    const edge = Math.abs(x - cx) === K || Math.abs(z - cz) === K;
+    if (edge) fillBox(x, 1, z, x, 9, z, T.CASTLE);
+    setB(x, 5, z, T.PLANK); setB(x, 9, z, T.CASTLE);
+    if (edge && (x + z) % 2 === 0) setB(x, 10, z, T.CASTLE);
+  }
+  fillBox(cx - 1, 1, cz + K, cx + 1, 3, cz + K, 0);                                   // door
+  for (const [x, z] of [[cx - K, cz], [cx + K, cz], [cx, cz - K]]) { setB(x, 3, z, 0); setB(x, 7, z, 0); }  // windows
+  for (let k = 1; k <= 4; k++) { fillBox(cx - K + 1 + k, k, cz - K + 1, cx - K + 1 + k, k, cz - K + 2, T.WOOD); setB(cx - K + 1 + k, 5, cz - K + 1, 0); setB(cx - K + 1 + k, 5, cz - K + 2, 0); }
+  for (let k = 1; k <= 4; k++) { fillBox(cx + K - 1 - k, 5 + k, cz - K + 1, cx + K - 1 - k, 5 + k, cz - K + 2, T.WOOD); setB(cx + K - 1 - k, 9, cz - K + 1, 0); setB(cx + K - 1 - k, 9, cz - K + 2, 0); }
+  for (let x = cx - 1; x <= cx + 2; x++) for (let z = cz - 1; z <= cz + 2; z++) {
+    const e = x === cx - 1 || x === cx + 2 || z === cz - 1 || z === cz + 2;
+    if (e) fillBox(x, 10, z, x, 12, z, T.CASTLE);
+  }
+  for (const [x, z] of [[cx, cz - 1], [cx + 2, cz + 1]]) setB(x, 10, z, 0);           // ways into the lookout
+}
+function stall(p, r) {
+  const roof = [T.BARN, T.TRIM, T.SILO, T.ROOF][ri(r, 0, 3)];
+  for (const [x, z] of [[p.x0, p.z0], [p.x1, p.z0], [p.x0, p.z1], [p.x1, p.z1]]) fillBox(x, 1, z, x, 3, z, T.WOOD);
+  fillBox(p.x0, 4, p.z0, p.x1, 4, p.z1, roof);
+  fillBox(p.x0 + 1, 1, p.z0, p.x1 - 1, 1, p.z0, T.PLANK);
+  if (r() < 0.6) setB(p.x0 + 1, 1, p.z1 - 1, T.HAY);
+}
+function buildCastle() {
+  fillBox(0, 0, 0, W - 1, 0, D - 1, T.GROUND);
+  outerWall(4, T.STONE, T.CASTLE);
+  const r = rng32(6061), plan = makePlanner(2), cx = W >> 1, cz = D >> 1;
+  castle(cx, cz); plan.take(cx - 23, cz - 23, cx + 23, cz + 23);
+  for (const [x, z] of [[cx - 26, cz - 6], [cx + 26, cz + 6], [cx + 6, cz - 26], [cx - 6, cz + 26]]) padAt(x, z);
+  for (let i = 0; i < 9; i++) { const p = plan.place(r, ri(r, 7, 9), ri(r, 5, 7)); if (p) placeBarn(p.x0, p.z0, p.x1, p.z1, 3, ["x0", "x1", "z0", "z1"][ri(r, 0, 3)], { wall: r() < 0.5 ? T.HOUSE : T.PLANK }); }
+  for (let i = 0; i < 10; i++) { const p = plan.place(r, 4, 3); if (p) stall(p, r); }
+  for (let i = 0; i < 3; i++) { const p = plan.place(r, ri(r, 8, 11), ri(r, 8, 11)); if (p) pen(p, r); }
+  for (let i = 0; i < 4; i++) { const p = plan.place(r, 9, 3); if (p) sniperTower(p); }
+  for (let i = 0; i < 40; i++) { const p = plan.place(r, 3, 3); if (p) tree(p.x0 + 1, p.z0 + 1, 0, ri(r, 3, 4), 2); }
+  for (let i = 0; i < 20; i++) { const len = ri(r, 3, 5), p = r() < 0.5 ? plan.place(r, len, 1) : plan.place(r, 1, len); if (p) coverWall(p, r, T.CASTLE); }
+  for (let i = 0; i < 50; i++) { const p = plan.place(r, 1, 1); if (p) fillBox(p.x0, 1, p.z0, p.x0, ri(r, 1, 2), p.z0, T.HAY); }
+  for (let i = 0; i < 30; i++) { const p = plan.place(r, 2, 2); if (p) cratePile(p, r); }
+}
+
+// ---------------------------------------------------------------------
+// Snowbase (104x104): a snowy military base. A radar tower in the middle, bunkers,
+// warehouses and containers, a frozen lake, igloos and pine forests.
+// ---------------------------------------------------------------------
+function igloo(cx, cz) {
+  for (let y = 1; y <= 3; y++) {
+    const rr = 3.2 - (y - 1) * 0.9;
+    for (let x = cx - 3; x <= cx + 3; x++) for (let z = cz - 3; z <= cz + 3; z++) {
+      const d = Math.hypot(x - cx, z - cz);
+      if (d <= rr && (d > rr - 1.2 || y === 3)) setB(x, y, z, T.SNOW);
+    }
+  }
+  fillBox(cx, 1, cz + 2, cx, 2, cz + 3, 0);                                            // doorway
+}
+function radar(cx, cz) {
+  centerTower(cx, cz);
+  fillBox(cx - 1, 9, cz - 1, cx, 11, cz, T.METAL);
+  for (let dx = -3; dx <= 2; dx++) for (let dy = 0; dy <= 3; dy++) if (Math.abs(dx + 0.5) + Math.abs(dy - 1.5) < 4) setB(cx + dx, 12 + dy, cz - 2, T.SILO);  // the dish
+}
+function buildSnow() {
+  fillBox(0, 0, 0, W - 1, 0, D - 1, T.GROUND);
+  outerWall(5, T.STONE, T.SNOW);
+  const r = rng32(4242), plan = makePlanner(2), pads = [];
+  const cx = (W >> 1) + ri(r, -5, 5), cz = (D >> 1) + ri(r, -5, 5);
+  radar(cx, cz); plan.take(cx - 9, cz - 9, cx + 8, cz + 8); padAt(cx - 9, cz + 6);
+  // frozen lake with a few ice chunks sticking up
+  const lk = plan.place(r, 24, 16);
+  if (lk) {
+    const lx = (lk.x0 + lk.x1) / 2, lz = (lk.z0 + lk.z1) / 2;
+    for (let x = lk.x0; x <= lk.x1; x++) for (let z = lk.z0; z <= lk.z1; z++) if (((x - lx) / 12) ** 2 + ((z - lz) / 8) ** 2 <= 1) setB(x, 1, z, T.ICE);
+    for (let i = 0; i < 6; i++) { const x = ri(r, lk.x0 + 4, lk.x1 - 4), z = ri(r, lk.z0 + 3, lk.z1 - 3); fillBox(x, 2, z, x, ri(r, 2, 3), z, T.ICE); }
+  }
+  const wh = [];
+  for (let i = 0; i < 3; i++) { const w = r() < 0.5 ? 13 : 9, d = w === 13 ? 9 : 13, p = plan.place(r, w, d); if (p) { warehouse(p, r); wh.push(p); } }
+  for (const p of wh) pads.push([p.x0 - 2, p.z0 + 1]);
+  for (let i = 0; i < 8; i++) { const p = plan.place(r, 5, 5); if (p) bunker(p); }
+  for (let i = 0; i < 5; i++) { const p = plan.place(r, 9, 3); if (p) sniperTower(p); }
+  for (let i = 0; i < 14; i++) { const p = r() < 0.5 ? plan.place(r, 6, 2) : plan.place(r, 2, 6); if (p) containers(p, r); }
+  for (let i = 0; i < 5; i++) { const p = plan.place(r, 7, 7); if (p) igloo(p.x0 + 3, p.z0 + 3); }
+  for (let f = 0; f < 5; f++) {                                                         // pine forests
+    const fx = ri(r, 8, W - 9), fz = ri(r, 8, D - 9);
+    for (let i = 0; i < 9; i++) { const p = plan.place(r, 3, 3, [clamp(fx - 9, 2, W - 3), clamp(fz - 9, 2, D - 3), clamp(fx + 9, 2, W - 3), clamp(fz + 9, 2, D - 3)]); if (p) tree(p.x0 + 1, p.z0 + 1, 0, ri(r, 3, 4), 2, T.LEAF); }
+  }
+  for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) for (let y = H - 2; y > 1; y--) {      // snow on the treetops
+    const t = grid[idx(x, y, z)]; if (!t) continue;
+    if (t === T.LEAF && !grid[idx(x, y + 1, z)]) setB(x, y, z, T.SNOW);
+    break;
+  }
+  for (let i = 0; i < 24; i++) { const len = ri(r, 3, 6), p = r() < 0.5 ? plan.place(r, len, 1) : plan.place(r, 1, len); if (p) coverWall(p, r, T.SNOW); }
+  for (let i = 0; i < 40; i++) { const p = plan.place(r, 3, 3); if (p) cratePile(p, r); }
+  for (const [x, z] of pads) padAt(x, z);
+}
+
+// ---------------------------------------------------------------------
+// Jungle (120x120): a big stepped temple with a shrine on top, a winding river with
+// bridges, giant jungle trees, and broken ruins overgrown with moss.
+// ---------------------------------------------------------------------
+function temple(cx, cz) {
+  const levels = 5;
+  for (let l = 0; l < levels; l++) {
+    const half = 10 - l * 2, y0 = 1 + l * 2;
+    fillBox(cx - half, y0, cz - half, cx + half, y0 + 1, cz + half, T.TEMPLE);
+    for (let x = cx - half; x <= cx + half; x++) for (let z = cz - half; z <= cz + half; z++) if (Math.abs(x - cx) === half || Math.abs(z - cz) === half) { if ((x * 7 + z * 3) % 5 === 0) setB(x, y0 + 1, z, T.MOSS); }
+  }
+  // stairs up all four sides
+  for (let k = 0; k < levels * 2; k++) {
+    const d = 11 - k, y = k + 1;
+    for (let o = -1; o <= 1; o++) { setB(cx + o, y, cz + d, T.STONE); setB(cx + o, y, cz - d, T.STONE); setB(cx + d, y, cz + o, T.STONE); setB(cx - d, y, cz + o, T.STONE); }
+  }
+  // shrine on top
+  const top = 1 + levels * 2;
+  for (const [x, z] of [[cx - 2, cz - 2], [cx + 2, cz - 2], [cx - 2, cz + 2], [cx + 2, cz + 2]]) fillBox(x, top, z, x, top + 2, z, T.TEMPLE);
+  fillBox(cx - 2, top + 3, cz - 2, cx + 2, top + 3, cz + 2, T.MOSS);
+  setB(cx, top, cz, T.TRIM);
+}
+function buildJungle() {
+  fillBox(0, 0, 0, W - 1, 0, D - 1, T.GROUND);
+  outerWall(5, T.MOSS, T.LEAF);
+  const r = rng32(7373), plan = makePlanner(2), cx = W >> 1, cz = D >> 1, pads = [];
+  temple(cx, cz); plan.take(cx - 13, cz - 13, cx + 13, cz + 13);
+  for (const [x, z] of [[cx - 15, cz + 4], [cx + 15, cz - 4]]) padAt(x, z);
+  // a river winding across the map, with plank bridges
+  const river = [], rz0 = Math.round(D * 0.22);
+  for (let x = 2; x < W - 2; x++) {
+    const zc = Math.round(rz0 + Math.sin(x / 11) * 7 + Math.sin(x / 5.3) * 2), bridge = x % 26 === 13;
+    for (let z = zc - 2; z <= zc + 2; z++) { setB(x, 1, z, bridge ? T.PLANK : T.WATER); river.push([x, z]); }
+  }
+  takeCells(plan, river);
+  for (let i = 0; i < 8; i++) { const p = plan.place(r, ri(r, 5, 8), ri(r, 5, 8)); if (p) { ruin(p, r); for (let x = p.x0; x <= p.x1; x++) for (let z = p.z0; z <= p.z1; z++) { const t = topY(x, z); if (t > 0 && grid[idx(x, t, z)] === T.ADOBE) setB(x, t, z, r() < 0.5 ? T.MOSS : T.TEMPLE); } } }
+  for (let i = 0; i < 6; i++) { const p = plan.place(r, 3, 3); if (p) { fillBox(p.x0 + 1, 1, p.z0 + 1, p.x0 + 1, ri(r, 3, 6), p.z0 + 1, T.TEMPLE); setB(p.x0 + 1, 1, p.z0, T.MOSS); } }   // broken pillars
+  for (let i = 0; i < 14; i++) {                                                          // giant jungle trees, 2x2 trunks
+    const p = plan.place(r, 5, 5); if (!p) continue;
+    const x = p.x0 + 2, z = p.z0 + 2, h = ri(r, 6, 9);
+    fillBox(x, 1, z, x + 1, h, z + 1, T.WOOD);
+    tree(x, z, h - 1, 1, 4, T.LEAF);
+  }
+  for (let i = 0; i < 40; i++) { const p = plan.place(r, 3, 3); if (p) tree(p.x0 + 1, p.z0 + 1, 0, ri(r, 2, 4), ri(r, 1, 2), r() < 0.5 ? T.LEAF : T.MOSS); }
+  for (let i = 0; i < 60; i++) { const p = plan.place(r, 1, 1); if (p) fillBox(p.x0, 1, p.z0, p.x0, ri(r, 1, 2), p.z0, T.LEAF); }          // bushes
+  for (let i = 0; i < 20; i++) { const len = ri(r, 3, 5), p = r() < 0.5 ? plan.place(r, len, 1) : plan.place(r, 1, len); if (p) coverWall(p, r, T.TEMPLE); }
+  for (let i = 0; i < 25; i++) { const p = plan.place(r, 2, 2); if (p) cratePile(p, r); }
+  for (let i = 0; i < 3; i++) { const p = plan.place(r, 9, 3); if (p) { sniperTower(p); pads.push([p.x0 - 2, p.z0 + 1]); } }
+  for (const [x, z] of pads) padAt(x, z);
+}
+
 const MAPS = {
   arena: { name: "Arena", size: 96, build: buildArena, sky: 0x8fc6f2, ground: 0x7aa457, outer: 0x5f8546, fog: [70, 190] },
   farm: { name: "Farm", size: 128, build: buildFarm, sky: 0x9fd0f0, ground: 0x86ad55, outer: 0x6f9a4c, fog: [80, 230] },
   peaks: { name: "Peaks", size: 112, build: buildPeaks, sky: 0xa3d2f5, ground: 0x6fa04e, outer: 0x8a939c, fog: [80, 220] },
+  desert: { name: "Desert", size: 112, build: buildDesert, sky: 0xf0d6a8, ground: 0xd9bf86, outer: 0xc9a96e, fog: [80, 220] },
+  castle: { name: "Castle", size: 120, build: buildCastle, sky: 0x9fc8ee, ground: 0x6f9f4a, outer: 0x5f8a40, fog: [80, 230] },
+  snow: { name: "Snowbase", size: 104, build: buildSnow, sky: 0xcfe2f0, ground: 0xe8eef3, outer: 0xdfe8ef, fog: [60, 190] },
+  jungle: { name: "Jungle", size: 120, build: buildJungle, sky: 0x9fd6c0, ground: 0x4f8a3a, outer: 0x3f7a2f, fog: [60, 180] },
 };
 let mapId = "arena";
 const spawns = [];
 function topY(x, z) { for (let y = H - 1; y >= 0; y--) if (grid[idx(x, y, z)]) return y; return 0; }
 // Spawn points: one open spot in every 7x7 patch of the map, on the ground with clear sky
 // above (so never inside a building) and level footing around it.
-const SPAWN_GROUND = [T.GROUND, T.GRASS, T.SNOW, T.DIRT];
+const SPAWN_GROUND = [T.GROUND, T.GRASS, T.SNOW, T.DIRT, T.SAND, T.MOSS];
 function spawnOk(x, z) {
   const ty = topY(x, z);
   if (!SPAWN_GROUND.includes(grid[idx(x, ty, z)]) || ty + 3 >= H) return false;
@@ -973,7 +1229,14 @@ function computeSpawns() {
 // ======================================================================
 const view = $("#view");
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+// Graphics. Auto watches the frame rate and lowers (or raises) the drawing resolution to
+// keep the game smooth; Fast draws at low resolution with a shorter view and no bullet
+// holes or shells; Sharp draws at full resolution.
+const DPR = window.devicePixelRatio || 1, TOUCHY = navigator.maxTouchPoints > 0;
+let gfxMode = ["auto", "fast", "sharp"].includes(load("cfa.gfx")) ? load("cfa.gfx") : "auto";
+const gfxMax = () => gfxMode === "sharp" ? Math.min(DPR, 1.5) : gfxMode === "fast" ? 0.7 : Math.min(DPR, TOUCHY ? 1.1 : 1.35);
+let pixRatio = gfxMax();
+renderer.setPixelRatio(pixRatio);
 renderer.autoClear = false;
 view.appendChild(renderer.domElement);
 const canvas = renderer.domElement;
@@ -1039,6 +1302,15 @@ const BLOCK_STYLE = {
   [T.SILO]: { tex: "plank", color: 0xc9ced4 },
   [T.HOUSE]: { tex: "plank", color: 0xeee7da },
   [T.PAD]: { tex: "pad", color: 0x36d6c3 },
+  [T.SAND]: { tex: "grass", color: 0xe0c88e },
+  [T.ADOBE]: { tex: "plain", color: 0xd9a066 },
+  [T.CACTUS]: { tex: "leaf", color: 0x4f8f3a },
+  [T.WATER]: { tex: "plain", color: 0x3a8fd8 },
+  [T.CASTLE]: { tex: "brick", color: 0x9a9a92 },
+  [T.ICE]: { tex: "plain", color: 0xc4ecf7 },
+  [T.TEMPLE]: { tex: "brick", color: 0x8f8a6a },
+  [T.MOSS]: { tex: "leaf", color: 0x4f7a35 },
+  [T.MESA]: { tex: "plank", color: 0xc7864a },
 };
 const boxGeo = new THREE.BoxGeometry(1, 1, 1);
 const groundTex = makeTex("ground"); groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping; groundTex.repeat.set(W, D);
@@ -1079,6 +1351,12 @@ function buildMeshes() {
 // guns with snouts, pink tracers, oinks, pink screen) and they stay a pig to others.
 let pigMode = load("cfa.pig") === "1";
 const PIG_PINK = 0xff7ac8;
+// Fast graphics: a shorter view (fog closes in), and nothing past the fog is drawn
+function applyViewDistance() {
+  const M = MAPS[mapId] || MAPS.arena, fast = gfxMode === "fast";
+  scene.fog.near = fast ? Math.min(M.fog[0], 45) : M.fog[0]; scene.fog.far = fast ? Math.min(M.fog[1], 115) : M.fog[1];
+  camera.far = scene.fog.far + 15; camera.updateProjectionMatrix();
+}
 function loadMap(id) {
   if (id === mapId && mapMeshes.length) return;
   mapId = MAPS[id] ? id : "arena";
@@ -1089,7 +1367,7 @@ function loadMap(id) {
   buildMeshes();
   computeSpawns();
   scene.background.setHex(M.sky); if (pigMode) scene.background.lerp(new THREE.Color(PIG_PINK), 0.32);
-  scene.fog.color.copy(scene.background); scene.fog.near = M.fog[0]; scene.fog.far = M.fog[1];
+  scene.fog.color.copy(scene.background); applyViewDistance();
   groundMat.color.setHex(M.ground); outerMat.color.setHex(M.outer);
   groundTex.repeat.set(W, D);
   ground.scale.set(W, D, 1); ground.position.set(W / 2, 1, D / 2);
@@ -1456,6 +1734,7 @@ function makeSkinned(id, colorHex, name, pts, parent) {
   box(0.18, 0.18, 0.5, armsM, 0.36, 0, -0.18, arms); box(0.18, 0.18, 0.5, armsM, -0.2, 0, -0.26, arms);
   const gun = box(0.1, 0.12, 0.7, gunM, 0.2, 0.04, -0.5, arms);
   if (S.extra) S.extra((w, h, d, c, x, y, z, par, o) => { const m = box(w, h, d, mat(c, o), x, y, z, par || g); if (o && o.rot) m.rotation.y = o.rot; return m; }, head, g);
+  const keep = new Set([gun]); mergeStatic(g, keep); mergeStatic(head, keep); mergeStatic(arms, keep);
   let tag = null;
   if (name != null) { tag = nameSprite(name, pts); tag.position.set(0, TAG_Y, 0); g.add(tag); }
   parent.add(g);
@@ -1484,6 +1763,38 @@ function makeSkinned(id, colorHex, name, pts, parent) {
   return { g, head, arms, gun, tag, name, tagKey: tagKey(name, pts), body: beltM, skin: id, bodyMat: bodyM, helmetMat: helmetM, armsMat: armsM, pulse, anim };
 }
 // Pig skin: pink pig with a snout, ears and a curly tail, wearing an armor-colored vest
+// Merge a group's plain block meshes into one mesh per material (far fewer draw calls).
+// Meshes in `keep` (ones that get moved or resized later) are left alone.
+const _mv = new V3(), _nm = new THREE.Matrix3();
+function mergeStatic(group, keep) {
+  const byMat = new Map();
+  for (const c of group.children) if (c.isMesh && !keep.has(c) && c.geometry && c.geometry.index && c.geometry.attributes.uv) {
+    if (!byMat.has(c.material)) byMat.set(c.material, []);
+    byMat.get(c.material).push(c);
+  }
+  for (const [mat, list] of byMat) {
+    if (list.length < 2) continue;
+    let nv = 0, ni = 0; for (const m of list) { nv += m.geometry.attributes.position.count; ni += m.geometry.index.count; }
+    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), ind = new Uint16Array(ni);
+    let vo = 0, io = 0;
+    for (const m of list) {
+      m.updateMatrix(); _nm.getNormalMatrix(m.matrix);
+      const G = m.geometry, P = G.attributes.position, N = G.attributes.normal, U = G.attributes.uv, I = G.index;
+      for (let i = 0; i < P.count; i++) {
+        _mv.fromBufferAttribute(P, i).applyMatrix4(m.matrix); pos[(vo + i) * 3] = _mv.x; pos[(vo + i) * 3 + 1] = _mv.y; pos[(vo + i) * 3 + 2] = _mv.z;
+        _mv.fromBufferAttribute(N, i).applyMatrix3(_nm).normalize(); nor[(vo + i) * 3] = _mv.x; nor[(vo + i) * 3 + 1] = _mv.y; nor[(vo + i) * 3 + 2] = _mv.z;
+        uv[(vo + i) * 2] = U.getX(i); uv[(vo + i) * 2 + 1] = U.getY(i);
+      }
+      for (let k = 0; k < I.count; k++) ind[io + k] = I.getX(k) + vo;
+      vo += P.count; io += I.count;
+      group.remove(m); G.dispose();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3)); geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    geo.setIndex(new THREE.BufferAttribute(ind, 1));
+    group.add(new THREE.Mesh(geo, mat));
+  }
+}
 function makePig(colorHex, name, pts, parent = scene) {
   const g = new THREE.Group();
   const pink = lam(0xf2a0b6), light = lam(0xf8c3d0), hoof = lam(0x5a3a3f), black = lam(0x1b1b1f), vest = lam(colorHex), dark = lam(0x2a2f37);
@@ -1507,6 +1818,7 @@ function makePig(colorHex, name, pts, parent = scene) {
   const arms = new THREE.Group(); arms.position.set(0, 1.25, 0); g.add(arms);
   box(0.18, 0.18, 0.5, pink, 0.38, 0, -0.18, arms); box(0.18, 0.18, 0.5, pink, -0.22, 0, -0.26, arms);
   const gun = box(0.1, 0.12, 0.7, dark, 0.2, 0.04, -0.5, arms);
+  { const keep = new Set([gun, earL, earR]); mergeStatic(g, keep); mergeStatic(head, keep); mergeStatic(arms, keep); }
   let tag = null;
   if (name != null) { tag = nameSprite(name, pts); tag.position.set(0, TAG_Y, 0); g.add(tag); }
   parent.add(g);
@@ -1527,6 +1839,7 @@ function makeAvatar(colorHex, name, skinName, pts, parent = scene) {
   const arms = new THREE.Group(); arms.position.set(0, 1.25, 0); g.add(arms);
   box(0.18, 0.18, 0.5, body, 0.36, 0, -0.18, arms); box(0.18, 0.18, 0.5, body, -0.2, 0, -0.26, arms);
   const gun = box(0.1, 0.12, 0.7, dark, 0.2, 0.04, -0.5, arms);
+  { const keep = new Set([gun]); mergeStatic(g, keep); mergeStatic(head, keep); mergeStatic(arms, keep); }
   let tag = null;
   if (name != null) { tag = nameSprite(name, pts); tag.position.set(0, TAG_Y, 0); g.add(tag); }
   parent.add(g);
@@ -1736,7 +2049,7 @@ function applyPigTheme() {
   const h1 = document.querySelector(".brand h1"); if (h1) { h1.textContent = "Pig"; const sp = document.createElement("span"); sp.textContent = "fire"; h1.appendChild(sp); }
   const tag = document.querySelector(".brand p"); if (tag) tag.textContent = "Free-for-all oink-fest. Play online with friends, or warm up against piglets.";
   WEAPONS.forEach(w => { w.name = w.pig; });
-  MAPS.arena.name = "Pig Arena"; MAPS.farm.name = "Pig Farm"; MAPS.peaks.name = "Pig Peaks";
+  for (const m of Object.values(MAPS)) m.name = "Pig " + m.name;
   document.querySelectorAll("#mapPick button").forEach(b => { if (MAPS[b.dataset.v]) b.textContent = MAPS[b.dataset.v].name; });
   const elimTag = document.querySelector("#elim .tag"); if (elimTag) elimTag.textContent = "Oinked";
   const hpLbl = document.querySelector(".vitals .lbl span"); if (hpLbl) hpLbl.textContent = "Oink HP";
@@ -1922,7 +2235,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 18;
+const BUILD = 19;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2438,16 +2751,20 @@ function showRanks() {
 $("#ranksClose").addEventListener("click", () => { $("#ranks").hidden = true; });
 $("#ranks").addEventListener("click", e => { if (e.target.id === "ranks") $("#ranks").hidden = true; });
 $("#pauseRanks").addEventListener("click", showRanks);
-// ---- Doug mode: only for the player named "Doug" wearing green armor. Bot matches
+// ---- Hack profiles: "Doug" in green armor and "Alex" in blue armor. Bot matches
 // need nothing more; online matches need the password, which the game server checks
 // (it's a secret on the server, never in this code). Where there is no game server
 // (claude.ai, peer-to-peer) the password is checked against its SHA-256 fingerprint.
 const DOUG_COLOR = 2; // green in PAL
-// Cheat profiles: a name + armor color unlocks a set of perks. Only Doug has one, and he needs the
-// password online. Colors are indexes into PAL.
+// Cheat profiles: a name + armor color unlocks a set of perks; each needs its password
+// online. Colors are indexes into PAL.
 const PROFILES = {
   doug: { color: DOUG_COLOR, perks: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], nukeWait: 0, password: true },
+  alex: { color: 3, perks: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], nukeWait: 0, password: true },   // blue
 };
+// Other names that use a profile (same armor color and password)
+const PROFILE_ALIAS = { duke: "doug", bill: "doug" };
+const profileKey = name => { const nm = cleanName(name).toLowerCase(); return PROFILE_ALIAS[nm] || nm; };
 const PERK_DEFAULT = { aim: true, god: true, snipe: true, wall: true, inv: false };
 const PERK_BUTTON = { aim: "dkAim", god: "dkGod", snipe: "dkSnipe", wall: "dkWall", inv: "dkInv", tp: "dkTp", nuke: "dkNuke" };
 const hasPerk = k => duke.on && duke.perks.includes(k);
@@ -2460,7 +2777,7 @@ const duke = { on: false, profile: null, perks: [], aim: false, god: false, snip
 let authKey = "", authWho = "", authedAs = null, authWait = null;
 // Which password-protected profile a name and the chosen color pick, if any
 const passwordProfileOf = name => {
-  const nm = cleanName(name).toLowerCase(), prof = PROFILES[nm];
+  const nm = profileKey(name), prof = PROFILES[nm];
   return prof && prof.password && myColor === prof.color ? nm : null;
 };
 const passwordProfile = () => passwordProfileOf(nick.value);
@@ -2486,7 +2803,7 @@ async function checkPassword(who, pw) {
 const SNIPER_NORMAL = (({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }) => ({ auto, rate, spread, aimSpread, quickscope, dmg, head, mag, reload }))(WEAPONS[SNIPER]);
 const SNIPER_DUKE = { auto: true, rate: 0.14, spread: 0, aimSpread: 0, quickscope: undefined, dmg: 150, head: 150, mag: 99, reload: 0.3 };
 function applyDuke() {
-  const nm = myName.toLowerCase(), prof = PROFILES[nm];
+  const nm = profileKey(myName), prof = PROFILES[nm];
   let profile = prof && myColor === prof.color ? nm : null;
   if (profile && PROFILES[profile].password && !(mode === "bots" || authedAs === profile)) profile = null;
   if (profile !== duke.profile) {                       // new profile: reset switches to its defaults
@@ -2604,11 +2921,13 @@ function updateNukeButton() {
 const HACKS = [["aim", "Aimbot"], ["god", "God mode"], ["snipe", "Auto sniper"], ["wall", "Wall hacks"], ["inv", "Invisible"]];
 let dkPicks = { ...PERK_DEFAULT };
 try { const sv = JSON.parse(load("cfa.dkpicks") || "null"); if (sv && typeof sv === "object") for (const [k] of HACKS) if (typeof sv[k] === "boolean") dkPicks[k] = sv[k]; } catch (e) {}
-const dougPicked = () => { const nm = state === "play" ? myName : cleanName(nick.value); return nm.toLowerCase() === "doug" && myColor === DOUG_COLOR; };
+const dougPicked = () => { const nm = profileKey(state === "play" ? myName : nick.value), prof = PROFILES[nm]; return prof && myColor === prof.color ? nm : null; };
 function renderHackPick() {
   const f = $("#dougField"); if (!f) return;
-  f.hidden = !dougPicked();
+  const who = dougPicked(); f.hidden = !who;
   if (f.hidden) return;
+  const shown = cleanName(state === "play" ? myName : nick.value) || who;
+  $("#hackWho").textContent = shown[0].toUpperCase() + shown.slice(1) + "'s hacks";
   const box = $("#hackPick"); box.replaceChildren();
   for (const [k, label] of HACKS) {
     const b = document.createElement("button"); b.type = "button"; b.textContent = label;
@@ -2868,7 +3187,7 @@ function fireMud(o, base, right, up, spread, w, t) {
 // Spent shells fly out of the gun (only on your own screen)
 const shells = [], shellGeo = new THREE.BoxGeometry(0.022, 0.022, 0.055), brassMat = lam(0xd9a63c), hullMat = lam(0xb8262e);
 function ejectShell() {
-  const g = guns[cur], ud = g.userData; if (!ud.eject || !g.visible) return;
+  const g = guns[cur], ud = g.userData; if (!ud.eject || !g.visible || gfxMode === "fast") return;
   const shotgun = cur === W_ID.shotgun, m = new THREE.Mesh(shellGeo, shotgun ? hullMat : brassMat);
   if (shotgun) m.scale.set(1.7, 1.7, 1.3);
   vmRoot.updateMatrixWorld(true);
@@ -2900,11 +3219,12 @@ function paintMat(hex) {
   return paintMats.get(hex);
 }
 function addDecal(p, n, size, mat) {
+  if (gfxMode === "fast" && mat === holeMat) return;
   const m = new THREE.Mesh(decalGeo, mat); m.scale.set(size, size, 1);
   m.position.copy(p).addScaledVector(n, 0.012);
   m.lookAt(m.position.x + n.x, m.position.y + n.y, m.position.z + n.z); m.rotateZ(Math.random() * Math.PI * 2);
   scene.add(m); decals.push(m);
-  while (decals.length > 150) scene.remove(decals.shift());
+  while (decals.length > 60) scene.remove(decals.shift());
 }
 function clearDecals() { for (const m of decals) scene.remove(m); decals.length = 0; }
 // Where a ray (origin o, direction d) enters a block t blocks away, and which way that face points
@@ -3583,6 +3903,7 @@ PAL.forEach((c, i) => {
 const sens = $("#sens"); sens.value = String(sensVal); $("#sensOut").textContent = String(sensVal);
 sens.addEventListener("input", () => { sensVal = clamp(parseFloat(sens.value) || 6, 1, 12); $("#sensOut").textContent = String(sensVal); save("cfa.sens", sensVal); });
 const mapPick = $("#mapPick");
+for (const [id, m] of Object.entries(MAPS)) { const b = document.createElement("button"); b.type = "button"; b.dataset.v = id; b.textContent = m.name; mapPick.appendChild(b); }
 function renderMapPick() { [...mapPick.children].forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === mapId))); }
 mapPick.addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b || state !== "menu") return;
@@ -3616,6 +3937,14 @@ const assistSeg = $("#assist");
 function renderAssist() { [...assistSeg.children].forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.v === assistLevel))); }
 assistSeg.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; assistLevel = +b.dataset.v; save("cfa.assist", assistLevel); renderAssist(); });
 renderAssist();
+const gfxSeg = $("#gfx");
+function renderGfx() { [...gfxSeg.children].forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === gfxMode))); }
+gfxSeg.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  gfxMode = b.dataset.v; save("cfa.gfx", gfxMode); renderGfx();
+  setPixRatio(gfxMax()); applyViewDistance();
+});
+renderGfx();
 
 function startGame(m) {
   initAudio();
@@ -3641,7 +3970,7 @@ $("#playOnline").addEventListener("click", () => {
   if (netState === "offline") { banner("Online play isn't available on this page"); return; }
   const who = passwordProfile();
   if (who && authedAs !== who) {
-    $("#pwWho").textContent = who[0].toUpperCase() + who.slice(1) + " needs the password to play online.";
+    $("#pwWho").textContent = (who === "doug" ? "Doug (also Duke and Bill)" : who[0].toUpperCase() + who.slice(1)) + " needs the password to play online.";
     $("#pwErr").hidden = true; $("#pwIn").value = ""; $("#pw").hidden = false; $("#pwIn").focus(); return;
   }
   startGame("online");
@@ -3921,6 +4250,17 @@ function leaveMatch() {
 // ======================================================================
 // Main loop
 // ======================================================================
+function setPixRatio(r) { pixRatio = r; renderer.setPixelRatio(r); resize(); }
+// Auto graphics: if frames run slow, draw at a lower resolution; when there's room, go back up
+let frameAvg = 1 / 60, gfxCheck = 0, gfxGood = 0;
+function autoQuality(raw, t) {
+  frameAvg += (Math.min(raw, 0.2) - frameAvg) * 0.05;
+  if (gfxMode !== "auto" || t < gfxCheck) return;
+  gfxCheck = t + 1.5;
+  if (frameAvg > 1 / 42 && pixRatio > 0.55) { setPixRatio(Math.max(0.55, +(pixRatio - 0.15).toFixed(2))); gfxGood = 0; }
+  else if (frameAvg < 1 / 56 && pixRatio < gfxMax()) { if (++gfxGood >= 3) { setPixRatio(Math.min(gfxMax(), +(pixRatio + 0.1).toFixed(2))); gfxGood = 0; } }
+  else gfxGood = 0;
+}
 function resize() {
   const w = view.clientWidth || window.innerWidth, h = view.clientHeight || window.innerHeight;
   renderer.setSize(w, h, false);
@@ -3932,7 +4272,8 @@ window.addEventListener("resize", resize); resize();
 let last = now(), orbit = 0;
 function tick() {
   requestAnimationFrame(tick);
-  const t = now(); const dt = Math.min(0.05, t - last); last = t;
+  const t = now(); const raw = t - last, dt = Math.min(0.05, raw); last = t;
+  autoQuality(raw, t);
 
   if (state === "play") {
     const input = !paused && alive;

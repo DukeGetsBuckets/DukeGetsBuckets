@@ -9,20 +9,21 @@
 //
 // Some name + armor color combinations have extra powers. Online they must first send
 // {t: "auth", key, who} with the password in that profile's Worker secret
-// (DOUG_PASSWORD; set with `wrangler secret put`). Anyone else using a
+// (DOUG_PASSWORD, ALEX_PASSWORD; set with `wrangler secret put`). Anyone else using a
 // protected name and color is refused.
 
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 18;
+const MIN_BUILD = 19;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
 const MIN_ROUND_PLAYERS = 2;
 // protected profiles: name -> armor color, and which can turn invisible
-const PROTECTED = { doug: { color: 2, invisible: true } };
-const profileOf = d => { const n = String(d.n || "").trim().toLowerCase(), p = PROTECTED[n]; return p && d.c === p.color ? n : null; };
+const PROTECTED = { doug: { color: 2, invisible: true }, alex: { color: 3, invisible: true } };
+const PROFILE_ALIAS = { duke: "doug", bill: "doug" };   // other names that use a profile
+const profileOf = d => { const raw = String(d.n || "").trim().toLowerCase(), n = PROFILE_ALIAS[raw] || raw, p = PROTECTED[n]; return p && d.c === p.color ? n : null; };
 
 function lobbyName(raw) {
   const name = String(raw || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 48);
@@ -86,7 +87,7 @@ export class Lobby {
     if (!al) { P.down = true; P.dead = false; }                                       // their game shows them dead
     else if (P.down) { P.down = false; P.dead = false; P.hp = 100; P.spawnUntil = now + 1500; }   // respawned
     if (P.dead && now - P.deadAt > 4000) P.dead = false;                              // their game never agreed: forget it
-    P.al = al; P.god = a.auth === "doug";
+    P.al = al; P.god = !!a.auth;
     if (!P.dead && now - P.lastHitAt > 1000 && typeof d.hp === "number") P.hp = Math.max(0, Math.min(100, d.hp));
     // their shots
     if (!Array.isArray(d.hits)) return;
@@ -178,7 +179,7 @@ export class Lobby {
       return;
     }
     if (!(a.auth && PROTECTED[a.auth].invisible)) delete d.iv; // only verified profiles can be invisible
-    if (a.auth !== "doug") {                                     // only Doug can nuke
+    if (!a.auth) {                                               // only verified profiles can nuke
       delete d.nk;
       if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => !(h && h.nk)); // grenades (w: 3) still count
     }
@@ -229,6 +230,8 @@ const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200],
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["super", 0.05], ["rare", 0.25], ["common", 0.7]];
 const START_TICKETS = 3, PTS_PER_TICKET = 10;
+// Accounts that own every skin and spin for free; each opens only with its Worker secret
+const OWNER_ACCOUNTS = { doug: "DOUG_PASSWORD", alex: "ALEX_PASSWORD" };
 // Perks that come with particular accounts (none right now)
 const ACCOUNT_PERKS = {};
 const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
@@ -261,7 +264,7 @@ export class Accounts {
   data(u) { try { return JSON.parse(u.data) || {}; } catch { return {}; } }
   saveData(name, d) { this.sql.exec("UPDATE users SET data = ? WHERE name = ?", JSON.stringify(d), name); }
   view(u, d) {
-    if (u.name === "doug") return { name: u.display, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k)], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false };
+    if (OWNER_ACCOUNTS[u.name]) return { name: u.display, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k)], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false };
     return { name: u.display, tickets: d.tickets || 0, owned: [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0))], equipped: d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), perks: ACCOUNT_PERKS[u.name] || [] };
   }
   async session(name) {
@@ -286,10 +289,10 @@ export class Accounts {
       if (password.length < 4 || password.length > 64) throw new UserError("Passwords are 4-64 characters");
       const f = this.fails.get(name);
       if (f && f.until > Date.now()) throw new UserError("Too many tries. Wait a minute and try again");
-      // The "Doug" account (every skin, unlimited spins) only opens with Doug's password
-      // (the DOUG_PASSWORD secret); it's created the first time Doug signs in.
-      if (name === "doug") {
-        const secret = this.env && this.env.DOUG_PASSWORD;
+      // The "Doug" and "Alex" accounts (every skin, unlimited spins) only open with their
+      // passwords (Worker secrets); each is created the first time its owner signs in.
+      if (OWNER_ACCOUNTS[name]) {
+        const secret = this.env && this.env[OWNER_ACCOUNTS[name]];
         if (!secret || password !== secret) {
           const g = this.fails.get(name) || { n: 0, until: 0 }; g.n++;
           if (g.n >= 8) { g.n = 0; g.until = Date.now() + 60000; }
@@ -300,7 +303,7 @@ export class Accounts {
         let u = this.user(name);
         if (!u) {
           const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
-          this.sql.exec("INSERT INTO users (name, display, salt, hash, data, created) VALUES (?, ?, ?, ?, ?, ?)", name, "Doug", salt, await hashPw(password, salt),
+          this.sql.exec("INSERT INTO users (name, display, salt, hash, data, created) VALUES (?, ?, ?, ?, ?, ?)", name, name[0].toUpperCase() + name.slice(1), salt, await hashPw(password, salt),
             JSON.stringify({ owned: [], equipped: null, tickets: 0, bank: 0, rank: Math.max(0, Math.min(5000, Math.floor(Number(body.rank) || 0))), lastDaily: "" }), Date.now());
           u = this.user(name);
         }
@@ -348,7 +351,7 @@ export class Accounts {
       if (skin && !this.view(u, d).owned.includes(skin)) throw new UserError("You don't have that skin yet");
       d.equipped = skin; this.saveData(u.name, d); return { account: this.view(u, d) };
     }
-    if (op === "spin" && u.name === "doug") {          // Doug: free spins, any skin
+    if (op === "spin" && OWNER_ACCOUNTS[u.name]) {      // Doug and Alex: free spins, any skin
       let r = Math.random(), rarity = "common";
       for (const [k, p] of ODDS) { if (r < p) { rarity = k; break; } r -= p; }
       const list = SKINS[rarity];
