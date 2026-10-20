@@ -15,7 +15,7 @@
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 20;
+const MIN_BUILD = 21;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -261,6 +261,8 @@ export class Accounts {
     let body = {};
     try { body = await request.json(); } catch {}
     if (!body || typeof body !== "object") body = {};
+    // an old copy of the page doesn't know the newest skins: have it reload first
+    if ((Number(body.v) || 0) < MIN_BUILD) return Response.json({ error: "This copy of the game is out of date. Refresh the page to get the new one.", update: true }, { status: 426 });
     try { return Response.json(await this.handle(op, body)); }
     catch (e) { return Response.json({ error: e instanceof UserError ? e.message : "Something went wrong" }, { status: e instanceof UserError ? 400 : 500 }); }
   }

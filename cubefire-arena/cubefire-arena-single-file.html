@@ -2412,7 +2412,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 20;
+const BUILD = 21;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -4194,10 +4194,11 @@ function acctPerk(k) { return !!(acct && Array.isArray(acct.perks) && acct.perks
 function mySkin() { return acct && acct.equipped && SKIN_DEFS[acct.equipped] ? acct.equipped : null; }
 async function api(op, body) {
   let res;
-  try { res = await fetch(API + "/api/" + op, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(body || {}), token: acctToken }) }); }
+  try { res = await fetch(API + "/api/" + op, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(body || {}), token: acctToken, v: BUILD }) }); }
   catch (e) { throw new Error("Can't reach the game server. Accounts work on the game's own link."); }
   let j = {}; try { j = await res.json(); } catch (e) {}
   if (!res.ok || j.error) {
+    if (j.update) autoReload();                              // this copy is older than the server's
     if (j.error === "Please sign in again") signOutLocal();
     throw new Error(j.error || "Something went wrong");
   }
@@ -4306,7 +4307,7 @@ function spinTo(rarity, done) {
 // ---- locker screen
 function renderLocker() {
   if (!$("#openLocker")) return;
-  $("#lockerSub").textContent = acct ? `Signed in as ${acct.name} · ${acct.owned.length}/${SKIN_IDS.length} skins · ${acct.unlimited ? "unlimited" : acct.tickets} spins` : "Skins and the skin wheel · sign in to start";
+  $("#lockerSub").textContent = acct ? `Signed in as ${acct.name} · ${acct.owned.length}/${SKIN_IDS.length} skins · ${acct.unlimited ? "unlimited" : acct.tickets} spins · v${BUILD}` : "Skins and the skin wheel · sign in to start · v" + BUILD;
   if ($("#locker").hidden) return;
   const box = $("#acctBox"); box.replaceChildren();
   const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); for (const k of kids || []) e.append(k); return e; };
