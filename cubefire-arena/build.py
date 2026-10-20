@@ -7,7 +7,9 @@ published to claude.ai).
   peer-to-peer networking code), so the one file runs on any host.
 - server/public/index.html: the single file again, served by the Cloudflare
   Worker in server/ alongside the multiplayer relay.
+- server/public/: also gets web/ (service worker, app manifest, Home Screen icons).
 """
+import shutil
 from pathlib import Path
 
 here = Path(__file__).parent
@@ -53,3 +55,8 @@ public = here / "server" / "public"
 public.mkdir(parents=True, exist_ok=True)
 (public / "index.html").write_text(single, encoding="utf-8")
 print("wrote", public / "index.html")
+
+# The service worker, web app manifest and Home Screen icons (for Premium notifications)
+for f in sorted((here / "web").iterdir()):
+    shutil.copy(f, here / "server" / "public" / f.name)
+print("copied", len(list((here / "web").iterdir())), "app files to", here / "server" / "public")
