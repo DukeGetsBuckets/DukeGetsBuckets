@@ -20,6 +20,9 @@ head = (
     '<meta name="mobile-web-app-capable" content="yes">\n'
     '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n'
     '<meta name="theme-color" content="#0b1016">\n'
+    '<meta name="apple-mobile-web-app-title" content="Cubefire">\n'
+    '<link rel="manifest" href="manifest.webmanifest">\n'
+    '<link rel="apple-touch-icon" href="icon-180.png">\n'
     '<meta name="description" content="Free-for-all voxel shooter. Play online with friends on any device.">\n'
     '</head>\n<body>\n'
 )

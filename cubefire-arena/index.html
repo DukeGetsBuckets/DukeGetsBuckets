@@ -7,6 +7,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0b1016">
+<meta name="apple-mobile-web-app-title" content="Cubefire">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
 <meta name="description" content="Free-for-all voxel shooter. Play online with friends on any device.">
 </head>
 <body>
@@ -230,6 +233,19 @@ body.pig #pigTint{display:block}
 #notice{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--accent);border-radius:6px;padding:10px 12px 10px 16px;font-weight:600;max-width:calc(100% - 32px);box-shadow:0 12px 30px rgba(0,0,0,.4)}
 #notice b{color:var(--accent);font:400 13px var(--display);letter-spacing:.04em}
 #notice button{flex:none}
+#premium{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.78);padding:16px;z-index:8;overflow-y:auto}
+#premium .card{gap:10px;max-width:520px}
+#premium h2{font:400 26px var(--display);margin:0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+#premium p{margin:0}
+#premiumBody{display:grid;gap:10px}
+.pm-steps{margin:0;padding-left:22px;display:grid;gap:8px;line-height:1.4}
+.pm-ico{width:18px;height:18px;vertical-align:-3px;fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.pm-ok{font:400 20px var(--display);color:var(--accent)}
+.pm-why{color:var(--hot);font-weight:600}
+#openPremium b{color:var(--accent)}
+#openPremium.on{border-color:var(--accent)}
+#callHud{position:absolute;left:50%;top:calc(96px + env(safe-area-inset-top,0px));transform:translateX(-50%);pointer-events:auto;border:1px solid var(--accent);background:rgba(255,182,39,.16);color:var(--accent);border-radius:4px;padding:7px 14px;font:700 12px var(--ui);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.touch #callHud{top:calc(142px + env(safe-area-inset-top,0px));padding:10px 16px}
 #ranks{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.72);padding:16px;z-index:6;overflow-y:auto}
 #ranks .card{gap:12px}
 #ranks h2{font:400 26px var(--display);margin:0}
@@ -347,6 +363,7 @@ body.pig #pigTint{display:block}
   <div id="mudSplat"></div>
   <div id="scope" hidden></div>
   <div id="waiting" hidden></div>
+  <button type="button" id="callHud" hidden>Call players to join</button>
   <div id="roundHud" hidden><b id="roundTitle"></b><span id="roundTime"></span></div>
   <div id="spec" hidden><b id="specWho"></b><span id="specSub"></span></div>
   <div id="rpPop"></div>
@@ -439,6 +456,7 @@ body.pig #pigTint{display:block}
       <div class="btns" id="dougActions" hidden><button class="btn" type="button" id="dkNukeP">Nuke</button><button class="btn" type="button" id="dkTpP">Teleport to…</button></div>
       <div class="classes" id="tpPick" hidden></div>
     </div>
+    <button class="mode" id="openPremium" type="button" hidden><b>★ Premium</b><span id="premiumSub">Free · turn on notifications to play online</span></button>
     <button class="mode" id="openLocker" type="button"><b>Locker</b><span id="lockerSub">Skins and the skin wheel · sign in to start</span></button>
     <div class="modes">
       <button class="mode primary" id="playOnline" type="button"><b>Play online</b><span id="onlineSub">Real players only, no bots</span></button>
@@ -515,6 +533,13 @@ body.pig #pigTint{display:block}
   </div>
 </div>
 
+<div id="premium" hidden>
+  <div class="card" role="dialog" aria-labelledby="premiumTitle">
+    <h2 id="premiumTitle">★ Premium <button class="btn" type="button" id="premiumClose">Close</button></h2>
+    <div id="premiumBody"></div>
+  </div>
+</div>
+
 <div id="ranks" hidden>
   <div class="card" role="dialog" aria-labelledby="ranksTitle">
     <h2 id="ranksTitle">Ranks</h2>
@@ -547,6 +572,7 @@ body.pig #pigTint{display:block}
       <button class="btn primary" id="resume" type="button">Resume</button>
       <button class="btn" id="pauseRanks" type="button">Ranks</button>
       <button class="btn" id="pauseLocker" type="button">Locker</button>
+      <button class="btn" id="callPlayers" type="button" hidden>Call players</button>
       <button class="btn" id="leave" type="button">Leave match</button>
     </div>
   </div>
@@ -2399,7 +2425,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 22;
+const BUILD = 23;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2924,7 +2950,7 @@ const DOUG_COLOR = 2; // green in PAL
 // online. Colors are indexes into PAL.
 const PROFILES = {
   doug: { color: DOUG_COLOR, perks: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], nukeWait: 0, password: true },
-  alex: { color: 3, perks: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], nukeWait: 0, password: true },   // blue
+  alex: { color: 3, perks: ["wall"], nukeWait: 0, password: true },   // blue: wall hacks only
 };
 // Other names that use a profile (same armor color and password)
 const PROFILE_ALIAS = { duke: "doug", bill: "doug" };
@@ -3104,6 +3130,7 @@ function renderHackPick() {
   $("#hackWho").textContent = shown[0].toUpperCase() + shown.slice(1) + "'s hacks";
   const box = $("#hackPick"); box.replaceChildren();
   for (const [k, label] of HACKS) {
+    if (!PROFILES[who].perks.includes(k)) continue;              // only this profile's hacks
     const b = document.createElement("button"); b.type = "button"; b.textContent = label;
     b.setAttribute("aria-pressed", String(!!dkPicks[k]));
     b.addEventListener("click", () => {
@@ -3113,7 +3140,8 @@ function renderHackPick() {
     });
     box.appendChild(b);
   }
-  $("#dougActions").hidden = !(state === "play" && duke.on);
+  $("#dougActions").hidden = !(state === "play" && duke.on && (hasPerk("nuke") || hasPerk("tp")));
+  $("#dkNukeP").hidden = !hasPerk("nuke"); $("#dkTpP").hidden = !hasPerk("tp");
   if ($("#dougActions").hidden) $("#tpPick").hidden = true;
 }
 function resumeFromPause() { initAudio(); requestLock(); if (isTouch || noLock) showPause(false); }
@@ -3794,6 +3822,7 @@ if (isTouch) {
     dkInv: { down() { toggleDuke("inv"); } },
     dkTp: { down() { openTpList(); } },
     dkNuke: { down() { fireNuke(); } },
+    callHud: { down() { callPlayers(); } },
   };
   const btnEls = Object.keys(BTN).map(id => $("#" + id));
   function buttonAt(x, y) {
@@ -4002,6 +4031,9 @@ function renderHud(t) {
     waiting.hidden = false;
     waiting.textContent = netState === "live" ? `Waiting for players in ${lobbyLabel()} · send friends this page's link` : "Connecting to other players…";
   } else waiting.hidden = true;
+  const callable = mode === "online" && state === "play" && (roundsOn() ? round.ph === "wait" : playersOnline() === 0);
+  if ($("#callHud").hidden === callable) $("#callHud").hidden = !callable;
+  if ($("#callPlayers").hidden === (mode === "online")) $("#callPlayers").hidden = mode !== "online";
   if (!alive && state === "play" && !spectating) $("#deathSub").textContent = "Respawning in " + Math.max(1, Math.ceil(respawnAt - t));
   $("#spec").hidden = !spectating;
   if (spectating) {
@@ -4142,6 +4174,7 @@ function startGame(m) {
 }
 $("#playOnline").addEventListener("click", () => {
   if (netState === "offline") { banner("Online play isn't available on this page"); return; }
+  if (needsPremium()) { openPremium("Online play is for Premium members. It's free: turn on notifications and you're in."); return; }
   const who = passwordProfile();
   if (who && authedAs !== who) {
     $("#pwWho").textContent = (who === "doug" ? "Doug (also Duke and Bill)" : who[0].toUpperCase() + who.slice(1)) + " needs the password to play online.";
@@ -4401,7 +4434,7 @@ renderLocker(); applyGunFinish();
 if (acctToken) api("me").catch(() => {});
 
 // One-time update notice; each device sees it until it's dismissed
-const NOTICE = { id: "rp-rules-2", text: "Ranked points changed: +30 RP for each elimination and −20 RP for each death. Winning a round gives +100 RP, or +300 RP when 4 or more players are in it. Also new: 100 more skins and 8 Ultra skins (1 spin in 100); spins take 50 points each to earn." };
+const NOTICE = { id: "premium-1", text: "New: ★ Premium, and it's free. Add Cubefire to your Home Screen and turn on notifications to play online, then tap Call players in a match to tell everyone to join. Ranked points also changed: +30 per elimination, −20 per death, +100 or +300 for a round win." };
 if (load("cfa.notice") !== NOTICE.id) { $("#noticeText").textContent = NOTICE.text; $("#notice").hidden = false; }
 $("#noticeOk").addEventListener("click", () => { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); });
 $("#pwForm").addEventListener("submit", async e => {
@@ -4419,6 +4452,124 @@ $("#pwForm").addEventListener("submit", async e => {
   authedAs = who; $("#pwIn").blur(); $("#pw").hidden = true;                // blur closes the iPad keyboard
   startGame("online");
 });
+// ======================================================================
+// Premium: free for anyone who turns on notifications. Premium players can play online
+// and can call everyone to their map. On iPad, notifications need the game added to the
+// Home Screen first (iPadOS 16.4 or newer), so the Premium screen walks through that.
+// Copies without the game server (claude.ai) don't have Premium; online stays open there.
+// ======================================================================
+const onOwnSite = API === "";
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandalone = () => navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+const canPush = () => onOwnSite && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+let premium = onOwnSite && load("cfa.premium") === "1", pushEndpoint = load("cfa.pushEp") || "", premiumBusy = false, premiumWhy = "";
+const needsPremium = () => onOwnSite && !premium && !passwordProfile();
+function setPremium(on, ep) {
+  premium = !!on; pushEndpoint = on ? ep || pushEndpoint : "";
+  save("cfa.premium", premium ? "1" : ""); save("cfa.pushEp", pushEndpoint); renderPremium();
+}
+const swReady = onOwnSite && "serviceWorker" in navigator ? navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready).catch(() => null) : Promise.resolve(null);
+// On start: still subscribed with notifications allowed? Otherwise Premium is off again.
+(async () => {
+  if (!premium) return;
+  const reg = await swReady;
+  const sub = reg && reg.pushManager ? await reg.pushManager.getSubscription().catch(() => null) : null;
+  if (!sub || Notification.permission !== "granted") { setPremium(false); return; }
+  try { const r = await api("push-check", { endpoint: sub.endpoint }); if (!r.premium) await api("push-sub", { sub: sub.toJSON() }); setPremium(true, sub.endpoint); } catch (e) {}
+})();
+async function becomePremium() {
+  if (premiumBusy) return;
+  premiumBusy = true; premiumWhy = ""; renderPremium();
+  try {
+    const perm = await Notification.requestPermission();           // asked right away, while the tap still counts
+    if (perm !== "granted") throw new Error(perm === "denied" ? "denied" : "Notifications weren't turned on. Tap the button and choose Allow.");
+    const [{ key }, reg] = await Promise.all([api("push-key"), swReady]);
+    if (!reg) throw new Error("Couldn't set up notifications on this device.");
+    const raw = atob(key.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((key.length + 3) % 4));
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: Uint8Array.from(raw, c => c.charCodeAt(0)) });
+    await api("push-sub", { sub: sub.toJSON() });
+    setPremium(true, sub.endpoint);
+    banner("★ You're Premium! Online play is unlocked");
+  } catch (e) { premiumWhy = e.message === "denied" ? "" : e.message || "Something went wrong. Try again."; }
+  premiumBusy = false; renderPremium();
+}
+async function leavePremium() {
+  const reg = await swReady, sub = reg && reg.pushManager ? await reg.pushManager.getSubscription().catch(() => null) : null;
+  try { await api("push-unsub", { endpoint: (sub && sub.endpoint) || pushEndpoint }); } catch (e) {}
+  if (sub) await sub.unsubscribe().catch(() => {});
+  setPremium(false);
+}
+function renderPremium() {
+  $("#openPremium").hidden = !onOwnSite;
+  $("#premiumSub").textContent = premium ? "Active · you get notified when people play" : "Free · turn on notifications to play online";
+  $("#openPremium").classList.toggle("on", premium);
+  $("#onlineSub").textContent = needsPremium() ? "★ Premium · free with notifications" : "Real players only, no bots";
+  if ($("#premium").hidden) return;
+  const box = $("#premiumBody"); box.replaceChildren();
+  const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); for (const k of kids || []) e.append(k); return e; };
+  const steps = list => el("ol", { className: "pm-steps" }, list.map(s => { const li = el("li"); li.innerHTML = s; return li; }));
+  if (premiumWhy) box.append(el("p", { className: "pm-why", textContent: premiumWhy }));
+  if (premium) {
+    box.append(el("p", { className: "pm-ok", textContent: "★ You're Premium" }),
+      el("p", { textContent: "You can play online, and you'll get a notification when someone calls players to a match. In a match, tap Call players to notify everyone." }));
+    const off = el("button", { type: "button", className: "btn", textContent: "Turn off notifications (ends Premium)" });
+    off.addEventListener("click", leavePremium); box.append(el("div", { className: "btns" }, [off]));
+    return;
+  }
+  box.append(el("p", { textContent: "Premium is free. Turn on notifications to unlock online play and to hear when friends start a match." }));
+  if (isIOS && !isStandalone()) {
+    box.append(el("b", { textContent: "First, add Cubefire to your Home Screen" }),
+      steps(["In Safari, tap the <b>Share</b> button <svg class=\"pm-ico\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 15V3M8 7l4-4 4 4M6 11v9h12v-9\"/></svg> (the square with an arrow pointing up) at the top of the screen.",
+        "Scroll down and tap <b>Add to Home Screen</b>, then tap <b>Add</b>.",
+        "Close Safari and open <b>Cubefire</b> from your Home Screen.",
+        "Tap <b>★ Premium</b> again and turn on notifications."]),
+      el("p", { className: "fine", textContent: "Apple only lets games send notifications once they're on the Home Screen. It needs iPadOS 16.4 or newer (Settings › General › Software Update)." }));
+    return;
+  }
+  if (!canPush()) {
+    box.append(el("p", { className: "pm-why", textContent: isIOS ? "This iPad can't do notifications yet. Update to iPadOS 16.4 or newer (Settings › General › Software Update), then open Cubefire from your Home Screen." : "This browser can't do notifications. Try Safari, Chrome, Edge or Firefox." }));
+    return;
+  }
+  if (Notification.permission === "denied") {
+    box.append(el("b", { textContent: "Notifications are blocked for Cubefire" }),
+      steps(isIOS ? ["Open the <b>Settings</b> app.", "Tap <b>Notifications</b>, then <b>Cubefire</b>.", "Turn on <b>Allow Notifications</b>.", "Come back here and tap the button below."]
+        : ["Click the lock or settings icon next to the web address.", "Set <b>Notifications</b> to <b>Allow</b>.", "Reload the page and tap the button below."]));
+  }
+  const go = el("button", { type: "button", className: "btn primary pm-go", textContent: premiumBusy ? "Turning on…" : "Turn on notifications", disabled: premiumBusy });
+  go.addEventListener("click", becomePremium);
+  box.append(el("div", { className: "btns" }, [go]), el("p", { className: "fine", textContent: "When your iPad asks, tap Allow. You'll only get a notification when someone calls players to a match." }));
+}
+function openPremium(why) { premiumWhy = why || ""; $("#premium").hidden = false; renderPremium(); }
+$("#openPremium").addEventListener("click", () => openPremium());
+$("#premiumClose").addEventListener("click", () => { $("#premium").hidden = true; });
+$("#premium").addEventListener("click", e => { if (e.target.id === "premium") $("#premium").hidden = true; });
+// Call players: notify every Premium player to come to this map
+let callBusy = false;
+async function callPlayers() {
+  if (callBusy || mode !== "online" || state !== "play") return;
+  if (!premium) { showPause(true); openPremium("Calling players is a Premium feature."); return; }
+  callBusy = true;
+  try { const r = await api("push-call", { endpoint: pushEndpoint, name: myName, map: mapId, mapName: MAPS[mapId].name, code: partyCode }); banner(r.sent ? `Called players! ${r.sent} notified` : "Called players! Nobody else has Premium yet"); }
+  catch (e) { banner(e.message); }
+  callBusy = false;
+}
+$("#callPlayers").addEventListener("click", () => { callPlayers(); resumeFromPause(); });
+$("#callHud").addEventListener("click", () => { if (!isTouchUI()) callPlayers(); });
+// Opening a "come play" notification: pick that map and party, ready to join
+function applyInvite(q) {
+  const map = String(q.get("map") || ""), code = cleanCode(q.get("code") || ""), from = cleanName(q.get("from") || "") || "Someone";
+  if (state !== "menu") { banner(`${from} is calling players to ${MAPS[map] ? MAPS[map].name : "a match"}`); return; }
+  if (MAPS[map] && map !== mapId) { loadMap(map); save("cfa.map", mapId); renderMapPick(); }
+  codeIn.value = code.toUpperCase(); partyCode = code; save("cfa.code", partyCode);
+  joinLobby(""); renderStatus();
+  banner(`${from} is playing ${MAPS[mapId].name}! Tap Play online to join`);
+}
+{
+  const q = new URLSearchParams(location.search);
+  if (q.get("join")) { applyInvite(q); try { history.replaceState(null, "", location.pathname); } catch (e) {} }
+  if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => { if (e.data && e.data.join) applyInvite(new URLSearchParams(e.data.join)); });
+}
+renderPremium();
 $("#playBots").addEventListener("click", () => startGame("bots"));
 $("#resume").addEventListener("click", () => { initAudio(); requestLock(); if (isTouch || noLock) showPause(false); });
 $("#leave").addEventListener("click", () => leaveMatch());

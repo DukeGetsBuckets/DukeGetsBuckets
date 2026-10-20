@@ -15,13 +15,13 @@
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 22;
+const MIN_BUILD = 23;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
 const MIN_ROUND_PLAYERS = 2;
 // protected profiles: name -> armor color, and which can turn invisible
-const PROTECTED = { doug: { color: 2, invisible: true }, alex: { color: 3, invisible: true } };
+const PROTECTED = { doug: { color: 2, invisible: true, god: true, nuke: true }, alex: { color: 3 } };   // Alex: wall hacks only
 const PROFILE_ALIAS = { duke: "doug", bill: "doug" };   // other names that use a profile
 const profileOf = d => { const raw = String(d.n || "").trim().toLowerCase(), n = PROFILE_ALIAS[raw] || raw, p = PROTECTED[n]; return p && d.c === p.color ? n : null; };
 
@@ -87,7 +87,7 @@ export class Lobby {
     if (!al) { P.down = true; P.dead = false; }                                       // their game shows them dead
     else if (P.down) { P.down = false; P.dead = false; P.hp = 100; P.spawnUntil = now + 1500; }   // respawned
     if (P.dead && now - P.deadAt > 4000) P.dead = false;                              // their game never agreed: forget it
-    P.al = al; P.god = !!a.auth;
+    P.al = al; P.god = !!(a.auth && PROTECTED[a.auth].god);
     if (!P.dead && now - P.lastHitAt > 1000 && typeof d.hp === "number") P.hp = Math.max(0, Math.min(100, d.hp));
     // their shots
     if (!Array.isArray(d.hits)) return;
@@ -179,7 +179,7 @@ export class Lobby {
       return;
     }
     if (!(a.auth && PROTECTED[a.auth].invisible)) delete d.iv; // only verified profiles can be invisible
-    if (!a.auth) {                                               // only verified profiles can nuke
+    if (!(a.auth && PROTECTED[a.auth].nuke)) {                    // only Doug can nuke
       delete d.nk;
       if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => !(h && h.nk)); // grenades (w: 3) still count
     }
@@ -246,6 +246,59 @@ async function hashPw(password, salt) {
   const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations: 5000 }, key, 256);
   return hex(bits);
 }
+// ======================================================================
+// Premium: players who turn on notifications. Web Push (RFC 8030) with VAPID (RFC 8292)
+// and encrypted messages (RFC 8291), all with WebCrypto. The VAPID signing key is the
+// VAPID_PRIVATE secret (a P-256 JWK). Premium players can "call" everyone to their map.
+//   POST /api/push-key    POST /api/push-sub {sub}     POST /api/push-check {endpoint}
+//   POST /api/push-unsub {endpoint}   POST /api/push-call {endpoint, name, map, mapName, code}
+// ======================================================================
+const PUSH_SUBJECT = "https://cubefire-arena.secret321.workers.dev";
+// Only real push services, so the server can't be pointed at any other address
+const PUSH_HOSTS = /(^|\.)push\.apple\.com$|^fcm\.googleapis\.com$|(^|\.)push\.services\.mozilla\.com$|(^|\.)notify\.windows\.com$/;
+const CALL_EACH_MS = 5 * 60000, CALL_ANY_MS = 30000;   // one call per player every 5 min; one per 30 s overall
+const enc = new TextEncoder();
+const b64u = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64u = s => Uint8Array.from(atob(String(s).replace(/-/g, "+").replace(/_/g, "/") + "===".slice((String(s).length + 3) % 4)), c => c.charCodeAt(0));
+const concat = (...parts) => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return out; };
+async function hkdf(salt, ikm, info, len) {
+  const key = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info }, key, len * 8));
+}
+// The message, encrypted for one subscription (aes128gcm, one record)
+async function encryptPush(sub, text) {
+  const uaPublic = unb64u(sub.p256dh), authSecret = unb64u(sub.auth);
+  const local = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const asPublic = new Uint8Array(await crypto.subtle.exportKey("raw", local.publicKey));
+  const uaKey = await crypto.subtle.importKey("raw", uaPublic, { name: "ECDH", namedCurve: "P-256" }, false, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: uaKey }, local.privateKey, 256));
+  const ikm = await hkdf(authSecret, shared, concat(enc.encode("WebPush: info\0"), uaPublic, asPublic), 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, ikm, enc.encode("Content-Encoding: aes128gcm\0"), 16);
+  const nonce = await hkdf(salt, ikm, enc.encode("Content-Encoding: nonce\0"), 12);
+  const aes = await crypto.subtle.importKey("raw", cek, "AES-GCM", false, ["encrypt"]);
+  const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, aes, concat(enc.encode(text), new Uint8Array([2]))));
+  const header = new Uint8Array(21); header.set(salt); new DataView(header.buffer).setUint32(16, 4096); header[20] = asPublic.length;
+  return concat(header, asPublic, sealed);
+}
+function vapidPublic(jwk) { return b64u(concat(new Uint8Array([4]), unb64u(jwk.x), unb64u(jwk.y))); }
+async function vapidAuth(jwk, endpoint) {
+  const key = await crypto.subtle.importKey("jwk", { kty: "EC", crv: "P-256", x: jwk.x, y: jwk.y, d: jwk.d }, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const head = b64u(enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const claims = b64u(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: PUSH_SUBJECT })));
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc.encode(head + "." + claims));
+  return "vapid t=" + head + "." + claims + "." + b64u(sig) + ", k=" + vapidPublic(jwk);
+}
+// Sends one message; resolves to the push service's HTTP status (0 if unreachable)
+async function sendPush(jwk, sub, message) {
+  try {
+    const res = await fetch(sub.endpoint, { method: "POST", body: await encryptPush(sub, JSON.stringify(message)),
+      headers: { Authorization: await vapidAuth(jwk, sub.endpoint), TTL: "1800", Urgency: "high", "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream" } });
+    return res.status;
+  } catch { return 0; }
+}
+const cleanText = (s, n) => String(s || "").replace(/[^\w .'!-]/g, "").trim().slice(0, n);
+
 class UserError extends Error {}
 
 export class Accounts {
@@ -253,6 +306,8 @@ export class Accounts {
     this.ctx = ctx; this.env = env; this.sql = ctx.storage.sql;
     this.sql.exec("CREATE TABLE IF NOT EXISTS users (name TEXT PRIMARY KEY, display TEXT, salt TEXT, hash TEXT, data TEXT, created INTEGER)");
     this.sql.exec("CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, name TEXT, created INTEGER)");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS push (endpoint TEXT PRIMARY KEY, p256dh TEXT, auth TEXT, created INTEGER, lastCall INTEGER)");
+    this.lastCallAt = 0;
     this.fails = new Map(); // name -> { n, until }: slows down password guessing
   }
 
@@ -287,7 +342,52 @@ export class Accounts {
     return u;
   }
 
+  vapid() {
+    try { const j = JSON.parse((this.env && this.env.VAPID_PRIVATE) || ""); if (j && j.d && j.x && j.y) return j; } catch {}
+    throw new UserError("Notifications aren't set up on this server yet");
+  }
+  pushEndpoint(s) {
+    let u; try { u = new URL(String(s || "")); } catch { return null; }
+    const test = this.env && this.env.PUSH_TEST === "1" && u.protocol === "http:" && u.hostname === "127.0.0.1";   // local testing only
+    return (u.protocol === "https:" && PUSH_HOSTS.test(u.hostname)) || test ? u.href : null;
+  }
+  async pushOp(op, body) {
+    const jwk = this.vapid();
+    if (op === "push-key") return { key: vapidPublic(jwk) };
+    const sub = body.sub && typeof body.sub === "object" ? body.sub : {};
+    const endpoint = this.pushEndpoint(op === "push-sub" ? sub.endpoint : body.endpoint);
+    if (!endpoint) throw new UserError("That notification address isn't supported");
+    if (op === "push-sub") {
+      const keys = sub.keys || {}, p256dh = String(keys.p256dh || ""), auth = String(keys.auth || "");
+      let ok = false; try { ok = unb64u(p256dh).length === 65 && unb64u(auth).length === 16; } catch {}
+      if (!ok) throw new UserError("Couldn't turn on notifications. Try again");
+      this.sql.exec("INSERT OR REPLACE INTO push (endpoint, p256dh, auth, created, lastCall) VALUES (?, ?, ?, ?, COALESCE((SELECT lastCall FROM push WHERE endpoint = ?), 0))", endpoint, p256dh, auth, Date.now(), endpoint);
+      return { premium: true };
+    }
+    const me = this.sql.exec("SELECT * FROM push WHERE endpoint = ?", endpoint).toArray()[0];
+    if (op === "push-check") return { premium: !!me };
+    if (op === "push-unsub") { this.sql.exec("DELETE FROM push WHERE endpoint = ?", endpoint); return { premium: false }; }
+    if (op === "push-call") {
+      if (!me) throw new UserError("Turn on notifications to become Premium first");
+      const now = Date.now(), wait = Math.max(me.lastCall + CALL_EACH_MS, this.lastCallAt + CALL_ANY_MS) - now;
+      if (wait > 0) throw new UserError(wait > 60000 ? `You can call players again in ${Math.ceil(wait / 60000)} min` : "Someone just called players. Try again in a moment");
+      this.sql.exec("UPDATE push SET lastCall = ? WHERE endpoint = ?", now, endpoint); this.lastCallAt = now;
+      const name = cleanText(body.name, 16) || "Someone", mapName = cleanText(body.mapName, 24) || "the arena";
+      const q = new URLSearchParams({ join: "1", map: cleanText(body.map, 16).replace(/[^a-z]/g, ""), code: cleanText(body.code, 12).replace(/[^\w-]/g, ""), from: name });
+      const message = { title: "Cubefire Arena", body: `${name} is playing ${mapName}${body.code ? " (party " + cleanText(body.code, 12).toUpperCase() + ")" : ""}. Tap to join!`, url: "/?" + q };
+      const subs = this.sql.exec("SELECT * FROM push WHERE endpoint != ?", endpoint).toArray();
+      let sent = 0;
+      for (let i = 0; i < subs.length; i += 20) {
+        const res = await Promise.all(subs.slice(i, i + 20).map(s => sendPush(jwk, s, message)));
+        res.forEach((st, k) => { if (st >= 200 && st < 300) sent++; else if (st === 404 || st === 410) this.sql.exec("DELETE FROM push WHERE endpoint = ?", subs[i + k].endpoint); });
+      }
+      return { sent };
+    }
+    throw new UserError("Unknown request");
+  }
+
   async handle(op, body) {
+    if (op.startsWith("push-")) return this.pushOp(op, body);
     if (op === "signup" || op === "login") {
       const display = String(body.name || "").trim().replace(/\s+/g, " ");
       const password = String(body.password || "");
