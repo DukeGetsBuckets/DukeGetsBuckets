@@ -15,7 +15,7 @@
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 19;
+const MIN_BUILD = 20;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -220,16 +220,21 @@ export class Lobby {
 // ======================================================================
 // Must match SKIN_DEFS in the game page.
 const SKINS = {
-  common: ["camo", "desert", "arctic", "nightops", "hivis", "cherry", "ocean", "grape", "forest", "sky", "lime", "bubblegum", "midnight", "sandstone", "tiger", "zebra"],
-  rare: ["ninja", "knight", "astro", "robot", "pirate", "cowboy", "firefighter", "police", "doctor", "chef", "viking", "samurai", "alien", "zombie"],
-  super: ["golden", "lava", "galaxy", "diamond", "rainbow", "iceking", "neon", "shadow", "toxic", "phoenix"],
+  common: ["camo", "desert", "arctic", "nightops", "hivis", "cherry", "ocean", "grape", "forest", "sky", "lime", "bubblegum", "midnight", "sandstone", "tiger", "zebra",
+    "olive", "slate", "rust", "mint", "coral", "navy", "plum", "mustard", "teal", "brick", "charcoal", "peach", "lavender", "khaki", "steel", "cocoa", "denim", "salmon", "pine", "sunny", "storm", "berry", "ash", "sage", "tangerine", "icecube", "wine", "beach", "urban", "snowcamo", "bluecamo", "pinkcamo", "redcamo", "jogger", "referee", "jailbird", "candycane", "bee", "ladybug", "watermelon", "banana", "grassy", "cloudy", "mud", "sunset", "copper"],
+  rare: ["ninja", "knight", "astro", "robot", "pirate", "cowboy", "firefighter", "police", "doctor", "chef", "viking", "samurai", "alien", "zombie",
+    "tuxedo", "scientist", "pilot", "diver", "miner", "kitty", "fox", "panda", "bunny", "grizzly", "froggy", "shark", "dino", "clown", "mummy", "skeleton", "pumpkin", "snowman", "santa", "wizard", "paladin", "spartan", "gladiator", "pharaoh", "jester", "racer", "goalie", "lifeguard", "punk", "hacker", "agent", "bandit"],
+  super: ["golden", "lava", "galaxy", "diamond", "rainbow", "iceking", "neon", "shadow", "toxic", "phoenix",
+    "plasma", "emerald", "ruby", "sapphire", "amethyst", "obsidian", "stormcaller", "aurora", "vampire", "reaper", "angel", "demon", "cyborg", "mecha", "kraken", "magma", "frostbyte", "venom", "nebula", "chrome", "shogun", "wildfire"],
+  ultra: ["voidemperor", "solarflare", "glitch", "jadedragon", "seraph", "infernodemon", "hologram", "thundergod"],
 };
-const ALL_SKINS = [...SKINS.common, ...SKINS.rare, ...SKINS.super];   // the wheel's skins
+const ALL_SKINS = [...SKINS.common, ...SKINS.rare, ...SKINS.super, ...SKINS.ultra];   // the wheel's skins
 // Rank rewards: owned automatically once the account's rank points reach the number
 const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200], ["diamondwarden", 1800], ["masterphantom", 2500], ["champion", 3500], ["mythic", 8000], ["legend", 15000]];
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
-const ODDS = [["super", 0.05], ["rare", 0.25], ["common", 0.7]];
-const START_TICKETS = 3, PTS_PER_TICKET = 10;
+const ODDS = [["ultra", 0.01], ["super", 0.04], ["rare", 0.25], ["common", 0.7]];
+// Spins are hard to earn: 50 points each (online elimination 2, bot one 1, round win 20)
+const START_TICKETS = 1, PTS_PER_TICKET = 50, PTS_PER_WIN = 20;
 // Accounts that own every skin and spin for free; each opens only with its Worker secret
 const OWNER_ACCOUNTS = { doug: "DOUG_PASSWORD", alex: "ALEX_PASSWORD" };
 // Perks that come with particular accounts (none right now)
@@ -339,8 +344,8 @@ export class Accounts {
     if (op === "progress") {
       const pts = Math.max(0, Math.min(100, Math.floor(Number(body.pts) || 0)));
       const wins = Math.max(0, Math.min(3, Math.floor(Number(body.wins) || 0)));
-      d.bank = (d.bank || 0) + pts;
-      d.tickets = (d.tickets || 0) + Math.floor(d.bank / PTS_PER_TICKET) + wins;
+      d.bank = (d.bank || 0) + pts + wins * PTS_PER_WIN;
+      d.tickets = (d.tickets || 0) + Math.floor(d.bank / PTS_PER_TICKET);
       d.bank %= PTS_PER_TICKET;
       if (body.rank != null) d.rank = Math.max(0, Math.min(99999, Math.floor(Number(body.rank) || 0)));
       d.best = Math.max(d.best || 0, d.rank || 0);                    // rank skins stay yours for good
@@ -361,10 +366,11 @@ export class Accounts {
       const owned = new Set(d.owned || []);
       if (ALL_SKINS.every(s => owned.has(s))) throw new UserError("You already have every skin!");
       if ((d.tickets || 0) < 1) throw new UserError("No spins left. Get eliminations, win rounds, or come back tomorrow");
-      // roll a rarity, then a skin of that rarity you don't have (or the nearest rarity that has one)
+      // roll a rarity, then a skin of that rarity you don't have (or the nearest rarity that has one;
+      // ultras only come from an ultra roll, unless they're all that's left)
       let r = Math.random(), rarity = "common";
       for (const [k, p] of ODDS) { if (r < p) { rarity = k; break; } r -= p; }
-      const order = rarity === "super" ? ["super", "rare", "common"] : rarity === "rare" ? ["rare", "super", "common"] : ["common", "rare", "super"];
+      const order = { ultra: ["ultra", "super", "rare", "common"], super: ["super", "rare", "common", "ultra"], rare: ["rare", "common", "super", "ultra"], common: ["common", "rare", "super", "ultra"] }[rarity];
       let skin = null;
       for (const k of order) {
         const left = SKINS[k].filter(s => !owned.has(s));

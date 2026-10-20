@@ -264,7 +264,7 @@ body.pig #pigTint{display:block}
 .wheelwrap canvas{width:240px;height:240px;display:block}
 .wheelwrap::after{content:"";position:absolute;left:50%;top:-6px;transform:translateX(-50%);border:12px solid transparent;border-top:20px solid var(--ink);filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))}
 .odds{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;font-weight:700}
-.r0{color:#b7c3cf}.r1{color:#4fb0ff}.r2{color:#d17bff}.r3{color:#ffc93c}
+.r0{color:#b7c3cf}.r1{color:#4fb0ff}.r2{color:#d17bff}.r3{color:#ffc93c}.r4{color:#ff4f8b;text-shadow:0 0 8px rgba(255,79,139,.6)}
 .prize{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;align-items:center;border:1px solid var(--accent);border-radius:6px;padding:8px 10px;background:rgba(255,182,39,.08)}
 .prize img{width:72px;height:90px;object-fit:contain}
 .prize b{font:400 18px var(--display);display:block}
@@ -434,6 +434,7 @@ body.pig #pigTint{display:block}
     </div>
     <div class="field" id="dougField" hidden>
       <span class="lbl-sm"><span id="hackWho">Doug's hacks</span> <em>pick before the round</em></span>
+      <p class="fine" id="hackHint" hidden></p>
       <div class="classes" id="hackPick"></div>
       <div class="btns" id="dougActions" hidden><button class="btn" type="button" id="dkNukeP">Nuke</button><button class="btn" type="button" id="dkTpP">Teleport to…</button></div>
       <div class="classes" id="tpPick" hidden></div>
@@ -503,7 +504,7 @@ body.pig #pigTint{display:block}
           <div class="lk-row"><button class="btn primary" type="button" id="spinBtn">Spin · 1 ticket</button><button class="btn" type="button" id="dailyBtn">Free daily spin</button></div>
           <div id="prize"></div>
           <div class="odds"><span class="r0">Common 70%</span><span class="r1">Rare 25%</span><span class="r2">Super rare 5%</span></div>
-          <p class="fine">Earn tickets: one for every 10 points of eliminations (online eliminations are worth 2, bot ones 1), one for each round you win, and one free spin a day. The wheel always gives you a skin you don't have yet.</p>
+          <p class="fine">Earn tickets: one for every 50 points (online eliminations are worth 2, bot ones 1, a round win 20), plus one free spin a day. Ultra skins land 1 spin in 100. The wheel always gives you a skin you don't have yet.</p>
         </div>
       </div>
       <div class="lk-col lk-box">
@@ -1570,10 +1571,10 @@ const tagKey = (name, pts) => name + "|" + (pts == null ? "" : rankOf(pts).label
 // Custom skins by player name (everyone sees them)
 const SKINS = { mason: "pig" };
 const skinFor = (name, color) => color === 6 ? "default" : SKINS[String(name || "").toLowerCase()] || "default"; // white armor = no pig
-// Skins from the skin wheel. rarity: 0 common, 1 rare, 2 super rare. Colors for each
+// Skins from the skin wheel. rarity: 0 common, 1 rare, 2 super rare, 4 ultra (1%). Colors for each
 // part of the body; glow: emissive color (super rares glow); gun: tint for your own gun;
 // extra(add, head, body) adds details; anim(av, t) animates the skin for everyone.
-const RARITY = [{ name: "Common", color: "#b7c3cf" }, { name: "Rare", color: "#4fb0ff" }, { name: "Super rare", color: "#d17bff" }, { name: "Rank reward", color: "#ffc93c" }];
+const RARITY = [{ name: "Common", color: "#b7c3cf" }, { name: "Rare", color: "#4fb0ff" }, { name: "Super rare", color: "#d17bff" }, { name: "Rank reward", color: "#ffc93c" }, { name: "Ultra 1%", color: "#ff4f8b" }];
 const SKIN_DEFS = {
   camo: { name: "Jungle Camo", rarity: 0, legs: 0x3b4526, body: 0x56683a, helmet: 0x4a5a30,
     extra(add) { for (const [x, y, w, h, c] of [[-0.16, 1.18, 0.16, 0.12, 0x2f3b20], [0.12, 0.96, 0.2, 0.1, 0x6f7f45], [0.15, 1.24, 0.12, 0.1, 0x2f3b20], [-0.1, 0.9, 0.14, 0.08, 0x6f7f45]]) add(w, h, 0.02, c, x, y, -0.18); } },
@@ -1685,8 +1686,179 @@ const SKIN_DEFS = {
     },
     anim(av, t) { const k = 0.6 + 0.4 * Math.sin(t * 2); for (const m of av.pulse) m.emissiveIntensity = k; } },
 };
+// ---- More skins, built from shared parts. Each row: [id, name, rarity, body, legs, helmet,
+// "parts+parts", accent, accent2, {other colors, aura, anim}]. Super rares and ultras glow.
+const PART = {
+  stripe: (add, h, a, b, o) => add(0.1, 0.62, 0.36, a, 0, 1.06, 0, null, o),
+  twin: (add, h, a, b, o) => { for (const x of [-0.14, 0.14]) add(0.06, 0.62, 0.36, a, x, 1.06, 0, null, o); },
+  bands: (add, h, a, b, o) => { for (const y of [0.98, 1.2]) add(0.64, 0.06, 0.36, a, 0, y, 0, null, o); },
+  hstripes: (add, h, a, b, o) => { for (const y of [0.84, 0.98, 1.12, 1.26]) add(0.64, 0.05, 0.36, a, 0, y, 0, null, o); },
+  vstripes: (add, h, a, b, o) => { for (const x of [-0.2, -0.07, 0.07, 0.2]) add(0.05, 0.62, 0.36, a, x, 1.06, 0, null, o); },
+  chevron: (add, h, a, b, o) => { add(0.26, 0.05, 0.02, a, -0.1, 1.14, -0.18, null, o).rotation.z = -0.5; add(0.26, 0.05, 0.02, a, 0.1, 1.14, -0.18, null, o).rotation.z = 0.5; },
+  dots: (add, h, a, b, o) => { for (const [x, y] of [[-0.16, 1.2], [0.14, 1.1], [-0.06, 0.96], [0.18, 0.88], [-0.2, 0.86]]) add(0.08, 0.08, 0.02, a, x, y, -0.18, null, o); },
+  pads: (add, h, a, b, o) => { for (const x of [-0.34, 0.34]) add(0.22, 0.09, 0.4, a, x, 1.35, 0, null, o); },
+  cape: (add, h, a, b, o) => add(0.56, 0.82, 0.05, a, 0, 0.96, 0.21, null, o),
+  horns: (add, h, a, b, o) => { add(0.07, 0.22, 0.07, a, -0.19, 0.58, 0, h, o).rotation.z = 0.4; add(0.07, 0.22, 0.07, a, 0.19, 0.58, 0, h, o).rotation.z = -0.4; },
+  crest: (add, h, a, b, o) => add(0.08, 0.16, 0.44, a, 0, 0.55, 0, h, o),
+  crown: (add, h, a, b, o) => { for (const x of [-0.18, -0.06, 0.06, 0.18]) add(0.07, 0.12, 0.07, a, x, 0.56, -0.18, h, o); add(0.5, 0.06, 0.5, a, 0, 0.5, 0, h, o); },
+  ears: (add, h, a, b, o) => { for (const x of [-0.15, 0.15]) add(0.12, 0.14, 0.08, a, x, 0.55, 0, h, o); },
+  bunny: (add, h, a, b, o) => { for (const x of [-0.1, 0.1]) { add(0.08, 0.3, 0.06, a, x, 0.64, 0, h, o); add(0.04, 0.22, 0.02, b, x, 0.64, -0.035, h); } },
+  goggles: (add, h, a, b, o) => { add(0.5, 0.06, 0.5, 0x2a2f37, 0, 0.4, 0, h); for (const x of [-0.1, 0.1]) add(0.12, 0.09, 0.03, a, x, 0.4, -0.255, h, o); },
+  scarf: (add, h, a, b, o) => { add(0.5, 0.1, 0.5, a, 0, 0.02, 0, h, o); add(0.12, 0.3, 0.05, a, 0.12, 1.2, 0.2, null, o); },
+  pack: (add, h, a, b, o) => add(0.44, 0.48, 0.18, a, 0, 1.06, 0.25, null, o),
+  antenna: (add, h, a) => { add(0.03, 0.22, 0.03, 0x5d646d, 0.12, 0.6, 0, h); add(0.07, 0.07, 0.07, a, 0.12, 0.73, 0, h, { glow: a }); },
+  mask: (add, h, a, b, o) => add(0.48, 0.16, 0.04, a, 0, 0.1, -0.235, h, o),
+  star: (add, h, a, b, o) => { add(0.14, 0.14, 0.02, a, 0.14, 1.18, -0.18, null, o).rotation.z = 0.785; },
+  split: (add, h, a, b, o) => add(0.32, 0.63, 0.36, a, 0.16, 1.06, 0, null, o),
+  knee: (add, h, a, b, o) => { for (const x of [-0.14, 0.14]) add(0.26, 0.12, 0.06, a, x, 0.45, -0.15, null, o); },
+  cross: (add, h, a, b, o) => { add(0.16, 0.05, 0.02, a, 0, 1.12, -0.18, null, o); add(0.05, 0.16, 0.02, a, 0, 1.12, -0.18, null, o); },
+  hood: (add, h, a, b, o) => { add(0.52, 0.36, 0.3, a, 0, 0.3, 0.1, h, o); add(0.52, 0.06, 0.52, a, 0, 0.49, 0, h, o); },
+  visor2: (add, h, a) => add(0.48, 0.08, 0.03, a, 0, 0.27, -0.245, h, { glow: a }),
+  spikes: (add, h, a, b, o) => { for (let k = 0; k < 3; k++) add(0.09, 0.09, 0.12, a, 0, 0.9 + k * 0.18, 0.22, null, o).rotation.z = 0.785; },
+  wings: (add, h, a, b, o) => { for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) add(0.3 - k * 0.07, 0.09, 0.04, k % 2 ? b : a, sx * (0.3 + k * 0.1), 1.28 - k * 0.14, 0.22, null, o); },
+  tie: (add, h, a, b, o) => { add(0.07, 0.32, 0.02, a, 0, 1.12, -0.18, null, o); add(0.14, 0.06, 0.02, a, 0, 1.3, -0.18, null, o); },
+  tux: (add, h, a, b, o) => { add(0.2, 0.62, 0.02, 0xf4f4f4, 0, 1.06, -0.18); add(0.16, 0.06, 0.03, a, 0, 1.32, -0.19, null, o); },
+  camo: (add, h, a, b, o) => { const r = rng32(a & 0xffff); for (let i = 0; i < 8; i++) add(0.1 + r() * 0.12, 0.06 + r() * 0.08, 0.02, i % 2 ? a : b, (r() - .5) * 0.46, 0.82 + r() * 0.5, i < 5 ? -0.18 : 0.18, null, o); },
+  checker: (add, h, a, b, o) => { for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) add(0.12, 0.12, 0.02, (i + j) % 2 ? a : b, -0.15 + i * 0.15, 0.94 + j * 0.15, -0.18, null, o); },
+  halo: (add, h, a) => { for (const z of [-0.15, 0.15]) add(0.36, 0.04, 0.06, a, 0, 0.68, z, h, { glow: a }); for (const x of [-0.15, 0.15]) add(0.06, 0.04, 0.36, a, x, 0.68, 0, h, { glow: a }); },
+  lamp: (add, h, a) => add(0.12, 0.1, 0.06, a, 0, 0.42, -0.27, h, { glow: a }),
+  nose: (add, h, a, b, o) => add(0.1, 0.1, 0.06, a, 0, 0.2, -0.26, h, o),
+  fangs: (add, h) => { for (const x of [-0.06, 0.06]) add(0.04, 0.06, 0.02, 0xffffff, x, 0.1, -0.245, h); },
+  tophat: (add, h, a) => { add(0.6, 0.04, 0.6, 0x15161a, 0, 0.5, 0, h); add(0.38, 0.3, 0.38, 0x15161a, 0, 0.67, 0, h); add(0.39, 0.06, 0.39, a, 0, 0.56, 0, h); },
+  santa: (add, h, a) => { add(0.52, 0.08, 0.52, 0xffffff, 0, 0.48, 0, h); add(0.34, 0.16, 0.34, a, 0, 0.6, 0.04, h); add(0.12, 0.12, 0.12, 0xffffff, 0, 0.66, 0.22, h); },
+  wizhat: (add, h, a, b) => { add(0.62, 0.04, 0.62, a, 0, 0.5, 0, h); add(0.4, 0.16, 0.4, a, 0, 0.6, 0, h); add(0.28, 0.16, 0.28, a, 0, 0.76, 0, h); add(0.16, 0.14, 0.16, a, 0, 0.9, 0, h); add(0.05, 0.05, 0.02, b, 0.08, 0.62, -0.205, h, { glow: b }); },
+  fin: (add, h, a, b, o) => add(0.06, 0.3, 0.26, a, 0, 0.6, 0.05, h, o),
+  frog: (add, h) => { for (const x of [-0.13, 0.13]) { add(0.14, 0.12, 0.14, 0xffffff, x, 0.52, -0.1, h); add(0.06, 0.06, 0.02, 0x15161a, x, 0.52, -0.18, h); } },
+  pumpkin: (add, h, a) => { add(0.06, 0.14, 0.06, 0x3a6a1a, 0, 0.55, 0, h); for (const x of [-0.1, 0.1]) add(0.08, 0.08, 0.02, a, x, 0.3, -0.235, h, { glow: a }); add(0.26, 0.05, 0.02, a, 0, 0.14, -0.235, h, { glow: a }); },
+  ribs: (add, h, a, b, o) => { for (const y of [0.92, 1.04, 1.16]) add(0.36, 0.04, 0.02, a, 0, y, -0.18, null, o); add(0.05, 0.5, 0.02, a, 0, 1.06, -0.18, null, o); },
+  nemes: (add, h, a, b, o) => { for (const x of [-0.26, 0.26]) add(0.06, 0.4, 0.48, a, x, 0.2, 0, h, o); add(0.5, 0.06, 0.5, a, 0, 0.4, 0, h, o); },
+  bolt: (add, h, a, b, o) => { add(0.06, 0.18, 0.02, a, 0.04, 1.2, -0.18, null, o).rotation.z = 0.4; add(0.14, 0.04, 0.02, a, 0, 1.1, -0.18, null, o); add(0.06, 0.18, 0.02, a, -0.04, 0.98, -0.18, null, o).rotation.z = 0.4; },
+  stars: (add, h, a) => { const r = rng32(7); for (let i = 0; i < 10; i++) add(0.03, 0.03, 0.02, a, (r() - .5) * 0.56, 0.78 + r() * 0.56, -0.18, null, { glow: a }); },
+};
+const MORE_SKINS = [
+  // common
+  ["olive", "Olive Drab", 0, 0x6b7040, 0x3f4226, 0x5a5f36, "pads", 0x4a4d2c],
+  ["slate", "Slate", 0, 0x5a6470, 0x2f353d, 0x6a7480, "bands", 0x3a414a],
+  ["rust", "Rust Bucket", 0, 0x9a4a22, 0x4a2614, 0x7a3a1a, "dots", 0xc8763a],
+  ["mint", "Mint", 0, 0x7fe0b8, 0x2a5a48, 0xa8f0d2, "stripe", 0xffffff],
+  ["coral", "Coral Reef", 0, 0xff7a6a, 0x6a2a2a, 0xffa090, "bands", 0xffd0a0],
+  ["navy", "Navy", 0, 0x1f3366, 0x111c3a, 0x26407a, "stripe", 0xf4f7fa],
+  ["plum", "Plum", 0, 0x6a2a5a, 0x341430, 0x7f3a6e, "chevron", 0xd890c8],
+  ["mustard", "Mustard", 0, 0xd8a82a, 0x4a3a14, 0xe8bf4a, "pads", 0x6a5014],
+  ["teal", "Teal Team", 0, 0x1f8a8a, 0x0f3a3a, 0x2aa8a8, "twin", 0xe8fffb],
+  ["brick", "Brick", 0, 0xa8452e, 0x3a1a12, 0x8a3622, "bands", 0xd9b27a],
+  ["charcoal", "Charcoal", 0, 0x33373d, 0x1d2024, 0x40454c, "chevron", 0xffb627, null, { visor: 0xffb627 }],
+  ["peach", "Peach", 0, 0xffb08a, 0x7a4a3a, 0xffc8a8, "dots", 0xffffff],
+  ["lavender", "Lavender", 0, 0xb7a0e8, 0x4a3a6a, 0xcbb8f4, "stripe", 0x7a5ac0],
+  ["khaki", "Khaki Scout", 0, 0xbfae7a, 0x6a5f40, 0xa89a68, "pack", 0x6a5f40],
+  ["steel", "Steel", 0, 0x8a96a2, 0x4a525a, 0xa2adb8, "pads", 0x5d646d],
+  ["cocoa", "Cocoa", 0, 0x6a4228, 0x3a2414, 0x7a5030, "bands", 0xd9b27a],
+  ["denim", "Denim", 0, 0x3a5a8a, 0x24385a, 0x4a6a9a, "knee", 0x8fb0d8],
+  ["salmon", "Salmon", 0, 0xff8f7a, 0x5a2f2a, 0xffa898, "twin", 0xffffff],
+  ["pine", "Pine", 0, 0x1f4a2e, 0x13301d, 0x2a5f3a, "chevron", 0x8fd08a],
+  ["sunny", "Sunny", 0, 0xffd23a, 0x5a4a14, 0xffe27a, "stripe", 0xff8a1f],
+  ["storm", "Storm Grey", 0, 0x4a5260, 0x2a2f37, 0x5a6372, "bands", 0x6fc3ff, null, { visor: 0x6fc3ff }],
+  ["berry", "Berry", 0, 0xb8245a, 0x4a0f26, 0xd8366e, "dots", 0xff9fc0],
+  ["ash", "Ash", 0, 0xb8b8b8, 0x5a5a5a, 0xcfcfcf, "split", 0x6a6a6a],
+  ["sage", "Sage", 0, 0x8fa88a, 0x4a5a46, 0xa8c0a2, "pads", 0x5a6a56],
+  ["tangerine", "Tangerine", 0, 0xff8a2a, 0x5a2a0a, 0xffa04a, "bands", 0xffffff],
+  ["icecube", "Ice Cube", 0, 0xcff0ff, 0x7aa8c8, 0xe6f8ff, "twin", 0x7fc8ff, null, { visor: 0x2a6aa8 }],
+  ["wine", "Wine", 0, 0x6a1424, 0x2a0810, 0x7f1a2e, "stripe", 0xd8b25a],
+  ["beach", "Beach Bum", 0, 0xf0d8a0, 0x3a8ab8, 0xff6a5a, "dots", 0xff6a5a],
+  ["urban", "Urban Camo", 0, 0x7a7f86, 0x3f4349, 0x6a6f76, "camo", 0x4a4f56, 0xa8adb4],
+  ["snowcamo", "Snow Camo", 0, 0xe6ebef, 0x9aa4ae, 0xf4f7fa, "camo", 0xb8c2cc, 0x8a949e],
+  ["bluecamo", "Blue Camo", 0, 0x3a5a8a, 0x1f2f4a, 0x2f4a74, "camo", 0x6a8ac0, 0x1f3360],
+  ["pinkcamo", "Pink Camo", 0, 0xff9fc8, 0x7a3a5a, 0xffb8d6, "camo", 0xd85a98, 0xffd6e8],
+  ["redcamo", "Red Camo", 0, 0x9a2a2a, 0x3a1010, 0x7a2020, "camo", 0xc84a3a, 0x4a1414],
+  ["jogger", "Jogger", 0, 0x3a8ae0, 0x2a2f37, 0x2a2f37, "twin", 0xffffff],
+  ["referee", "Referee", 0, 0xf4f4f4, 0x15161a, 0x15161a, "vstripes", 0x15161a],
+  ["jailbird", "Jailbird", 0, 0xf4f4f4, 0xf4f4f4, 0xf4f4f4, "hstripes", 0x15161a],
+  ["candycane", "Candy Cane", 0, 0xf4f4f4, 0xd8323c, 0xd8323c, "hstripes", 0xd8323c],
+  ["bee", "Bumblebee", 0, 0xffd21f, 0x15161a, 0x15161a, "hstripes+antenna", 0x15161a],
+  ["ladybug", "Ladybug", 0, 0xd8242c, 0x15161a, 0x15161a, "dots", 0x15161a],
+  ["watermelon", "Watermelon", 0, 0xff4f5e, 0x2a7a2a, 0x3aa83a, "dots", 0x15161a],
+  ["banana", "Banana", 0, 0xffe14a, 0x8a7a1a, 0xfff08a, "stripe", 0x8a6a14],
+  ["grassy", "Grassy", 0, 0x5fbf3a, 0x3a5a1a, 0x7fd85a, "crest", 0x3a8a1a],
+  ["cloudy", "Cloudy", 0, 0xf4f7fa, 0x9fd9ff, 0xffffff, "dots", 0x9fd9ff, null, { visor: 0x6fc3ff }],
+  ["mud", "Mud Runner", 0, 0x6a4a2a, 0x3a2814, 0x5a3c20, "camo", 0x8a6a42, 0x3a2814],
+  ["sunset", "Sunset", 0, 0xff7a3a, 0x5a1a4a, 0xffb03a, "bands", 0xd83a7a],
+  ["copper", "Copper", 0, 0xb8703a, 0x5a3418, 0xc8804a, "chevron", 0xf0b080],
+  // rare
+  ["tuxedo", "Tuxedo", 1, 0x15161a, 0x15161a, 0x15161a, "tux", 0xd8323c],
+  ["scientist", "Mad Scientist", 1, 0xf4f7fa, 0x3a3f4a, 0x9aa3ad, "goggles+tie", 0x7fe07a],
+  ["pilot", "Ace Pilot", 1, 0x6a5030, 0x3a3020, 0x5a4028, "goggles+scarf", 0xf4ecd8],
+  ["diver", "Scuba Diver", 1, 0x15161a, 0x15161a, 0xffd21f, "pack+goggles", 0xffd21f, null, { visor: 0x9fd6ff }],
+  ["miner", "Miner", 1, 0x5a4a3a, 0x2a2f37, 0xffd21f, "lamp+bands", 0xfff3a0],
+  ["kitty", "Kitty", 1, 0xf0a050, 0xc07a30, 0xf0a050, "ears+stripe", 0xc07a30, null, { head: 0xf6c08a }],
+  ["fox", "Fox", 1, 0xe8742a, 0x3a2414, 0xe8742a, "ears+scarf", 0xf4ecd8, null, { head: 0xf4ecd8 }],
+  ["panda", "Panda", 1, 0xf4f4f4, 0x15161a, 0xf4f4f4, "ears", 0x15161a, null, { arms: 0x15161a, head: 0xf4f4f4, visor: 0x15161a }],
+  ["bunny", "Bunny", 1, 0xf4e8f0, 0xd8b8c8, 0xf4e8f0, "bunny", 0xf4e8f0, 0xffb8d0, { head: 0xf4e8f0 }],
+  ["grizzly", "Grizzly", 1, 0x6a4428, 0x4a2e18, 0x6a4428, "ears", 0x4a2e18, null, { head: 0x8a5a38 }],
+  ["froggy", "Froggy", 1, 0x5fbf3a, 0x3a7a1a, 0x5fbf3a, "frog", 0x5fbf3a, null, { head: 0x5fbf3a, visor: 0x2a5a1a }],
+  ["shark", "Shark", 1, 0x6a8aa8, 0x3a4a5a, 0x6a8aa8, "fin+fangs", 0x6a8aa8, null, { head: 0x8aa8c0 }],
+  ["dino", "Dino", 1, 0x4aa83a, 0x2a6a1a, 0x4aa83a, "spikes", 0xffd21f, null, { head: 0x4aa83a }],
+  ["clown", "Clown", 1, 0xffd21f, 0x3a6ae0, 0xff5df0, "dots+nose", 0xd8242c, null, { head: 0xffffff }],
+  ["mummy", "Mummy", 1, 0xe8dcc0, 0xd8ccb0, 0xe8dcc0, "hstripes", 0xc8bca0, null, { head: 0xe8dcc0, arms: 0xe8dcc0, visor: 0x15161a }],
+  ["skeleton", "Skeleton", 1, 0x15161a, 0x15161a, 0xf4f4f4, "ribs", 0xf4f4f4, null, { head: 0xf4f4f4, visor: 0x15161a }],
+  ["pumpkin", "Pumpkin Head", 1, 0x2a2f37, 0x15161a, 0xff8a1f, "pumpkin", 0xffd23a, null, { head: 0xff8a1f, visor: 0xff8a1f }],
+  ["snowman", "Snowman", 1, 0xf4f7fa, 0xf4f7fa, 0xffffff, "tophat+scarf", 0xd8323c, null, { head: 0xffffff, visor: 0x15161a }],
+  ["santa", "Santa", 1, 0xd8242c, 0x15161a, 0xd8242c, "santa+bands", 0xd8242c, null, { visor: 0x15161a }],
+  ["wizard", "Wizard", 1, 0x3a2a8a, 0x2a1a5a, 0x3a2a8a, "wizhat+stars", 0x3a2a8a, 0xffd21f],
+  ["paladin", "Paladin", 1, 0xe8e8f0, 0x9aa4ae, 0xe8e8f0, "cross+pads", 0xffd76a],
+  ["spartan", "Spartan", 1, 0xa8282e, 0x6a4a2a, 0xc8a03a, "crest+cape", 0xd8242c],
+  ["gladiator", "Gladiator", 1, 0x9a7a52, 0x6a4a2a, 0x8a939c, "pads+bands", 0x8a939c],
+  ["pharaoh", "Pharaoh", 1, 0xf4ecd8, 0xd8b25a, 0x1f3a8a, "nemes", 0xd8b25a],
+  ["jester", "Jester", 1, 0x7a3ab8, 0xffd21f, 0x7a3ab8, "split+horns", 0xffd21f],
+  ["racer", "Race Driver", 1, 0xf4f4f4, 0x15161a, 0xd8242c, "twin+star", 0xd8242c],
+  ["goalie", "Goalie", 1, 0xd8242c, 0x15161a, 0xf4f4f4, "mask+bands", 0xf4f4f4],
+  ["lifeguard", "Lifeguard", 1, 0xd8242c, 0xffd21f, 0xd8242c, "cross", 0xffffff],
+  ["punk", "Punk", 1, 0x15161a, 0x2a3a5a, 0x15161a, "crest+spikes", 0xff2bd6],
+  ["hacker", "Hacker", 1, 0x15161a, 0x15161a, 0x15161a, "hood+visor2", 0x3cff7a],
+  ["agent", "Secret Agent", 1, 0x15161a, 0x15161a, 0x15161a, "tux", 0x15161a, null, { visor: 0x0a0a0a }],
+  ["bandit", "Bandit", 1, 0x6a4a2a, 0x2a2f37, 0x15161a, "mask", 0xd8323c],
+  // super rare
+  ["plasma", "Plasma", 2, 0x1a0a3a, 0x0a0518, 0x2a0f5a, "twin+visor2", 0xff2bd6],
+  ["emerald", "Emerald", 2, 0x0f6a3a, 0x063a1f, 0x0f8a4a, "crown+pads", 0x3fff9a],
+  ["ruby", "Ruby", 2, 0x8a0f1f, 0x40050c, 0xa8142a, "crown+chevron", 0xff4f6a],
+  ["sapphire", "Sapphire", 2, 0x0f2a8a, 0x061444, 0x1438a8, "pads+star", 0x4fa8ff],
+  ["amethyst", "Amethyst", 2, 0x5a1f8a, 0x2a0a44, 0x6a2aa8, "crown+vstripes", 0xd08aff],
+  ["obsidian", "Obsidian", 2, 0x0a0a0f, 0x050508, 0x14141c, "dots+visor2", 0x2bf3ff],
+  ["stormcaller", "Storm Caller", 2, 0x1f2a4a, 0x0f1428, 0x2a3a6a, "bolt+pads", 0xffe14a],
+  ["aurora", "Aurora", 2, 0x1fa880, 0x0a3a3a, 0x2ad0a0, "bands+halo", 0x9fffe0, null, { anim(av, t) { av.bodyMat.color.setHSL(0.42 + 0.1 * Math.sin(t * 0.9), 0.75, 0.45); av.helmetMat.color.setHSL(0.5 + 0.1 * Math.sin(t * 0.9 + 1), 0.75, 0.55); } }],
+  ["vampire", "Vampire", 2, 0x15161a, 0x0a0a0f, 0x15161a, "cape+fangs", 0xb8202a, null, { head: 0xe6e0ea }],
+  ["reaper", "Grim Reaper", 2, 0x0a0a0f, 0x050508, 0x0a0a0f, "hood+cape", 0x1a1a24, null, { head: 0x0a0a0f, visor: 0xff3030, visorGlow: 0xff3030 }],
+  ["angel", "Angel", 2, 0xffffff, 0xe8e8f0, 0xffffff, "halo+wings", 0xffe680, 0xffffff],
+  ["demon", "Demon", 2, 0x5a0a0a, 0x2a0505, 0x5a0a0a, "horns+wings", 0x15161a, 0x3a0a0a, { head: 0x8a1a1a, visor: 0xffd21f, visorGlow: 0xff3a00 }],
+  ["cyborg", "Cyborg", 2, 0x8a939c, 0x3a3f4a, 0x9aa3ad, "split+visor2+antenna", 0xff3030],
+  ["mecha", "Mecha", 2, 0xe8e8f0, 0x5d646d, 0xe8e8f0, "pads+visor2+pack", 0x2bf3ff],
+  ["kraken", "Kraken", 2, 0x2a1a4a, 0x140a26, 0x3a2a6a, "spikes+dots", 0x7a3aff],
+  ["magma", "Magma", 2, 0x2a1210, 0x140806, 0x3a1a14, "camo", 0xff6a1a, 0xffb03a],
+  ["frostbyte", "Frostbyte", 2, 0x9fe8ff, 0x5aa8d0, 0xcff4ff, "spikes+visor2", 0x2a8aff],
+  ["venom", "Venom", 2, 0x0a0a0f, 0x050508, 0x0a0a0f, "camo+visor2", 0x9bff3a, 0x3a7a1a],
+  ["nebula", "Nebula", 2, 0x2a0a4a, 0x14052a, 0x3a1a6a, "stars+bands", 0xff7ad8],
+  ["chrome", "Chrome", 2, 0xd8dee6, 0x8a939c, 0xeef2f6, "pads+visor2", 0x6fc3ff],
+  ["shogun", "Golden Shogun", 2, 0x15161a, 0x0a0a0f, 0x15161a, "crest+pads+bands", 0xffc93c],
+  ["wildfire", "Wildfire", 2, 0xff4a1a, 0x3a0a05, 0xff7a1a, "spikes+dots", 0xffe14a, null, { anim(av, t) { av.bodyMat.color.setHSL(0.03 + 0.03 * Math.sin(t * 4), 1, 0.52); } }],
+  // ultra (1%): glow, an aura and sparkles
+  ["voidemperor", "Void Emperor", 4, 0x0d0618, 0x07030d, 0x1a0a2e, "crown+cape+stars", 0xb56bff, 0x6a2aff, { head: 0x1a0a2e, visor: 0xd9a6ff, glow: 0x14052a, aura: 0x9b4bff }],
+  ["solarflare", "Solar Flare", 4, 0xfff3c4, 0xd9a040, 0xffd23a, "halo+wings+star", 0xffa31a, 0xffe680, { glow: 0x5a3000, visor: 0xff7a00, aura: 0xffb020 }],
+  ["glitch", "Glitch", 4, 0x10141c, 0x0a0d12, 0x10141c, "checker+visor2+bands", 0x2bf3ff, 0xff2bd6, { aura: 0x2bf3ff,
+    anim(av, t) { const g = Math.sin(t * 23) > 0.8 || Math.sin(t * 7.3) > 0.95; av.bodyMat.color.setHex(g ? 0xff2bd6 : 0x10141c); av.helmetMat.color.setHex(g ? 0x2bf3ff : 0x10141c); } }],
+  ["jadedragon", "Jade Dragon", 4, 0x0f7a4a, 0x0a3a24, 0x14a060, "horns+spikes+wings", 0xffd23a, 0x0f7a4a, { head: 0x14a060, visor: 0xffd23a, glow: 0x02200f, aura: 0x2aff9a }],
+  ["seraph", "Crystal Seraph", 4, 0xffd6f0, 0xd88ab8, 0xffe6f6, "halo+wings+cross", 0xff7ad8, 0xffffff, { glow: 0x4a1a3a, visor: 0xff4fc8, aura: 0xff8ae0 }],
+  ["infernodemon", "Inferno Demon", 4, 0x3a0606, 0x140202, 0x5a0a0a, "horns+wings+dots", 0xff3a1a, 0xff9a3a, { head: 0x5a0a0a, visor: 0xffd23a, glow: 0x300000, aura: 0xff3a1a }],
+  ["hologram", "Hologram", 4, 0x5ff0ff, 0x2aa8c8, 0x8ff6ff, "vstripes+visor2+antenna", 0xffffff, 0x2bf3ff, { glow: 0x0a5a6a, aura: 0x5ff0ff,
+    anim(av, t) { av.bodyMat.color.setHSL(0.52, 0.9, 0.62 + 0.12 * Math.sin(t * 9)); } }],
+  ["thundergod", "Thunder God", 4, 0x1f2f6a, 0x101a3a, 0xc9d3dd, "bolt+cape+pads", 0xffe14a, 0x6fc3ff, { visor: 0x6fc3ff, glow: 0x0a1440, aura: 0x6fc3ff }],
+];
+for (const [id, name, rarity, body, legs, helmet, parts, a, b, x = {}] of MORE_SKINS) {
+  const fancy = rarity === 2 || rarity === 4, o = fancy ? { glow: a, pulse: true } : undefined, own = x.anim;
+  SKIN_DEFS[id] = { name, rarity, body, legs, helmet, gun: rarity ? a : undefined, ...(fancy ? { visor: a, visorGlow: a } : {}), ...x,
+    extra(add, head) { for (const p of parts.split("+")) PART[p](add, head, a, b != null ? b : a, o); },
+    anim: fancy ? (av, t) => { const k = 0.55 + 0.45 * Math.sin(t * 3); for (const m of av.pulse) m.emissiveIntensity = k; if (own) own(av, t); } : own };
+}
 const RANK_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity === 3);
-const WHEEL_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity < 3);
+const WHEEL_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity !== 3);
 const SKIN_IDS = Object.keys(SKIN_DEFS);
 // Soft round glow used for the top rank skins' auras
 const auraTex = (() => {
@@ -1720,7 +1892,12 @@ function makeSkinned(id, colorHex, name, pts, parent) {
   const arms = new THREE.Group(); arms.position.set(0, 1.25, 0); g.add(arms);
   box(0.18, 0.18, 0.5, armsM, 0.36, 0, -0.18, arms); box(0.18, 0.18, 0.5, armsM, -0.2, 0, -0.26, arms);
   const gun = box(0.1, 0.12, 0.7, gunM, 0.2, 0.04, -0.5, arms);
-  if (S.extra) S.extra((w, h, d, c, x, y, z, par, o) => { const m = box(w, h, d, mat(c, o), x, y, z, par || g); if (o && o.rot) m.rotation.y = o.rot; return m; }, head, g);
+  const xm = new Map(), xmat = (c, o) => {                                           // details of the same look share a material
+    if (o && o.pulse) return mat(c, o);
+    const k = c + "|" + (o && o.glow) + "|" + (o && o.opacity);
+    if (!xm.has(k)) xm.set(k, mat(c, o)); return xm.get(k);
+  };
+  if (S.extra) S.extra((w, h, d, c, x, y, z, par, o) => { const m = box(w, h, d, xmat(c, o), x, y, z, par || g); if (o && o.rot) m.rotation.y = o.rot; return m; }, head, g);
   const keep = new Set([gun]); mergeStatic(g, keep); mergeStatic(head, keep); mergeStatic(arms, keep);
   let tag = null;
   if (name != null) { tag = nameSprite(name, pts); tag.position.set(0, TAG_Y, 0); g.add(tag); }
@@ -2222,7 +2399,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 19;
+const BUILD = 20;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2908,10 +3085,20 @@ function updateNukeButton() {
 const HACKS = [["aim", "Aimbot"], ["god", "God mode"], ["snipe", "Auto sniper"], ["wall", "Wall hacks"], ["inv", "Invisible"]];
 let dkPicks = { ...PERK_DEFAULT };
 try { const sv = JSON.parse(load("cfa.dkpicks") || "null"); if (sv && typeof sv === "object") for (const [k] of HACKS) if (typeof sv[k] === "boolean") dkPicks[k] = sv[k]; } catch (e) {}
+const COLOR_NAMES = ["red", "orange", "green", "blue", "purple", "pink", "white", "teal"];   // PAL order
 const dougPicked = () => { const nm = profileKey(state === "play" ? myName : nick.value), prof = PROFILES[nm]; return prof && myColor === prof.color ? nm : null; };
 function renderHackPick() {
   const f = $("#dougField"); if (!f) return;
-  const who = dougPicked(); f.hidden = !who;
+  const who = dougPicked(), typed = profileKey(state === "play" ? myName : nick.value), want = PROFILES[typed];
+  // the right name in the wrong armor: say which color unlocks the hacks
+  const hint = !who && want && state !== "play";
+  f.hidden = !who && !hint; $("#hackHint").hidden = !hint; $("#hackPick").hidden = !!hint;
+  if (hint) {
+    const n = cleanName(nick.value);
+    $("#hackWho").textContent = n[0].toUpperCase() + n.slice(1) + "'s hacks";
+    $("#hackHint").textContent = `Pick the ${COLOR_NAMES[want.color]} armor (color ${want.color + 1}) to use these hacks. Online you'll then be asked for the password.`;
+    return;
+  }
   if (f.hidden) return;
   const shown = cleanName(state === "play" ? myName : nick.value) || who;
   $("#hackWho").textContent = shown[0].toUpperCase() + shown.slice(1) + "'s hacks";
@@ -4068,19 +4255,19 @@ function updatePreview(dt, t) {
   k.r.render(k.sc, k.cam);
 }
 // ---- the wheel: 12 slices, colored by rarity
-const WHEEL = [0, 0, 1, 0, 0, 2, 0, 1, 0, 0, 1, 0];
+const WHEEL = [0, 0, 1, 0, 0, 2, 0, 1, 0, 4, 1, 0];
 let wheelRot = 0, wheelSpinning = false;
 function drawWheel() {
   const c = $("#wheel"), g = c.getContext("2d"), R = 230, n = WHEEL.length;
   g.clearRect(0, 0, 480, 480); g.save(); g.translate(240, 240); g.rotate(wheelRot);
-  const fill = ["#5b6773", "#1f7ae0", "#9b3ff0"], light = ["#7a8896", "#43a0ff", "#c27bff"];
+  const fill = { 0: "#5b6773", 1: "#1f7ae0", 2: "#9b3ff0", 4: "#d81b60" }, light = { 0: "#7a8896", 1: "#43a0ff", 2: "#c27bff", 4: "#ff4f8b" };
   for (let i = 0; i < n; i++) {
     const a0 = -Math.PI / 2 + (i - 0.5) * (Math.PI * 2 / n), a1 = a0 + Math.PI * 2 / n;
     g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, R, a0, a1); g.closePath();
     g.fillStyle = i % 2 ? fill[WHEEL[i]] : light[WHEEL[i]]; g.fill();
     g.strokeStyle = "rgba(10,14,20,.6)"; g.lineWidth = 3; g.stroke();
     g.save(); g.rotate((a0 + a1) / 2); g.fillStyle = "#fff"; g.font = "700 22px 'Chakra Petch', sans-serif"; g.textAlign = "right"; g.textBaseline = "middle";
-    g.fillText(["COMMON", "RARE", "SUPER"][WHEEL[i]], R - 16, 0); g.restore();
+    g.fillText({ 0: "COMMON", 1: "RARE", 2: "SUPER", 4: "ULTRA 1%" }[WHEEL[i]], R - 16, 0); g.restore();
   }
   g.beginPath(); g.arc(0, 0, 34, 0, Math.PI * 2); g.fillStyle = "#0b1016"; g.fill(); g.lineWidth = 4; g.strokeStyle = "#f3efe4"; g.stroke();
   g.restore();
@@ -4150,14 +4337,26 @@ function renderLocker() {
   const grid = $("#skinGrid"); grid.replaceChildren();
   const none = el("button", { type: "button", className: "skin none" + (!id ? " on" : ""), textContent: "No skin" });
   none.addEventListener("click", () => equipSkin(null)); grid.appendChild(none);
-  for (const rar of [3, 2, 1, 0]) for (const sid of SKIN_IDS.filter(k => SKIN_DEFS[k].rarity === rar)) {
+  for (const rar of [4, 3, 2, 1, 0]) for (const sid of SKIN_IDS.filter(k => SKIN_DEFS[k].rarity === rar)) {
     const owned = !!acct && acct.owned.includes(sid), D = SKIN_DEFS[sid];
     const tagTxt = D.rarity === 3 ? (owned ? "Rank reward" : "Reach " + rankOf(D.rank).label.split(" ")[0]) : RARITY[D.rarity].name;
-    const b = el("button", { type: "button", className: "skin" + (owned ? "" : " locked") + (sid === id ? " on" : "") }, [el("img", { src: skinThumb(sid), alt: "" }), el("span", { textContent: D.name }), el("small", { className: "r" + D.rarity, textContent: tagTxt })]);
+    const b = el("button", { type: "button", className: "skin" + (owned ? "" : " locked") + (sid === id ? " on" : "") }, [thumbImg(sid), el("span", { textContent: D.name }), el("small", { className: "r" + D.rarity, textContent: tagTxt })]);
     b.dataset.skin = sid; b.title = owned ? "Wear " + D.name : D.rarity === 3 ? "Reach " + rankOf(D.rank).label.split(" ")[0] + " to unlock" : "Win it on the wheel";
     b.addEventListener("click", () => { if (owned) equipSkin(sid); });
     grid.appendChild(b);
   }
+}
+// Skin pictures are drawn a few per frame so opening the locker never stalls
+const thumbQ = [];
+function thumbImg(sid) {
+  const k = previewKit(), img = document.createElement("img"); img.alt = "";
+  if (k.thumbs[sid]) img.src = k.thumbs[sid]; else { thumbQ.push([sid, img]); if (thumbQ.length === 1) requestAnimationFrame(drainThumbs); }
+  return img;
+}
+function drainThumbs() {
+  const t0 = performance.now();
+  while (thumbQ.length && performance.now() - t0 < 12) { const [sid, img] = thumbQ.shift(); if (img.isConnected) img.src = skinThumb(sid); }
+  if (thumbQ.length) requestAnimationFrame(drainThumbs);
 }
 async function equipSkin(sid) {
   if (!acct) return;
@@ -4179,7 +4378,7 @@ $("#spinBtn").addEventListener("click", async () => {
   let r;
   const keep = acct;
   try { r = await api("spin"); } catch (e) { $("#prize").textContent = e.message; $("#spinBtn").disabled = false; return; }
-  const rarity = r.rarity === "super" ? 2 : r.rarity === "rare" ? 1 : 0, won = r.account;
+  const rarity = { ultra: 4, super: 2, rare: 1 }[r.rarity] || 0, won = r.account;
   acct = { ...won, owned: keep.owned, equipped: keep.equipped };   // don't reveal the prize until the wheel stops
   wheelSpinning = true; renderLocker();
   spinTo(rarity, () => {
@@ -4192,7 +4391,8 @@ $("#spinBtn").addEventListener("click", async () => {
     wear.addEventListener("click", () => equipSkin(r.skin));
     txt.append(nm, rr, document.createElement("br"), wear); card.append(img, txt);
     $("#prize").replaceChildren(card);
-    if (rarity === 2) { blip(880, 0.15, 0.12); blip(1320, 0.15, 0.12, "square", 0.12); blip(1760, 0.3, 0.12, "square", 0.24); }
+    if (rarity === 4) { for (let i = 0; i < 6; i++) blip(660 * Math.pow(1.26, i), 0.18, 0.12, "square", i * 0.11); banner("ULTRA 1%! You won " + D.name + "!"); }
+    else if (rarity === 2) { blip(880, 0.15, 0.12); blip(1320, 0.15, 0.12, "square", 0.12); blip(1760, 0.3, 0.12, "square", 0.24); }
     else blip(rarity ? 1320 : 990, 0.2, 0.1);
   });
 });
@@ -4200,7 +4400,7 @@ renderLocker(); applyGunFinish();
 if (acctToken) api("me").catch(() => {});
 
 // One-time update notice; each device sees it until it's dismissed
-const NOTICE = { id: "elite-ranks", text: "New: two elite ranks above Champion, Mythic (8000 RP) and Legend (15000 RP), each with its own skin. They're much harder to reach. Winning a round now gives +150 RP." };
+const NOTICE = { id: "ultra-skins", text: "New: 100 more skins on the wheel, plus 8 Ultra skins that glow and only drop 1 spin in 100. Spins are harder to earn now: one for every 50 points (online eliminations 2, bot ones 1, round wins 20), plus your free daily spin." };
 if (load("cfa.notice") !== NOTICE.id) { $("#noticeText").textContent = NOTICE.text; $("#notice").hidden = false; }
 $("#noticeOk").addEventListener("click", () => { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); });
 $("#pwForm").addEventListener("submit", async e => {
