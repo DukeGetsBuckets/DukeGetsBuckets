@@ -420,6 +420,12 @@ body.pig #pigTint{display:block}
       <div class="classes" id="classPick" role="group" aria-labelledby="classLbl"></div>
       <p class="fine" id="classDesc"></p>
     </div>
+    <div class="field" id="dougField" hidden>
+      <span class="lbl-sm">Doug's hacks <em>pick before the round</em></span>
+      <div class="classes" id="hackPick"></div>
+      <div class="btns" id="dougActions" hidden><button class="btn" type="button" id="dkNukeP">Nuke</button><button class="btn" type="button" id="dkTpP">Teleport to…</button></div>
+      <div class="classes" id="tpPick" hidden></div>
+    </div>
     <button class="mode" id="openLocker" type="button"><b>Locker</b><span id="lockerSub">Skins and the skin wheel · sign in to start</span></button>
     <div class="modes">
       <button class="mode primary" id="playOnline" type="button"><b>Play online</b><span id="onlineSub">Real players only, no bots</span></button>
@@ -1891,7 +1897,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 17;
+const BUILD = 18;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2281,7 +2287,7 @@ function respawn() {
 function buildLoadout(fresh) {
   const main = W_ID[classOf(classId).gun];
   loadout = [main, PISTOL];
-  if (hasPerk("snipe") && main !== SNIPER) loadout.push(SNIPER);
+  if (hasPerk("snipe") && duke.snipe && main !== SNIPER) loadout.push(SNIPER);   // only if Doug picked it
   if (fresh || !loadout.includes(cur)) { cur = loadout[0]; reloading = false; triggerHeld = holdFire = false; shotQueue = 0; }
   renderSlots(); buildPips();
 }
@@ -2460,13 +2466,14 @@ function applyDuke() {
   if (profile && PROFILES[profile].password && !(mode === "bots" || authedAs === profile)) profile = null;
   if (profile !== duke.profile) {                       // new profile: reset switches to its defaults
     duke.profile = profile; duke.perks = profile ? PROFILES[profile].perks : [];
-    for (const k of Object.keys(PERK_DEFAULT)) duke[k] = duke.perks.includes(k) && PERK_DEFAULT[k];
+    for (const k of Object.keys(PERK_DEFAULT)) duke[k] = duke.perks.includes(k) && !!dkPicks[k];
   }
   duke.on = !!profile;
   for (const [k, id] of Object.entries(PERK_BUTTON)) $("#" + id).hidden = !duke.perks.includes(k);
   Object.assign(WEAPONS[SNIPER], duke.on && duke.snipe ? SNIPER_DUKE : SNIPER_NORMAL);
   ammo[SNIPER] = WEAPONS[SNIPER].mag; buildLoadout();
-  $("#duke").hidden = !duke.on;
+  $("#duke").hidden = true;                             // no buttons in the round: hacks are picked beforehand
+  renderHackPick();
   $("#dkAim").setAttribute("aria-pressed", String(duke.aim));
   $("#dkGod").setAttribute("aria-pressed", String(duke.god));
   $("#dkSnipe").setAttribute("aria-pressed", String(duke.snipe));
@@ -2566,7 +2573,45 @@ function updateNukeButton() {
   const left = Math.ceil(nukeReadyAt - now());
   b.disabled = left > 0;
   b.firstChild.textContent = left > 0 ? "Nuke " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") : "Nuke";
+  const pb = $("#dkNukeP"); if (pb) { pb.disabled = left > 0; pb.textContent = b.firstChild.textContent; }
 }
+// ---- Doug picks his hacks before the round (menu, or the pause screen); nothing shows in the round
+const HACKS = [["aim", "Aimbot"], ["god", "God mode"], ["snipe", "Auto sniper"], ["wall", "Wall hacks"], ["inv", "Invisible"]];
+let dkPicks = { ...PERK_DEFAULT };
+try { const sv = JSON.parse(load("cfa.dkpicks") || "null"); if (sv && typeof sv === "object") for (const [k] of HACKS) if (typeof sv[k] === "boolean") dkPicks[k] = sv[k]; } catch (e) {}
+const dougPicked = () => { const nm = state === "play" ? myName : cleanName(nick.value); return nm.toLowerCase() === "doug" && myColor === DOUG_COLOR; };
+function renderHackPick() {
+  const f = $("#dougField"); if (!f) return;
+  f.hidden = !dougPicked();
+  if (f.hidden) return;
+  const box = $("#hackPick"); box.replaceChildren();
+  for (const [k, label] of HACKS) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = label;
+    b.setAttribute("aria-pressed", String(!!dkPicks[k]));
+    b.addEventListener("click", () => {
+      dkPicks[k] = !dkPicks[k]; save("cfa.dkpicks", JSON.stringify(dkPicks));
+      if (duke.on && duke.perks.includes(k)) { duke[k] = dkPicks[k]; applyDuke(); if (k === "inv") publish(true); }
+      else renderHackPick();
+    });
+    box.appendChild(b);
+  }
+  $("#dougActions").hidden = !(state === "play" && duke.on);
+  if ($("#dougActions").hidden) $("#tpPick").hidden = true;
+}
+function resumeFromPause() { initAudio(); requestLock(); if (isTouch || noLock) showPause(false); }
+$("#dkNukeP").addEventListener("click", () => { fireNuke(); resumeFromPause(); });
+$("#dkTpP").addEventListener("click", () => {
+  const el = $("#tpPick");
+  if (!el.hidden) { el.hidden = true; return; }
+  const list = enemies(); el.replaceChildren();
+  if (!list.length) { const n = document.createElement("span"); n.className = "fine"; n.textContent = "Nobody to teleport to"; el.appendChild(n); }
+  for (const tg of list) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = tg.r.name;
+    b.addEventListener("click", () => { teleportTo(tg); el.hidden = true; resumeFromPause(); });
+    el.appendChild(b);
+  }
+  el.hidden = false;
+});
 function closeTpList() { const el = $("#tpList"); if (el) { el.hidden = true; el.replaceChildren(); } $("#dkTp") && $("#dkTp").setAttribute("aria-pressed", "false"); }
 function openTpList() {
   if (!hasPerk("tp")) return;
@@ -3122,7 +3167,7 @@ if (isTouch) { document.body.classList.add("touch"); $("#keysHelp").hidden = tru
 
 function showPause(on) {
   paused = on; $("#pause").hidden = !on;
-  if (on) { $("#pauseSlot").appendChild($("#classField")); $("#pauseSlot").appendChild($("#settings")); releaseAllTouches(); resetAim(); crouch = false; keys.clear(); }
+  if (on) { $("#pauseSlot").appendChild($("#classField")); $("#pauseSlot").appendChild($("#dougField")); renderHackPick(); $("#pauseSlot").appendChild($("#settings")); releaseAllTouches(); resetAim(); crouch = false; keys.clear(); }
 }
 function requestLock() {
   if (isTouch || noLock) { showPause(false); return; }
@@ -3151,11 +3196,6 @@ window.addEventListener("keydown", e => {
   if ((e.code === "KeyQ" || e.code === "KeyX") && !e.repeat) dash();
   if (e.code === "KeyG" && !e.repeat) throwGrenade();
   if (e.code === "KeyM") shootMud();
-  if (!e.repeat && e.code === "KeyH") toggleDuke("aim");
-  if (!e.repeat && e.code === "KeyJ") toggleDuke("god");
-  if (!e.repeat && e.code === "KeyK") toggleDuke("snipe");
-  if (!e.repeat && e.code === "KeyN") toggleDuke("wall");
-  if (!e.repeat && e.code === "KeyI") toggleDuke("inv");
   if (!e.repeat && e.code === "KeyT") teleportCycle();
   if (!e.repeat && e.code === "KeyB") fireNuke();
   if (e.code === "KeyE") aimKey = true;
@@ -3488,6 +3528,8 @@ function renderRoundHud() {
 // Menu and settings
 // ======================================================================
 const nick = $("#nick"); nick.value = myName;
+nick.addEventListener("input", () => renderHackPick());
+renderHackPick();
 // Once someone has played as Mason, they stay Mason (and the pig) on this device
 function lockMason() {
   if (!pigMode) return;
@@ -3509,6 +3551,7 @@ PAL.forEach((c, i) => {
   b.addEventListener("click", () => {
     myColor = i; [...sw.children].forEach((x, j) => x.setAttribute("aria-pressed", String(j === i)));
     if (pigMode && i === PIG_EXIT_COLOR) leavePig();
+    renderHackPick();
   });
   sw.appendChild(b);
 });
@@ -3840,6 +3883,7 @@ $("#leave").addEventListener("click", () => leaveMatch());
 function leaveMatch() {
   state = "menu"; alive = false; resetAim(); spectating = false; joinPending = false; specCur = null;
   $(".card").insertBefore($("#classField"), $(".modes"));
+  $(".card").insertBefore($("#dougField"), $("#openLocker")); renderHackPick();
   if (document.exitPointerLock && locked) document.exitPointerLock();
   showPause(false);
   $(".card").appendChild($("#settings"));

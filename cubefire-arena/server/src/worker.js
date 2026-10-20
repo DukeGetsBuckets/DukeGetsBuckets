@@ -15,7 +15,7 @@
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 17;
+const MIN_BUILD = 18;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -229,8 +229,8 @@ const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200],
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["super", 0.05], ["rare", 0.25], ["common", 0.7]];
 const START_TICKETS = 3, PTS_PER_TICKET = 10;
-// Perks that come with particular accounts: "alex" always has wall hacks (no off switch)
-const ACCOUNT_PERKS = { alex: ["wall"] };
+// Perks that come with particular accounts (none right now)
+const ACCOUNT_PERKS = {};
 const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 const today = () => new Date().toISOString().slice(0, 10);
 async function hashPw(password, salt) {
