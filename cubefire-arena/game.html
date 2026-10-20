@@ -452,7 +452,7 @@ body.pig #pigTint{display:block}
       <li><b>Tab</b>Scoreboard · <b>P</b>Pause</li>
     </ul>
     <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
-    <p class="fine">Online matches are played in 3-minute rounds once 2 players are in; if you join mid-round you spectate until the next one. Ranked: +25 for each elimination (+5 for a headshot), +150 for winning a round, −15 for each death. From Champion up, eliminations give 15 and deaths cost 25.</p>
+    <p class="fine">Online matches are played in 3-minute rounds once 2 players are in; you can jump in at any time, even mid-round. Ranked: +25 for each elimination (+5 for a headshot), +150 for winning a round, −15 for each death. From Champion up, eliminations give 15 and deaths cost 25.</p>
     <p class="fine">Friends who type the same party code land in the same private match. Leave it blank to join the open arena.</p>
   </div>
 </div>
@@ -1316,6 +1316,50 @@ const SKIN_DEFS = {
     extra(add, head) { add(0.1, 0.24, 0.1, 0xdfffff, 0, 0.62, 0, head, { glow: 0x3fd0e0, rot: 0.785 }); add(0.08, 0.16, 0.08, 0xdfffff, -0.38, 1.46, 0, null, { glow: 0x3fd0e0, rot: 0.785 }); add(0.08, 0.16, 0.08, 0xdfffff, 0.38, 1.46, 0, null, { glow: 0x3fd0e0, rot: 0.785 }); } },
   rainbow: { name: "Rainbow", rarity: 2, legs: 0x2a2f37, body: 0xff5d5d, arms: 0xff5d5d, helmet: 0xff5d5d, glow: 0x202020, gun: 0xff7ac8,
     anim(av, t) { av.bodyMat.color.setHSL((t * 0.25) % 1, 0.85, 0.58); av.helmetMat.color.setHSL((t * 0.25 + 0.15) % 1, 0.85, 0.58); av.armsMat.color.setHSL((t * 0.25 + 0.3) % 1, 0.85, 0.58); } },
+  // ---- more wheel skins
+  forest: { name: "Forest Ranger", rarity: 0, legs: 0x4a3a24, body: 0x3e6b3a, helmet: 0x5a4628,
+    extra(add) { add(0.1, 0.1, 0.06, 0x5a4628, -0.2, 0.88, -0.18); add(0.1, 0.1, 0.06, 0x5a4628, 0.2, 0.88, -0.18); add(0.04, 0.5, 0.02, 0x5a4628, 0.12, 1.1, -0.18).rotation.z = 0.5; } },
+  sky: { name: "Sky Blue", rarity: 0, legs: 0x2a4a6a, body: 0x6fc3ff, helmet: 0x9fd9ff },
+  lime: { name: "Lime Zest", rarity: 0, legs: 0x2a3a10, body: 0x9be03a, helmet: 0xc4f06a },
+  bubblegum: { name: "Bubblegum", rarity: 0, legs: 0x7a2a5a, body: 0xff8fc8, helmet: 0xffb3d9,
+    extra(add) { add(0.14, 0.14, 0.02, 0xffffff, 0.14, 1.18, -0.18); } },
+  midnight: { name: "Midnight", rarity: 0, legs: 0x0d1530, body: 0x1a2550, helmet: 0x2a3a70, visor: 0x8fb7ff },
+  sandstone: { name: "Sandstone", rarity: 0, legs: 0x9a7a52, body: 0xd9b27a, helmet: 0xe8c896 },
+  tiger: { name: "Tiger Stripe", rarity: 0, legs: 0x2a1a10, body: 0xff8a1f, arms: 0xff8a1f, helmet: 0xff8a1f,
+    extra(add) { for (const y of [0.92, 1.06, 1.2]) add(0.64, 0.04, 0.36, 0x15161a, 0, y, 0).rotation.z = 0.25; } },
+  zebra: { name: "Zebra", rarity: 0, legs: 0x15161a, body: 0xf4f4f4, arms: 0xf4f4f4, helmet: 0xf4f4f4,
+    extra(add) { for (const y of [0.9, 1.02, 1.14, 1.26]) add(0.64, 0.035, 0.36, 0x15161a, 0, y, 0).rotation.z = -0.2; } },
+  firefighter: { name: "Firefighter", rarity: 1, legs: 0x2a2a2a, body: 0xc8242c, arms: 0xc8242c, helmet: 0xffd21f, gun: 0xc8242c,
+    extra(add, head) { add(0.62, 0.04, 0.62, 0xffd21f, 0, 0.4, 0.04, head); add(0.64, 0.05, 0.36, 0xffe14a, 0, 0.95, 0); add(0.64, 0.05, 0.36, 0xffe14a, 0, 1.2, 0); } },
+  police: { name: "Police", rarity: 1, legs: 0x101a33, body: 0x1a2a55, arms: 0x1a2a55, helmet: 0x101a33, gun: 0x2a2f37,
+    extra(add, head) { add(0.32, 0.04, 0.2, 0x101a33, 0, 0.38, -0.27, head); add(0.08, 0.1, 0.02, 0xffd76a, -0.15, 1.2, -0.18); add(0.06, 0.05, 0.02, 0xffd76a, 0, 0.44, -0.245, head); } },
+  doctor: { name: "Doctor", rarity: 1, legs: 0x5a8ab8, body: 0xf4f7fa, arms: 0xf4f7fa, helmet: 0x5a8ab8, gun: 0xdfe6ec,
+    extra(add) { add(0.12, 0.04, 0.02, 0xd8323c, 0.15, 1.18, -0.18); add(0.04, 0.12, 0.02, 0xd8323c, 0.15, 1.18, -0.18); add(0.62, 0.3, 0.36, 0xf4f7fa, 0, 0.64, 0); add(0.03, 0.3, 0.02, 0x2a2f37, -0.12, 1.12, -0.18); } },
+  chef: { name: "Chef", rarity: 1, legs: 0x2a2f37, body: 0xf4f4f4, arms: 0xf4f4f4, helmet: 0xffffff, gun: 0xc9d1da,
+    extra(add, head) { add(0.4, 0.3, 0.4, 0xffffff, 0, 0.6, 0, head); add(0.5, 0.14, 0.5, 0xffffff, 0, 0.8, 0, head); for (const y of [1.2, 1.05, 0.9]) { add(0.04, 0.04, 0.02, 0x2a2f37, -0.08, y, -0.18); add(0.04, 0.04, 0.02, 0x2a2f37, 0.08, y, -0.18); } add(0.3, 0.08, 0.04, 0xd8323c, 0, 0.02, -0.23, head); } },
+  viking: { name: "Viking", rarity: 1, legs: 0x4a3a28, body: 0x7a5a3a, arms: 0x9a7a52, helmet: 0x8a939c, gun: 0x7a5a3a,
+    extra(add, head) { add(0.06, 0.22, 0.06, 0xf4ecd8, -0.28, 0.52, 0, head).rotation.z = 0.5; add(0.06, 0.22, 0.06, 0xf4ecd8, 0.28, 0.52, 0, head).rotation.z = -0.5; add(0.4, 0.2, 0.06, 0xd8892a, 0, 0.06, -0.25, head); add(0.66, 0.1, 0.38, 0x9a7a52, 0, 1.34, 0); } },
+  samurai: { name: "Samurai", rarity: 1, legs: 0x1a1a1a, body: 0xb8202a, arms: 0x1a1a1a, helmet: 0x1a1a1a, visor: 0xd8b25a, gun: 0x1a1a1a,
+    extra(add, head) { add(0.32, 0.12, 0.04, 0xd8b25a, 0, 0.56, -0.2, head); for (const y of [0.92, 1.1]) add(0.64, 0.05, 0.36, 0x1a1a1a, 0, y, 0); add(0.22, 0.06, 0.4, 0xb8202a, -0.34, 1.33, 0); add(0.22, 0.06, 0.4, 0xb8202a, 0.34, 1.33, 0); } },
+  alien: { name: "Alien", rarity: 1, legs: 0x2a4a2a, body: 0x3a3f4a, arms: 0x3a3f4a, head: 0x7fe07a, helmet: 0x7fe07a, visor: 0x7fe07a, gun: 0x7fe07a,
+    extra(add, head) { add(0.14, 0.11, 0.02, 0x0a0a0a, -0.11, 0.26, -0.24, head); add(0.14, 0.11, 0.02, 0x0a0a0a, 0.11, 0.26, -0.24, head); for (const x of [-0.12, 0.12]) { add(0.03, 0.2, 0.03, 0x7fe07a, x, 0.56, 0, head); add(0.07, 0.07, 0.07, 0xff5df0, x, 0.68, 0, head, { glow: 0xff5df0 }); } } },
+  zombie: { name: "Zombie", rarity: 1, legs: 0x3a4a6a, body: 0x6a7a5a, arms: 0x8fa87a, head: 0x8fa87a, helmet: 0x5a6a4a, visor: 0x8fa87a, gun: 0x5a6a4a,
+    extra(add, head) { add(0.12, 0.08, 0.02, 0x8fa87a, 0.12, 0.95, -0.18); add(0.1, 0.12, 0.02, 0x8fa87a, -0.15, 1.18, -0.18); add(0.06, 0.05, 0.02, 0xff3030, -0.1, 0.27, -0.245, head, { glow: 0xff3030 }); add(0.06, 0.05, 0.02, 0xff3030, 0.1, 0.27, -0.245, head, { glow: 0xff3030 }); } },
+  iceking: { name: "Ice King", rarity: 2, legs: 0x7fb7e8, body: 0xbfe8ff, arms: 0xbfe8ff, head: 0xdff6ff, helmet: 0xbfe8ff, visor: 0x2a5a8a, glow: 0x1f4a6a, gun: 0xbfe8ff,
+    extra(add, head) { for (const x of [-0.16, 0, 0.16]) add(0.07, x ? 0.16 : 0.24, 0.07, 0xeaffff, x, 0.58, -0.1, head, { glow: 0x5fd0ff, rot: 0.785 }); add(0.08, 0.18, 0.08, 0xeaffff, -0.36, 1.44, 0, null, { glow: 0x5fd0ff, rot: 0.785 }); add(0.08, 0.18, 0.08, 0xeaffff, 0.36, 1.44, 0, null, { glow: 0x5fd0ff, rot: 0.785 }); },
+    anim(av, t) { av.helmetMat.emissive.setHSL(0.55, 0.8, 0.15 + 0.08 * Math.sin(t * 2)); } },
+  neon: { name: "Neon Racer", rarity: 2, legs: 0x0a0a12, body: 0x14141f, arms: 0x14141f, helmet: 0x14141f, visor: 0xff2bd6, visorGlow: 0xff2bd6, gun: 0x2bf3ff,
+    extra(add) { add(0.04, 0.62, 0.02, 0x2bf3ff, -0.12, 1.06, -0.18, null, { glow: 0x2bf3ff, pulse: true }); add(0.04, 0.62, 0.02, 0x2bf3ff, 0.12, 1.06, -0.18, null, { glow: 0x2bf3ff, pulse: true }); add(0.64, 0.03, 0.36, 0xff2bd6, 0, 1.3, 0, null, { glow: 0xff2bd6, pulse: true }); for (const x of [-0.14, 0.14]) add(0.03, 0.6, 0.3, 0xff2bd6, x, 0.4, 0, null, { glow: 0xff2bd6, pulse: true }); },
+    anim(av, t) { for (const [i, m] of av.pulse.entries()) m.emissiveIntensity = 0.55 + 0.45 * Math.sin(t * 5 + i); } },
+  shadow: { name: "Shadow", rarity: 2, legs: 0x050508, body: 0x0b0b12, arms: 0x0b0b12, head: 0x0b0b12, helmet: 0x0b0b12, visor: 0x7a3aff, visorGlow: 0x7a3aff, gun: 0x2a1a4a,
+    extra(add) { const r = rng32(9); for (let i = 0; i < 9; i++) add(0.12, 0.12, 0.12, 0x3a1a6a, (r() - .5) * 0.8, 0.3 + r() * 1.4, (r() - .5) * 0.5, null, { glow: 0x2a0a5a, opacity: 0.45, pulse: true }); },
+    anim(av, t) { for (const [i, m] of av.pulse.entries()) m.opacity = 0.25 + 0.25 * Math.sin(t * 2 + i); } },
+  toxic: { name: "Toxic", rarity: 2, legs: 0x1a2a10, body: 0x2a3a1a, arms: 0x2a3a1a, helmet: 0x3a5a1a, visor: 0x9bff3a, visorGlow: 0x7aff2a, glow: 0x0f2a05, gun: 0x9bff3a,
+    extra(add) { add(0.16, 0.16, 0.02, 0x9bff3a, 0, 1.12, -0.18, null, { glow: 0x7aff2a, pulse: true }); for (const [x, y] of [[-0.2, 0.95], [0.18, 0.88], [-0.05, 0.82]]) add(0.05, 0.12, 0.02, 0x9bff3a, x, y, -0.18, null, { glow: 0x7aff2a, pulse: true }); add(0.18, 0.24, 0.12, 0x5a6a2a, 0, 1.1, 0.22); },
+    anim(av, t) { const k = 0.5 + 0.5 * Math.sin(t * 3.5); for (const m of av.pulse) m.emissiveIntensity = k; } },
+  phoenix: { name: "Phoenix", rarity: 2, legs: 0x5a1a08, body: 0xff5a1a, arms: 0xff7a2a, head: 0xffb05a, helmet: 0xff3a1a, visor: 0xffe14a, visorGlow: 0xffb000, glow: 0x4a1000, gun: 0xff7a2a,
+    extra(add, head) { add(0.06, 0.26, 0.24, 0xffe14a, 0, 0.58, 0.04, head, { glow: 0xff9000, pulse: true }); for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) add(0.32 - k * 0.07, 0.1, 0.04, k % 2 ? 0xffe14a : 0xff7a1a, sx * (0.3 + k * 0.11), 1.28 - k * 0.15, 0.22, null, { glow: 0xff6a00, pulse: true }); },
+    anim(av, t) { const k = 0.5 + 0.5 * Math.sin(t * 4); for (const m of av.pulse) m.emissiveIntensity = k; av.bodyMat.color.setHSL(0.04 + 0.03 * Math.sin(t * 3), 1, 0.55); } },
   // Rank rewards: unlocked for good when your account reaches the rank (rank: points needed)
   silvervet: { name: "Silver Veteran", rarity: 3, rank: 300, legs: 0x5d646d, body: 0x9aa4ae, arms: 0x9aa4ae, helmet: 0xc9d3dd, visor: 0x1a1c20, gun: 0xc9d3dd,
     extra(add) { for (const y of [1.2, 1.12]) { add(0.12, 0.03, 0.02, 0xf4f7fa, -0.07, y, -0.18).rotation.z = 0.5; add(0.12, 0.03, 0.02, 0xf4f7fa, 0.07, y, -0.18).rotation.z = -0.5; } add(0.2, 0.08, 0.38, 0xc9d3dd, -0.34, 1.34, 0); add(0.2, 0.08, 0.38, 0xc9d3dd, 0.34, 1.34, 0); } },
@@ -1847,7 +1891,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 16;
+const BUILD = 17;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3521,11 +3565,7 @@ function startGame(m) {
   if (m === "bots") startBots(); else { stopBots(); joinLobby(partyCode); }
   for (const r of remotes.values()) if (r.av) r.av.g.visible = false;
   respawn();
-  // a round already running in this lobby: watch until the next one
-  if (roundsOn()) {
-    if (round.lobby === lobbyName) { if (round.ph === "live" || round.ph === "end") startSpectate(); }
-    else joinPending = true;
-  }
+  // you can always jump straight in, even in the middle of a round
   showPause(false);
   requestLock();
 }
@@ -3923,7 +3963,7 @@ function tick() {
   }
 
   // remote players (only shown in online matches)
-  const kk = 1 - Math.exp(-14 * dt);
+  const kk = 1 - Math.exp(-22 * dt);   // other players follow their latest position closely
   for (const r of remotes.values()) {
     const show = mode === "online" && activePeer(r) && r.hasPos && r.alive && !r.iv && r !== specCur;
     const wantSkin = r.sk || skinFor(r.name, r.color);

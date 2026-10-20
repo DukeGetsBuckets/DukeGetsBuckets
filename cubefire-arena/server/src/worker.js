@@ -15,7 +15,7 @@
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 16;
+const MIN_BUILD = 17;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -66,6 +66,48 @@ export class Lobby {
     this.env = env;
     this.last = new Map(); // player id -> latest state, handed to newcomers
     this.round = { ph: "wait", ends: 0, n: 0 };
+    this.ps = new Map(); // player id -> what the server knows about their health (see referee)
+  }
+
+  // No trading kills. Each game decides its own hits, so when two players shoot each other
+  // at the same moment both shots used to count. The server referees: it keeps an estimate
+  // of everyone's health from the hits it relays, and once a player's health hits zero
+  // their shots stop counting (they're dropped from what everyone receives) until that
+  // player has died and respawned. Whichever killing shot reaches the server first wins.
+  player(id) {
+    let P = this.ps.get(id);
+    if (!P) { P = { hp: 100, al: true, dead: false, deadAt: 0, down: false, spawnUntil: 0, lastHitAt: 0, lastSeq: 0, dropped: new Set() }; this.ps.set(id, P); }
+    return P;
+  }
+  referee(a, d) {
+    const now = Date.now(), P = this.player(a.id);
+    // what this player says about themselves
+    const al = d.al !== 0;
+    if (!al) { P.down = true; P.dead = false; }                                       // their game shows them dead
+    else if (P.down) { P.down = false; P.dead = false; P.hp = 100; P.spawnUntil = now + 1500; }   // respawned
+    if (P.dead && now - P.deadAt > 4000) P.dead = false;                              // their game never agreed: forget it
+    P.al = al; P.god = a.auth === "doug";
+    if (!P.dead && now - P.lastHitAt > 1000 && typeof d.hp === "number") P.hp = Math.max(0, Math.min(100, d.hp));
+    // their shots
+    if (!Array.isArray(d.hits)) return;
+    const keep = [];
+    for (const h of d.hits) {
+      if (!h || typeof h.s !== "number" || P.dropped.has(h.s)) continue;
+      if (h.s > P.lastSeq) {
+        P.lastSeq = h.s;
+        if ((P.dead || !P.al) && !h.nk) {                                            // fired after being killed
+          P.dropped.add(h.s); if (P.dropped.size > 64) P.dropped.delete(P.dropped.values().next().value);
+          continue;
+        }
+        const T = this.ps.get(String(h.t));
+        if (T && T.al && !T.dead && !(T.spawnUntil > now) && this.round.ph !== "end") {
+          T.hp -= Math.max(0, Math.min(999, Number(h.dm) || 0)); T.lastHitAt = now;
+          if (T.hp <= 0 && !T.god) { T.dead = true; T.deadAt = now; }
+        }
+      }
+      keep.push(h);
+    }
+    d.hits = keep;
   }
 
   times() { return this.env && this.env.ROUND_TEST === "1" ? ROUND_TEST_MS : ROUND_MS; }
@@ -140,6 +182,7 @@ export class Lobby {
       delete d.nk;
       if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => !(h && h.nk)); // grenades (w: 3) still count
     }
+    this.referee(a, d);
     this.last.set(a.id, d);
     const out = JSON.stringify({ t: "st", id: a.id, d });
     for (const other of this.ctx.getWebSockets()) {
@@ -156,7 +199,7 @@ export class Lobby {
   leave(ws) {
     const a = ws.deserializeAttachment();
     if (!a) return;
-    this.last.delete(a.id);
+    this.last.delete(a.id); this.ps.delete(a.id);
     const out = JSON.stringify({ t: "leave", id: a.id });
     for (const other of this.ctx.getWebSockets()) {
       if (other !== ws) { try { other.send(out); } catch {} }
@@ -176,9 +219,9 @@ export class Lobby {
 // ======================================================================
 // Must match SKIN_DEFS in the game page.
 const SKINS = {
-  common: ["camo", "desert", "arctic", "nightops", "hivis", "cherry", "ocean", "grape"],
-  rare: ["ninja", "knight", "astro", "robot", "pirate", "cowboy"],
-  super: ["golden", "lava", "galaxy", "diamond", "rainbow"],
+  common: ["camo", "desert", "arctic", "nightops", "hivis", "cherry", "ocean", "grape", "forest", "sky", "lime", "bubblegum", "midnight", "sandstone", "tiger", "zebra"],
+  rare: ["ninja", "knight", "astro", "robot", "pirate", "cowboy", "firefighter", "police", "doctor", "chef", "viking", "samurai", "alien", "zombie"],
+  super: ["golden", "lava", "galaxy", "diamond", "rainbow", "iceking", "neon", "shadow", "toxic", "phoenix"],
 };
 const ALL_SKINS = [...SKINS.common, ...SKINS.rare, ...SKINS.super];   // the wheel's skins
 // Rank rewards: owned automatically once the account's rank points reach the number
