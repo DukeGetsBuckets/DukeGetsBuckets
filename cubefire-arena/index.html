@@ -477,7 +477,7 @@ body.pig #pigTint{display:block}
       <li><b>Tab</b>Scoreboard · <b>P</b>Pause</li>
     </ul>
     <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
-    <p class="fine">Online matches are played in 3-minute rounds once 2 players are in; you can jump in at any time, even mid-round. Ranked: +25 for each elimination (+5 for a headshot), +150 for winning a round, −15 for each death. From Champion up, eliminations give 15 and deaths cost 25.</p>
+    <p class="fine">Online matches are played in 3-minute rounds once 2 players are in; you can jump in at any time, even mid-round. Ranked: +30 for each elimination (+5 for a headshot), −20 for each death, and for winning a round +100 (under 4 players) or +300 (4 or more). From Champion up, eliminations give 18 and deaths cost 33.</p>
     <p class="fine">Friends who type the same party code land in the same private match. Leave it blank to join the open arena.</p>
   </div>
 </div>
@@ -520,7 +520,7 @@ body.pig #pigTint{display:block}
     <h2 id="ranksTitle">Ranks</h2>
     <div class="rankme" id="rankMe"></div>
     <div class="ranklist" id="rankList"></div>
-    <p class="fine">+25 RP for each elimination (+5 for a headshot) and +150 for winning a round; −15 RP for each death. From Champion up it gets much harder: eliminations give 15 RP and deaths cost 25. Only online rounds count. Every rank but Legend has three levels: III, II, then I.</p>
+    <p class="fine">+30 RP for each elimination (+5 for a headshot); −20 RP for each death. Winning a round gives +100 RP, or +300 RP when 4 or more players are in it. From Champion up it gets much harder: eliminations give 18 RP and deaths cost 33. Only online rounds count. Every rank but Legend has three levels: III, II, then I.</p>
     <div class="btns"><button class="btn primary" type="button" id="ranksClose">Close</button></div>
   </div>
 </div>
@@ -1524,7 +1524,7 @@ const RANKS = [
   { name: "Mythic", min: 8000, color: "#ff8f3a" },
   { name: "Legend", min: 15000, color: "#fff08a" },
 ];
-const RP = { kill: 25, head: 5, death: 15, win: 150 };
+const RP = { kill: 30, head: 5, death: 20, win: 100, bigWin: 300, bigRound: 4 };   // bigWin: rounds with 4+ players
 // From Champion up, eliminations give less and deaths cost more, so the elite ranks are hard to reach
 const ELITE = 3500;
 const rpGain = n => rankPts >= ELITE ? Math.round(n * 0.6) : n;
@@ -2399,7 +2399,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 21;
+const BUILD = 22;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2834,7 +2834,7 @@ function onRoundPhase(prev, ph) {
     if (prev === "live" && top && top.k > 0) {
       const winners = st.filter(p => p.k === top.k);
       banner(winners.length === 1 ? top.name + " wins round " + round.n + "!" : "Round " + round.n + " is a tie!");
-      if (winners.some(p => p.me) && !spectating) { addRank(RP.win); pendWins++; }
+      if (winners.some(p => p.me) && !spectating) { addRank(st.filter(p => !p.sp).length >= RP.bigRound ? RP.bigWin : RP.win); pendWins++; }
     } else banner("Round over");
     resetAim();
   } else if (ph === "wait") {
@@ -4401,7 +4401,7 @@ renderLocker(); applyGunFinish();
 if (acctToken) api("me").catch(() => {});
 
 // One-time update notice; each device sees it until it's dismissed
-const NOTICE = { id: "ultra-skins", text: "New: 100 more skins on the wheel, plus 8 Ultra skins that glow and only drop 1 spin in 100. Spins are harder to earn now: one for every 50 points (online eliminations 2, bot ones 1, round wins 20), plus your free daily spin." };
+const NOTICE = { id: "rp-rules-2", text: "Ranked points changed: +30 RP for each elimination and −20 RP for each death. Winning a round gives +100 RP, or +300 RP when 4 or more players are in it. Also new: 100 more skins and 8 Ultra skins (1 spin in 100); spins take 50 points each to earn." };
 if (load("cfa.notice") !== NOTICE.id) { $("#noticeText").textContent = NOTICE.text; $("#notice").hidden = false; }
 $("#noticeOk").addEventListener("click", () => { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); });
 $("#pwForm").addEventListener("submit", async e => {
