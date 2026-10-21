@@ -495,7 +495,7 @@ body.pig #pigTint{display:block}
       <li><b>Tab</b>Scoreboard · <b>P</b>Pause</li>
     </ul>
     <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
-    <p class="fine">Online matches are played in 3-minute rounds once 2 players are in; you can jump in at any time, even mid-round. Ranked: +30 for each elimination (+5 for a headshot), −20 for each death, and for winning a round +100 (under 4 players) or +300 (4 or more). From Champion up, eliminations give 18 and deaths cost 33.</p>
+    <p class="fine">Online matches are played in 3-minute rounds once 2 players are in; you can jump in at any time, even mid-round. Ranked: +30 for each elimination (+5 for a headshot), −10 for each death, and for winning a round +100 (under 4 players) or +300 (4 or more); second place gets a third of that (+33 or +100). From Champion up, eliminations give 18 and deaths cost 17.</p>
     <p class="fine">Friends who type the same party code land in the same private match. Leave it blank to join the open arena.</p>
   </div>
 </div>
@@ -545,7 +545,7 @@ body.pig #pigTint{display:block}
     <h2 id="ranksTitle">Ranks</h2>
     <div class="rankme" id="rankMe"></div>
     <div class="ranklist" id="rankList"></div>
-    <p class="fine">+30 RP for each elimination (+5 for a headshot); −20 RP for each death. Winning a round gives +100 RP, or +300 RP when 4 or more players are in it. From Champion up it gets much harder: eliminations give 18 RP and deaths cost 33. Only online rounds count. Every rank but Legend has three levels: III, II, then I.</p>
+    <p class="fine">+30 RP for each elimination (+5 for a headshot); −10 RP for each death. Winning a round gives +100 RP, or +300 RP when 4 or more players are in it, and second place gets a third of that (+33 or +100 RP). From Champion up it gets much harder: eliminations give 18 RP and deaths cost 17. Only online rounds count. Every rank but Legend has three levels: III, II, then I.</p>
     <div class="btns"><button class="btn primary" type="button" id="ranksClose">Close</button></div>
   </div>
 </div>
@@ -1550,7 +1550,7 @@ const RANKS = [
   { name: "Mythic", min: 8000, color: "#ff8f3a" },
   { name: "Legend", min: 15000, color: "#fff08a" },
 ];
-const RP = { kill: 30, head: 5, death: 20, win: 100, bigWin: 300, bigRound: 4 };   // bigWin: rounds with 4+ players
+const RP = { kill: 30, head: 5, death: 10, win: 100, bigWin: 300, bigRound: 4 };   // bigWin: rounds with 4+ players; 2nd place gets a third
 // From Champion up, eliminations give less and deaths cost more, so the elite ranks are hard to reach
 const ELITE = 3500;
 const rpGain = n => rankPts >= ELITE ? Math.round(n * 0.6) : n;
@@ -2425,7 +2425,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 23;
+const BUILD = 24;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2860,7 +2860,10 @@ function onRoundPhase(prev, ph) {
     if (prev === "live" && top && top.k > 0) {
       const winners = st.filter(p => p.k === top.k);
       banner(winners.length === 1 ? top.name + " wins round " + round.n + "!" : "Round " + round.n + " is a tie!");
-      if (winners.some(p => p.me) && !spectating) { addRank(st.filter(p => !p.sp).length >= RP.bigRound ? RP.bigWin : RP.win); pendWins++; }
+      const prize = st.filter(p => !p.sp).length >= RP.bigRound ? RP.bigWin : RP.win;
+      const second = st.find(p => p.k < top.k && p.k > 0);                  // the next-best score after the winners
+      if (winners.some(p => p.me) && !spectating) { addRank(prize); pendWins++; }
+      else if (second && st.some(p => p.me && p.k === second.k) && !spectating) addRank(Math.round(prize / 3));
     } else banner("Round over");
     resetAim();
   } else if (ph === "wait") {
@@ -4434,7 +4437,7 @@ renderLocker(); applyGunFinish();
 if (acctToken) api("me").catch(() => {});
 
 // One-time update notice; each device sees it until it's dismissed
-const NOTICE = { id: "premium-1", text: "New: ★ Premium, and it's free. Add Cubefire to your Home Screen and turn on notifications to play online, then tap Call players in a match to tell everyone to join. Ranked points also changed: +30 per elimination, −20 per death, +100 or +300 for a round win." };
+const NOTICE = { id: "rp-rules-3", text: "Ranked points changed: +30 per elimination, only −10 per death, and second place in a round now gets a third of the winner's points (+33, or +100 in rounds with 4 or more players). Also new: ★ Premium, free with notifications, unlocks online play and Call players." };
 if (load("cfa.notice") !== NOTICE.id) { $("#noticeText").textContent = NOTICE.text; $("#notice").hidden = false; }
 $("#noticeOk").addEventListener("click", () => { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); });
 $("#pwForm").addEventListener("submit", async e => {
