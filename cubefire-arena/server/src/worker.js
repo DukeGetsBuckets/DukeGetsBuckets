@@ -6,23 +6,33 @@
 // Each lobby also runs the round clock: with at least 2 players in a match it counts
 // down 20 seconds, plays a 3-minute round, shows the results for 8 seconds and repeats.
 // Below 2 players it goes back to warm-up ("wait"). Players get {t: "round"} on changes.
+// Each countdown picks a new map; in the ranked lobby it also re-sorts players into
+// rank groups ({t: "group"}). If everyone else leaves mid-round, the last player left
+// in a group wins it ({t: "lastwin"}).
 //
 // Some name + armor color combinations have extra powers. Online they must first send
 // {t: "auth", key, who} with the password in that profile's Worker secret
-// (DOUG_PASSWORD, ALEX_PASSWORD; set with `wrangler secret put`). Anyone else using a
+// (DOUG_PASSWORD; set with `wrangler secret put`). Anyone else using a
 // protected name and color is refused.
 
-const MAX_PLAYERS = 16;
+const MAX_PLAYERS = 24;   // sockets per lobby, including people still in the menu
+// Ranked: one lobby where players are sorted by rank into groups of about GROUP_SIZE
+// (Elite, Normal, Trash), each with its own fights; up to RANKED_MAX playing at once.
+const GROUP_SIZE = 6, RANKED_MAX = 18;
+const GROUP_NAMES = [["normal"], ["elite", "normal"], ["elite", "normal", "trash"]];
+// Every round is played on a new map (must match MAPS in the game page)
+const MAP_IDS = ["arena", "farm", "peaks", "desert", "castle", "snow", "jungle"];
+const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math.floor(Math.random() * l.length)]; };
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 26;
+const MIN_BUILD = 28;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
 const MIN_ROUND_PLAYERS = 2;
 // protected profiles: name -> armor color, and which can turn invisible
-const PROTECTED = { doug: { color: 2, invisible: true, god: true, nuke: true }, alex: { color: 3 } };   // Alex: wall hacks only
-const PROFILE_ALIAS = { duke: "doug", bill: "doug" };   // other names that use a profile
+const PROTECTED = {};   // all hacks are removed: no protected profiles
+const PROFILE_ALIAS = {};   // other names that use a profile
 const profileOf = d => { const raw = String(d.n || "").trim().toLowerCase(), n = PROFILE_ALIAS[raw] || raw, p = PROTECTED[n]; return p && d.c === p.color ? n : null; };
 
 function lobbyName(raw) {
@@ -66,7 +76,7 @@ export class Lobby {
     this.ctx = ctx;
     this.env = env;
     this.last = new Map(); // player id -> latest state, handed to newcomers
-    this.round = { ph: "wait", ends: 0, n: 0 };
+    this.round = { ph: "wait", ends: 0, n: 0, map: nextMap(null), sizes: {}, won: [] };
     this.ps = new Map(); // player id -> what the server knows about their health (see referee)
   }
 
@@ -87,7 +97,7 @@ export class Lobby {
     if (!al) { P.down = true; P.dead = false; }                                       // their game shows them dead
     else if (P.down) { P.down = false; P.dead = false; P.hp = 100; P.spawnUntil = now + 1500; }   // respawned
     if (P.dead && now - P.deadAt > 4000) P.dead = false;                              // their game never agreed: forget it
-    P.al = al; P.god = !!(a.auth && PROTECTED[a.auth].god);
+    P.al = al; P.god = !!(a.auth && PROTECTED[a.auth] && PROTECTED[a.auth].god);
     if (!P.dead && now - P.lastHitAt > 1000 && typeof d.hp === "number") P.hp = Math.max(0, Math.min(100, d.hp));
     // their shots
     if (!Array.isArray(d.hits)) return;
@@ -122,6 +132,52 @@ export class Lobby {
     }
     return n;
   }
+  // ---- ranked groups (kept in each socket's attachment as g)
+  ranked() { for (const ws of this.ctx.getWebSockets()) { const a = ws.deserializeAttachment(); if (a) return !!a.ranked; } return false; }
+  players(except) {
+    const out = [];
+    for (const ws of this.ctx.getWebSockets()) { const a = ws.deserializeAttachment(); if (ws !== except && a && a.pl) out.push({ ws, a }); }
+    return out;
+  }
+  rankOf(id) { const d = this.last.get(id); return Math.max(0, Number(d && d.rk) || 0); }
+  sendGroup(ws, a) {
+    const peers = this.players(ws).filter(p => p.a.g === a.g && this.last.has(p.a.id)).map(p => ({ id: p.a.id, d: this.last.get(p.a.id) }));
+    try { ws.send(JSON.stringify({ t: "group", g: a.g, peers })); } catch {}
+  }
+  // Someone joining mid-round goes to the group nearest their rank that has room
+  place(id) {
+    const groups = new Map();
+    for (const p of this.players()) if (p.a.g) { const l = groups.get(p.a.g) || []; l.push(this.rankOf(p.a.id)); groups.set(p.a.g, l); }
+    if (!groups.size) return "normal";
+    const rk = this.rankOf(id), open = [...groups].filter(([, l]) => l.length < GROUP_SIZE), pool = open.length ? open : [...groups];
+    pool.sort((x, y) => Math.abs(x[1].reduce((s, v) => s + v, 0) / x[1].length - rk) - Math.abs(y[1].reduce((s, v) => s + v, 0) / y[1].length - rk));
+    return pool[0][0];
+  }
+  // At each countdown: everyone playing, sorted by rank, split into even groups of up to 6
+  regroup() {
+    const ps = this.players().sort((x, y) => this.rankOf(y.a.id) - this.rankOf(x.a.id));
+    const k = Math.min(3, Math.max(1, Math.ceil(ps.length / GROUP_SIZE))), names = GROUP_NAMES[k - 1];
+    const base = Math.floor(ps.length / k), extra = ps.length % k;
+    let i = 0;
+    names.forEach((g, gi) => { for (let n = base + (gi < extra ? 1 : 0); n > 0; n--, i++) { ps[i].a = { ...ps[i].a, g }; ps[i].ws.serializeAttachment(ps[i].a); } });
+    for (const p of ps) this.sendGroup(p.ws, p.a);
+  }
+  // How many are playing (and in which group), for the menu
+  pop(except) {
+    const groups = {}, ps = this.players(except);
+    for (const p of ps) if (p.a.g) groups[p.a.g] = (groups[p.a.g] || 0) + 1;
+    const out = JSON.stringify({ t: "pop", n: ps.length, groups });
+    for (const ws of this.ctx.getWebSockets()) if (ws !== except) { try { ws.send(out); } catch {} }
+  }
+  // The last one left in a group (or the lobby) mid-round wins that round
+  lastStanding(g, except) {
+    const r = this.round; if (r.ph !== "live") return;
+    const key = g || "all", left = this.players(except).filter(p => !g || p.a.g === g);
+    if (left.length !== 1 || (r.sizes[key] || 0) < 2 || r.won.includes(key)) return;
+    r.won.push(key);
+    try { left[0].ws.send(JSON.stringify({ t: "lastwin", n: r.n, size: r.sizes[key] })); } catch {}
+  }
+
   // Move the round on if it's time (or if players came or went), and tell everyone
   tickRound(except) {
     const now = Date.now(), r = this.round, T = this.times(), n = this.inMatch(except);
@@ -134,27 +190,37 @@ export class Lobby {
       else next = { ph: "count", ends: now + T.count, n: r.n };
     }
     if (!next) { if (r.ends > now) this.ctx.storage.setAlarm(r.ends).catch(() => {}); return; }
+    next.map = next.ph === "count" ? nextMap(r.map) : r.map;
+    next.sizes = r.sizes; next.won = r.won;
+    if (next.ph === "count" && this.ranked()) this.regroup();
+    if (next.ph === "live") {                                    // group sizes as the round starts
+      next.sizes = {}; next.won = [];
+      for (const p of this.players(except)) { const key = p.a.g || "all"; next.sizes[key] = (next.sizes[key] || 0) + 1; }
+    }
     this.round = next;
-    const out = JSON.stringify({ t: "round", ...next, now });
+    const out = JSON.stringify({ t: "round", ph: next.ph, ends: next.ends, n: next.n, map: next.map, now });
     for (const ws of this.ctx.getWebSockets()) { if (ws !== except) { try { ws.send(out); } catch {} } }
     if (next.ends) this.ctx.storage.setAlarm(next.ends).catch(() => {});
   }
   async alarm() { this.tickRound(); }
 
-  async fetch() {
+  async fetch(request) {
     const sockets = this.ctx.getWebSockets();
+    const ranked = lobbyName(new URL(request.url).searchParams.get("room")).startsWith("ranked");
     if (sockets.length >= MAX_PLAYERS) return new Response("Lobby is full", { status: 503 });
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 10);
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ id, auth: false });
+    server.serializeAttachment({ id, auth: false, ranked });
     const peers = [];
     for (const ws of sockets) {
       const a = ws.deserializeAttachment();
-      if (a && this.last.has(a.id)) peers.push({ id: a.id, d: this.last.get(a.id) });
+      if (!ranked && a && this.last.has(a.id)) peers.push({ id: a.id, d: this.last.get(a.id) });   // ranked: sent with the group
     }
-    server.send(JSON.stringify({ t: "welcome", id, peers, round: this.round, now: Date.now() }));
+    const r = this.round;
+    server.send(JSON.stringify({ t: "welcome", id, peers, round: { ph: r.ph, ends: r.ends, n: r.n, map: r.map }, now: Date.now() }));
+    this.pop();
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -166,8 +232,8 @@ export class Lobby {
     try { d = JSON.parse(message); } catch { return; }
     if (!d || typeof d !== "object" || Array.isArray(d)) return;
     if (d.t === "auth") {
-      const who = typeof d.who === "string" && PROTECTED[d.who] ? d.who : "doug";
-      const secret = this.env && this.env[who.toUpperCase() + "_PASSWORD"];
+      const who = typeof d.who === "string" && PROTECTED[d.who] ? d.who : null;
+      const secret = who && this.env && this.env[who.toUpperCase() + "_PASSWORD"];
       const ok = !!secret && typeof d.key === "string" && d.key === secret;
       ws.serializeAttachment({ ...a, auth: ok ? who : false });
       try { ws.send(JSON.stringify({ t: "auth", ok })); } catch {}
@@ -178,19 +244,34 @@ export class Lobby {
       try { ws.send(JSON.stringify({ t: "denied" })); } catch {}
       return;
     }
-    if (!(a.auth && PROTECTED[a.auth].invisible)) delete d.iv; // only verified profiles can be invisible
-    if (!(a.auth && PROTECTED[a.auth].nuke)) {                    // only Doug can nuke
+    const perk = a.auth && PROTECTED[a.auth] || {};
+    if (!perk.invisible) delete d.iv;                            // only verified profiles can be invisible
+    if (!perk.nuke) {                                            // or nuke
       delete d.nk;
       if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => !(h && h.nk)); // grenades (w: 3) still count
+    }
+    const pl = d.pl === 1;
+    if (pl && !a.pl && a.ranked && this.players().length >= RANKED_MAX) {              // ranked is full
+      try { ws.send(JSON.stringify({ t: "full", max: RANKED_MAX })); } catch {}
+      return;
     }
     this.referee(a, d);
     this.last.set(a.id, d);
     const out = JSON.stringify({ t: "st", id: a.id, d });
     for (const other of this.ctx.getWebSockets()) {
-      if (other !== ws) { try { other.send(out); } catch {} }
+      if (other === ws) continue;
+      if (a.ranked) { const o = other.deserializeAttachment(); if (!a.g || !o || o.g !== a.g) continue; }   // ranked: only your group
+      try { other.send(out); } catch {}
     }
-    const pl = d.pl === 1;
-    if (!!a.pl !== pl) { ws.serializeAttachment({ ...a, pl }); this.tickRound(); }      // joined or left a match
+    if (!!a.pl !== pl) {                                                                // joined or left a match
+      const old = a.g;
+      const early = this.round.ph === "wait" || this.round.ph === "count";       // no fighting yet: re-sort everyone
+      const now = { ...a, pl, g: pl && a.ranked ? (early ? "normal" : this.place(a.id)) : null };
+      ws.serializeAttachment(now);
+      if (now.g && early) this.regroup(); else if (now.g) this.sendGroup(ws, now);
+      if (!pl) { this.tellGroup(old, ws, JSON.stringify({ t: "leave", id: a.id })); this.lastStanding(old, ws); }
+      this.pop(); this.tickRound();
+    }
     else if (this.round.ends && Date.now() >= this.round.ends) this.tickRound();
   }
 
@@ -206,7 +287,15 @@ export class Lobby {
       if (other !== ws) { try { other.send(out); } catch {} }
     }
     try { ws.close(1000, "bye"); } catch {}
-    if (a.pl) this.tickRound(ws);
+    if (a.pl) { this.lastStanding(a.g, ws); this.tickRound(ws); }
+    this.pop(ws);
+  }
+  tellGroup(g, except, out) {
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws === except) continue;
+      const a = ws.deserializeAttachment(); if (g && (!a || a.g !== g)) continue;
+      try { ws.send(out); } catch {}
+    }
   }
 }
 

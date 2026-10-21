@@ -40,18 +40,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--ui);margin:0;-webki
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-/* ---------- menu ---------- */
-#menu{position:fixed;inset:0;display:grid;place-items:center;padding:16px;overflow-y:auto;background:radial-gradient(ellipse at center,rgba(11,16,22,.2),rgba(11,16,22,.75))}
 .card{width:min(480px,100%);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:24px 22px 20px;display:grid;gap:16px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 24px 60px rgba(0,0,0,.45)}
-.brand{display:grid;gap:6px}
-.brand h1{font-family:var(--display);font-weight:400;font-size:clamp(30px,8vw,42px);line-height:.95;margin:0;letter-spacing:.01em}
-.brand h1 span{color:var(--accent)}
-.brand p{margin:0;color:var(--muted);font-size:14px}
 .status{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .status i{width:9px;height:9px;border-radius:50%;background:var(--muted);display:block;flex:none}
 .status.live i{background:var(--ok);box-shadow:0 0 0 4px rgba(95,209,122,.18)}
 .status.live{color:var(--ink)}
-.two{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px}
 .field{display:grid;gap:6px;min-width:0}
 .field label,.lbl-sm{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .field label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.7}
@@ -59,13 +52,6 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .swatches{display:flex;flex-wrap:wrap;gap:8px}
 .swatches button{width:30px;height:30px;border-radius:4px;border:2px solid transparent;padding:0}
 .swatches button[aria-pressed="true"]{border-color:var(--ink);box-shadow:0 0 0 2px var(--bg) inset}
-.modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.mode{display:grid;gap:3px;text-align:left;border-radius:4px;padding:12px 14px;border:1px solid var(--line);background:rgba(255,255,255,.06)}
-.mode b{font:400 18px var(--display);letter-spacing:.03em}
-.mode span{font-size:12px;color:var(--muted)}
-.mode.primary{background:var(--accent);border-color:var(--accent);color:#1a1205}
-.mode.primary span{color:rgba(26,18,5,.75)}
-.mode:hover{filter:brightness(1.08)}
 .settings{display:grid;gap:12px;border-top:1px solid var(--line);padding-top:14px}
 .set-row{display:grid;grid-template-columns:120px minmax(0,1fr);align-items:center;gap:12px}
 .set-row output{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent);margin-left:6px}
@@ -83,8 +69,69 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 .classes.maps{grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
 .classes.maps button{text-align:center}
 .classes button[aria-pressed="true"]{background:rgba(255,182,39,.18);border-color:var(--accent);color:var(--accent)}
-.rankline{display:flex;align-items:baseline;gap:8px;font-size:13px;font-weight:600;color:var(--muted);flex-wrap:wrap}
-.rankline b{font:400 16px var(--display);letter-spacing:.03em}
+/* ---------- menu: a game lobby. Your character in the middle, tabs on top, a big Play button ---------- */
+#menu{position:fixed;inset:0;background:radial-gradient(ellipse 60% 70% at 50% 55%,rgba(11,16,22,.05),rgba(11,16,22,.55) 70%,rgba(11,16,22,.85)),linear-gradient(180deg,rgba(11,16,22,.75),rgba(11,16,22,0) 22%,rgba(11,16,22,0) 70%,rgba(11,16,22,.8))}
+.lobby{position:absolute;inset:0;display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr) minmax(240px,320px);grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"top top top" "side hero ." "foot foot foot";gap:12px;padding:calc(12px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) calc(16px + env(safe-area-inset-left,0px))}
+.lb-top{grid-area:top;display:flex;align-items:center;gap:18px;min-width:0}
+.brand{display:grid;line-height:.9;flex:none}
+.brand h1{font:400 30px var(--display);margin:0;letter-spacing:.01em;text-shadow:0 3px 0 rgba(0,0,0,.45)}
+.brand h1 span{color:var(--accent)}
+.brand p{margin:0;font:400 13px var(--display);letter-spacing:.32em;color:var(--muted)}
+.tabs{display:flex;gap:4px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;touch-action:pan-x}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;border:0;background:transparent;font:400 17px var(--display);letter-spacing:.04em;text-transform:uppercase;color:rgba(243,239,228,.62);padding:10px 14px;border-radius:4px;position:relative;text-shadow:0 2px 0 rgba(0,0,0,.4)}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink)}
+.tab.on::after{content:"";position:absolute;left:14px;right:14px;bottom:2px;height:4px;border-radius:2px;background:var(--accent)}
+.tab.prem{color:var(--accent)}
+.tab.prem.on::after{background:var(--accent)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rankbadge{flex:none;display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 12px;text-align:left}
+.rankbadge i{width:16px;height:16px;transform:rotate(45deg);border-radius:3px;flex:none;box-shadow:0 0 12px currentColor}
+.rankbadge b{display:block;font:400 15px var(--display);letter-spacing:.03em;white-space:nowrap}
+.rankbadge small{display:block;font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.lb-side{grid-area:side;align-self:start;display:grid;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;max-height:100%;overflow-y:auto;touch-action:pan-y;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-sizing:border-box}
+.lb-side .classes{grid-template-columns:repeat(2,minmax(0,1fr))}
+.lb-side .swatches button{width:28px;height:28px}
+.lb-hero{grid-area:hero;position:relative;display:grid;place-items:center;min-height:0;pointer-events:none}
+#hero{width:auto;height:100%;max-height:560px;aspect-ratio:3/4;max-width:100%;pointer-events:auto;touch-action:none;cursor:grab}
+.plate{position:absolute;left:50%;bottom:2%;transform:translateX(-50%);display:grid;justify-items:center;gap:2px;text-align:center;white-space:nowrap}
+.plate b{font:400 clamp(20px,3.4vw,30px) var(--display);letter-spacing:.03em;text-shadow:0 3px 0 rgba(0,0,0,.55)}
+.plate span{font:400 14px var(--display);letter-spacing:.06em;text-shadow:0 2px 0 rgba(0,0,0,.55)}
+.lb-foot{grid-area:foot;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.lb-foot .status{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 14px;max-width:min(520px,100%)}
+.playbox{display:grid;gap:8px;width:min(340px,100%);margin-left:auto}
+.modeswitch{display:grid;grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px;gap:3px}
+.modeswitch button{border:0;background:transparent;border-radius:4px;padding:8px 6px;font:400 14px var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.modeswitch button[aria-pressed="true"]{background:rgba(255,182,39,.2);color:var(--accent)}
+.partyrow{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 6px 6px 12px}
+.partyrow label{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.partyrow label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.75;font-weight:600}
+.partyrow input{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:4px;padding:7px 10px;color:var(--ink);font:600 15px var(--ui);-webkit-user-select:text;user-select:text;min-width:0;width:100%;box-sizing:border-box;text-transform:uppercase}
+.partyrow input:disabled{opacity:.5}
+.bigplay{display:grid;justify-items:center;gap:0;border:0;border-radius:8px;padding:12px 18px 10px;background:linear-gradient(180deg,#ffd23a,#ffb627 55%,#f39a12);color:#1a1205;box-shadow:0 6px 0 #b8700a,0 14px 30px rgba(0,0,0,.45);transition:transform .08s,box-shadow .08s}
+.bigplay b{font:400 clamp(34px,5vw,46px) var(--display);letter-spacing:.06em;line-height:1}
+.bigplay span{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.8}
+.bigplay:hover{filter:brightness(1.06)}
+.bigplay:active{transform:translateY(4px);box-shadow:0 2px 0 #b8700a,0 8px 20px rgba(0,0,0,.45)}
+#setSheet{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.78);padding:16px;z-index:6;overflow-y:auto}
+#setSheet .card{max-width:560px;gap:12px}
+#setSheet h2{font:400 26px var(--display);margin:0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+#setBody{display:grid;gap:12px}
+#setBody .settings{border-top:0;padding-top:0}
+/* narrow screens (phones, iPad portrait): character on top, everything stacks */
+@media (max-width:820px){
+  .lobby{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto auto;grid-template-areas:"top" "hero" "foot" "side";overflow-y:auto;touch-action:pan-y}
+  .lb-top{flex-wrap:wrap;gap:8px}
+  .tabs{order:3;flex-basis:100%}
+  .rankbadge{margin-left:auto}
+  .lb-side{max-height:none;overflow:visible}
+  .lb-foot{flex-direction:column-reverse;align-items:stretch}
+  .playbox{width:100%}
+  .lb-foot .status{align-self:center}
+  .lb-hero{height:42vh}
+  #hero{height:100%;max-height:none}
+}
 
 /* ---------- HUD ---------- */
 #hud{position:fixed;inset:0;pointer-events:none}
@@ -429,84 +476,116 @@ body.pig #pigTint{display:block}
 </div>
 
 <div id="menu">
-  <div class="card">
-    <div class="brand">
-      <h1>Cube<span>fire</span><br>Arena</h1>
-      <p>Free-for-all voxel shooter. Play online with friends on any device, or warm up against bots.</p>
-    </div>
-    <div class="status" id="menuStatus"><i></i><span>Connecting to the arena…</span></div>
-    <div class="rankline" id="menuRank"></div>
-    <div class="two">
+  <div class="lobby">
+    <header class="lb-top">
+      <div class="brand">
+        <h1>Cube<span>fire</span></h1>
+        <p>Arena</p>
+      </div>
+      <nav class="tabs" aria-label="Lobby">
+        <button type="button" class="tab on" id="tabPlay">Play</button>
+        <button type="button" class="tab" id="openLocker">Locker<span id="lockerSub" class="sr"></span></button>
+        <button type="button" class="tab" id="tabRanks">Ranks</button>
+        <button type="button" class="tab prem" id="openPremium" hidden>★ Premium<span id="premiumSub" class="sr"></span></button>
+        <button type="button" class="tab" id="tabSettings">Settings</button>
+      </nav>
+      <button type="button" class="rankbadge" id="menuRank" aria-label="Your rank"></button>
+    </header>
+
+    <aside class="lb-side">
       <div class="field">
         <label for="nick">Callsign</label>
         <input type="text" id="nick" maxlength="24" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Your name">
       </div>
       <div class="field">
-        <label for="code">Party code <em id="codeLock">optional</em></label>
-        <input type="text" id="code" maxlength="12" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="Open lobby">
+        <span class="lbl-sm" id="colorLbl">Armor</span>
+        <div class="swatches" id="swatches" role="group" aria-labelledby="colorLbl"></div>
       </div>
-    </div>
-    <div class="field">
-      <span class="lbl-sm" id="colorLbl">Armor color</span>
-      <div class="swatches" id="swatches" role="group" aria-labelledby="colorLbl"></div>
-    </div>
-    <div class="field">
-      <span class="lbl-sm" id="mapLbl">Map</span>
-      <div class="classes maps" id="mapPick" role="group" aria-labelledby="mapLbl"></div>
-    </div>
-    <div class="field" id="classField">
-      <span class="lbl-sm" id="classLbl">Class</span>
-      <div class="classes" id="classPick" role="group" aria-labelledby="classLbl"></div>
-      <p class="fine" id="classDesc"></p>
-    </div>
-    <div class="field" id="dougField" hidden>
-      <span class="lbl-sm"><span id="hackWho">Doug's hacks</span> <em>pick before the round</em></span>
-      <p class="fine" id="hackHint" hidden></p>
-      <div class="classes" id="hackPick"></div>
-      <div class="btns" id="dougActions" hidden><button class="btn" type="button" id="dkNukeP">Nuke</button><button class="btn" type="button" id="dkTpP">Teleport to…</button></div>
-      <div class="classes" id="tpPick" hidden></div>
-    </div>
-    <button class="mode" id="openPremium" type="button" hidden><b>★ Premium</b><span id="premiumSub">Free · turn on notifications to play online</span></button>
-    <button class="mode" id="openLocker" type="button"><b>Locker</b><span id="lockerSub">Skins and the skin wheel · sign in to start</span></button>
-    <div class="modes">
-      <button class="mode primary" id="playOnline" type="button"><b>Play online</b><span id="onlineSub">Real players only, no bots</span></button>
-      <button class="mode" id="playBots" type="button"><b>Bot match</b><span>Practice against 6–8 bots</span></button>
-    </div>
-    <div class="settings" id="settings">
-      <div class="set-row">
-        <label class="lbl-sm" for="sens">Look speed <output id="sensOut">6</output></label>
-        <input type="range" id="sens" min="1" max="12" step="0.5" value="6">
+      <div class="field" hidden>
+        <span class="lbl-sm" id="mapLbl">Map</span>
+        <div class="classes maps" id="mapPick" role="group" aria-labelledby="mapLbl"></div>
       </div>
-      <div class="set-row">
-        <span class="lbl-sm" id="assistLbl">Aim assist</span>
-        <div class="seg" id="assist" role="group" aria-labelledby="assistLbl">
-          <button type="button" data-v="2">Strong</button><button type="button" data-v="1">Normal</button><button type="button" data-v="0">Off</button>
+      <div class="field" id="classField">
+        <span class="lbl-sm" id="classLbl">Class</span>
+        <div class="classes" id="classPick" role="group" aria-labelledby="classLbl"></div>
+        <p class="fine" id="classDesc"></p>
+      </div>
+      <div class="field" id="dougField" hidden>
+        <span class="lbl-sm"><span id="hackWho">Hacks</span> <em>pick before the round</em></span>
+        <p class="fine" id="hackHint" hidden></p>
+        <div class="classes" id="hackPick"></div>
+        <div class="btns" id="dougActions" hidden><button class="btn" type="button" id="dkNukeP">Nuke</button><button class="btn" type="button" id="dkTpP">Teleport to…</button></div>
+        <div class="classes" id="tpPick" hidden></div>
+      </div>
+    </aside>
+
+    <div class="lb-hero">
+      <canvas id="hero" width="420" height="560" aria-label="Your character"></canvas>
+      <div class="plate"><b id="heroName">Player</b><span id="heroRank"></span></div>
+    </div>
+
+    <footer class="lb-foot">
+      <div class="status" id="menuStatus"><i></i><span>Connecting to the arena…</span></div>
+      <div class="playbox">
+        <div class="modeswitch" role="group" aria-label="Mode">
+          <button type="button" id="modeRanked" aria-pressed="true">Ranked</button><button type="button" id="modeBots" aria-pressed="false">Bot match</button>
+        </div>
+        <div class="partyrow">
+          <label for="code">Party <em id="codeLock">optional</em></label>
+          <input type="text" id="code" maxlength="12" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="Open lobby">
+        </div>
+        <button type="button" class="bigplay" id="bigPlay"><b>Play</b><span id="playSub">Ranked · matched by rank</span></button>
+        <div hidden>
+          <button type="button" id="playOnline"><span id="onlineSub"></span></button>
+          <button type="button" id="playBots"></button>
         </div>
       </div>
-      <div class="set-row">
-        <span class="lbl-sm" id="gfxLbl">Graphics</span>
-        <div class="seg" id="gfx" role="group" aria-labelledby="gfxLbl">
-          <button type="button" data-v="auto">Auto</button><button type="button" data-v="fast">Fast</button><button type="button" data-v="sharp">Sharp</button>
+    </footer>
+  </div>
+</div>
+
+<div id="setSheet" hidden>
+  <div class="card" role="dialog" aria-labelledby="setTitle">
+    <h2 id="setTitle">Settings <button class="btn" type="button" id="setClose">Close</button></h2>
+    <div id="setBody">
+      <div class="settings" id="settings">
+        <div class="set-row">
+          <label class="lbl-sm" for="sens">Look speed <output id="sensOut">6</output></label>
+          <input type="range" id="sens" min="1" max="12" step="0.5" value="6">
         </div>
+        <div class="set-row">
+          <span class="lbl-sm" id="assistLbl">Aim assist</span>
+          <div class="seg" id="assist" role="group" aria-labelledby="assistLbl">
+            <button type="button" data-v="2">Strong</button><button type="button" data-v="1">Normal</button><button type="button" data-v="0">Off</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <span class="lbl-sm" id="gfxLbl">Graphics</span>
+          <div class="seg" id="gfx" role="group" aria-labelledby="gfxLbl">
+            <button type="button" data-v="auto">Auto</button><button type="button" data-v="fast">Fast</button><button type="button" data-v="sharp">Sharp</button>
+          </div>
+        </div>
+        <p class="fine" id="assistNote">Applies to bot matches. Online matches always use Normal aim assist so everyone is even.</p>
       </div>
-      <p class="fine" id="assistNote">Applies to bot matches. Online matches always use Normal aim assist so everyone is even.</p>
+      <span class="lbl-sm">Controls</span>
+      <ul class="keys" id="keysHelp">
+        <li><b>WASD</b>Move</li>
+        <li><b>Space</b>Jump</li>
+        <li><b>Shift</b>Run</li>
+        <li><b>Q / X</b>Dash</li>
+        <li><b>Click</b>Shoot</li>
+        <li><b>Right-click / E</b>Aim</li>
+        <li><b>C</b>Crouch</li>
+        <li><b>R</b>Reload</li>
+        <li><b>1 2</b>Class gun, pistol</li>
+        <li><b>G</b>Throw grenade</li>
+        <li><b>Tab</b>Scoreboard · <b>P</b>Pause</li>
+      </ul>
+      <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
+      <span class="lbl-sm">How ranked works</span>
+      <p class="fine">Ranked puts you with players near your rank: up to 18 play at once, in groups of about 6 (Elite, Normal and Trash lobbies). Rounds last 3 minutes once 2 players are in, and every round is on a new map. Ranked points: +30 for each elimination (+5 for a headshot); a death costs 2 RP at Bronze, rising with rank to 28 at Legend; and for winning a round +100 (under 4 players) or +300 (4 or more); second place gets a third of that (+33 or +100). If everyone else leaves, the last player left wins the round.</p>
+      <p class="fine">Friends who type the same party code land in the same private match (Diamond and higher only). Leave it blank to join ranked.</p>
     </div>
-    <ul class="keys" id="keysHelp">
-      <li><b>WASD</b>Move</li>
-      <li><b>Space</b>Jump</li>
-      <li><b>Shift</b>Run</li>
-      <li><b>Q / X</b>Dash</li>
-      <li><b>Click</b>Shoot</li>
-      <li><b>Right-click / E</b>Aim</li>
-      <li><b>C</b>Crouch</li>
-      <li><b>R</b>Reload</li>
-      <li><b>1 2</b>Class gun, pistol</li>
-      <li><b>G</b>Throw grenade</li>
-      <li><b>Tab</b>Scoreboard · <b>P</b>Pause</li>
-    </ul>
-    <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
-    <p class="fine">Online matches are played in 3-minute rounds once 2 players are in; you can jump in at any time, even mid-round. Ranked: +30 for each elimination (+5 for a headshot), −10 for each death, and for winning a round +100 (under 4 players) or +300 (4 or more); second place gets a third of that (+33 or +100). From Champion up, eliminations give 18 and deaths cost 17.</p>
-    <p class="fine">Friends who type the same party code land in the same private match (Champion I and higher only). Leave it blank to join the open arena.</p>
   </div>
 </div>
 
@@ -557,7 +636,7 @@ body.pig #pigTint{display:block}
     <div class="lb-head"><b>Leaderboard</b><span class="fine" id="lbNote"></span></div>
     <div class="lb" id="leaderboard"></div>
     <div class="ranklist" id="rankList"></div>
-    <p class="fine">+30 RP for each elimination (+5 for a headshot); −10 RP for each death. Winning a round gives +100 RP, or +300 RP when 4 or more players are in it, and second place gets a third of that (+33 or +100 RP). From Champion up it gets much harder: eliminations give 18 RP and deaths cost 17. Only online rounds count. Every rank but Legend has three levels: III, II, then I.</p>
+    <p class="fine">+30 RP for each elimination (+5 for a headshot). A death costs more the higher your rank: Bronze −2, Silver −5, Gold −9, Platinum −12, Diamond −15, Master −18, Champion −22, Mythic −25, Legend −28. Winning a round gives +100 RP, or +300 RP when 4 or more players are in it, and second place gets a third of that (+33 or +100 RP). Only online rounds count. Every rank but Legend has three levels: III, II, then I.</p>
     <div class="btns"><button class="btn primary" type="button" id="ranksClose">Close</button></div>
   </div>
 </div>
@@ -1562,11 +1641,11 @@ const RANKS = [
   { name: "Mythic", min: 8000, color: "#ff8f3a" },
   { name: "Legend", min: 15000, color: "#fff08a" },
 ];
-const RP = { kill: 30, head: 5, death: 10, win: 100, bigWin: 300, bigRound: 4 };   // bigWin: rounds with 4+ players; 2nd place gets a third
-// From Champion up, eliminations give less and deaths cost more, so the elite ranks are hard to reach
-const ELITE = 3500;
-const rpGain = n => rankPts >= ELITE ? Math.round(n * 0.6) : n;
-const rpLoss = n => rankPts >= ELITE ? Math.round(n * 5 / 3) : n;
+const RP = { kill: 30, head: 5, death: 20, win: 100, bigWin: 300, bigRound: 4 };   // bigWin: rounds with 4+ players; 2nd place gets a third
+// +30 for every elimination at any rank; deaths cost more the higher you are (Bronze 2 … Legend 28)
+const DEATH_LOSS = [2, 5, 9, 12, 15, 18, 22, 25, 28];   // one per rank in RANKS
+const rankTier = () => { let i = 0; RANKS.forEach((R, k) => { if (rankPts >= R.min) i = k; }); return i; };
+const rpGain = n => n, rpLoss = () => DEATH_LOSS[rankTier()];
 // Each rank but the top one has three divisions: III, then II, then I
 function rankOf(pts) {
   pts = Math.max(0, pts || 0);
@@ -2249,7 +2328,7 @@ function applyPigTheme() {
   // On this device the game becomes "Pig Fire": pig names for the game, guns, maps and labels
   document.title = "Pig Fire";
   const h1 = document.querySelector(".brand h1"); if (h1) { h1.textContent = "Pig"; const sp = document.createElement("span"); sp.textContent = "fire"; h1.appendChild(sp); }
-  const tag = document.querySelector(".brand p"); if (tag) tag.textContent = "Free-for-all oink-fest. Play online with friends, or warm up against piglets.";
+  const tag = document.querySelector(".brand p"); if (tag) tag.textContent = "Oink Arena";
   WEAPONS.forEach(w => { w.name = w.pig; });
   for (const m of Object.values(MAPS)) m.name = "Pig " + m.name;
   document.querySelectorAll("#mapPick button").forEach(b => { if (MAPS[b.dataset.v]) b.textContent = MAPS[b.dataset.v].name; });
@@ -2437,7 +2516,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 26;
+const BUILD = 28;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2455,7 +2534,10 @@ const iAmAfk = () => document.hidden || now() - lastInputT > AFK_IDLE;
 const activePeer = r => r.pl && !r.afk && now() - r.seen < STALE;
 function setNet(s) { netState = s; renderStatus(); }
 const MAP_VERSION = "v4"; // bump when map layouts change so mismatched versions never share a lobby
-const lobbyKey = code => mapId + MAP_VERSION + "-" + (code || "open");
+const lobbyKey = code => (code ? "party" : "ranked") + MAP_VERSION + "-" + (code || "open");
+// Ranked: the server sorts players by rank into lobbies of about 6
+const GROUP_LABEL = { elite: "Elite lobby", normal: "Normal lobby", trash: "Trash lobby" };
+let myGroup = null, pop = null, serverMap = null;
 
 function serverUrl(name) {
   const local = location.host === SERVER_HOST || /^(localhost|127\.0\.0\.1):87\d\d$/.test(location.host);
@@ -2494,6 +2576,10 @@ function connectServer(name) {
       onPeer({ peer: String(m.id), presence: m.d && typeof m.d === "object" ? m.d : {}, kind: "viewer", sameTab: false });
       renderStatus();
     } else if (m.t === "leave" && m.id) removeRemote(String(m.id));
+    else if (m.t === "group") onGroup(m);
+    else if (m.t === "pop") { pop = { n: num(m.n) || 0, groups: m.groups && typeof m.groups === "object" ? m.groups : {} }; renderStatus(); }
+    else if (m.t === "lastwin") onLastWin(m);
+    else if (m.t === "full" && state === "play" && mode === "online") { leaveMatch(); banner(`Ranked is full (${num(m.max) || 18} players). Try again in a minute`); }
     else if (m.t === "round") setRound(m);
     else if (m.t === "update") { mustRefresh = true; autoReload(); }
     else if (m.t === "auth") { authedAs = m.ok ? authWho : null; if (authWait) authWait(!!m.ok); }
@@ -2845,8 +2931,29 @@ const roundLeft = () => Math.max(0, (round.endsAt - Date.now()) / 1000);
 const roundFrozen = () => roundsOn() && state === "play" && round.ph === "end";
 // Ranked only counts in online rounds that are live (or always, where there are no rounds)
 const rankedNow = () => state === "play" && mode === "online" && !spectating && (!roundsOn() || round.ph === "live");
+// Ranked: which lobby you're in, and who else is in it
+function onGroup(m) {
+  const g = GROUP_LABEL[m.g] ? m.g : null, ids = new Set();
+  for (const p of Array.isArray(m.peers) ? m.peers : []) if (p && p.id && p.d) { ids.add(String(p.id)); onPeer({ peer: String(p.id), presence: p.d, kind: "viewer", sameTab: false }); }
+  for (const id of [...remotes.keys()]) if (!ids.has(id)) removeRemote(id);
+  if (g && g !== myGroup && state === "play" && mode === "online") banner(myGroup ? "Moved to the " + GROUP_LABEL[g] : "You're in the " + GROUP_LABEL[g]);
+  myGroup = g; renderStatus();
+}
+// Everyone else left in the middle of a round: you win it
+function onLastWin(m) {
+  if (state !== "play" || mode !== "online" || spectating) return;
+  const size = num(m.size) || 2;
+  round.wonN = num(m.n);
+  addRank(size >= RP.bigRound ? RP.bigWin : RP.win); pendWins++;
+  banner("Everyone else left · you win round " + round.wonN + "!");
+}
 function setRound(m) {
   const ph = ["wait", "count", "live", "end"].includes(m.ph) ? m.ph : "wait";
+  // every round is on a new map, picked by the server (not during a bot match)
+  if (netKind === "ws" && MAPS[m.map]) {
+    serverMap = m.map;
+    if (m.map !== mapId && !(state === "play" && mode === "bots")) { loadMap(m.map); if (state === "play" && mode === "online") respawn(); }
+  }
   const skew = num(m.now) !== null ? m.now - Date.now() : 0;
   const prev = round.ph, same = round.lobby === lobbyName;
   round.ph = ph; round.endsAt = (num(m.ends) || 0) - skew; round.n = clamp(Math.floor(num(m.n) || 0), 0, 1e6); round.lobby = lobbyName;
@@ -2869,7 +2976,8 @@ function onRoundPhase(prev, ph) {
     banner("Round " + round.n + " · Fight!"); blip(880, 0.12, 0.12); blip(1320, 0.25, 0.12, "square", 0.12);
   } else if (ph === "end") {
     const st = standings(), top = st[0];
-    if (prev === "live" && top && top.k > 0) {
+    if (round.wonN === round.n) banner("You won round " + round.n + "!");                 // already won: everyone else left
+    else if (prev === "live" && top && top.k > 0) {
       const winners = st.filter(p => p.k === top.k);
       banner(winners.length === 1 ? top.name + " wins round " + round.n + "!" : "Round " + round.n + " is a tie!");
       const prize = st.filter(p => !p.sp).length >= RP.bigRound ? RP.bigWin : RP.win;
@@ -2906,17 +3014,16 @@ function addRank(delta) {
 function renderRank() {
   const rk = rankOf(rankPts);
   const n = $("#rankName"); n.textContent = rk.label; n.style.color = rk.color; $("#rankPts").textContent = rankPts + " RP";
-  const m = $("#menuRank"), a = document.createElement("span"), b = document.createElement("b"), c = document.createElement("span");
-  a.textContent = "Your rank"; b.textContent = rk.label; b.style.color = rk.color; c.textContent = rankPts + " RP";
-  const open = document.createElement("button"); open.type = "button"; open.className = "linkbtn"; open.textContent = "See all ranks";
-  open.addEventListener("click", showRanks);
-  m.replaceChildren(a, b, c, open);
+  const m = $("#menuRank"), dia = document.createElement("i"), txt = document.createElement("span"), b = document.createElement("b"), c = document.createElement("small");
+  dia.style.background = rk.color; dia.style.color = rk.color; b.textContent = rk.label; b.style.color = rk.color; c.textContent = rankPts + " RP";
+  txt.append(b, c); m.replaceChildren(dia, txt);
+  if (typeof renderPlate === "function" && $("#heroRank")) { $("#heroRank").textContent = rk.label; $("#heroRank").style.color = rk.color; }
   if (!$("#ranks").hidden) showRanks();
   renderPartyLock();
 }
-// Party codes (private matches) are only for Champion I and higher
-const PARTY_RANK = "Champion I";
-const partyMin = () => rankSteps().find(s => s.label === PARTY_RANK).min;
+// Party codes (private matches) are only for Diamond and higher
+const PARTY_RANK = "Diamond";
+const partyMin = () => RANKS.find(R => R.name === PARTY_RANK).min;
 const canParty = () => rankPts >= partyMin();
 function renderPartyLock() {
   const inp = $("#code"), ok = canParty(); if (!inp) return;
@@ -2987,28 +3094,18 @@ async function loadLeaderboard() {
 $("#ranksClose").addEventListener("click", () => { $("#ranks").hidden = true; });
 $("#ranks").addEventListener("click", e => { if (e.target.id === "ranks") $("#ranks").hidden = true; });
 $("#pauseRanks").addEventListener("click", showRanks);
-// ---- Hack profiles: "Doug" in green armor and "Alex" in blue armor. Bot matches
-// need nothing more; online matches need the password, which the game server checks
-// (it's a secret on the server, never in this code). Where there is no game server
-// (claude.ai, peer-to-peer) the password is checked against its SHA-256 fingerprint.
+// ---- Hack profiles: all hacks are removed, so there are none. (A profile was a name +
+// armor color that unlocked perks; online it needed a password the game server checks.)
 const DOUG_COLOR = 2; // green in PAL
-// Cheat profiles: a name + armor color unlocks a set of perks; each needs its password
-// online. Colors are indexes into PAL.
-const PROFILES = {
-  doug: { color: DOUG_COLOR, perks: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], nukeWait: 0, password: true },
-  alex: { color: 3, perks: ["wall"], nukeWait: 0, password: true },   // blue: wall hacks only
-};
-// Other names that use a profile (same armor color and password)
-const PROFILE_ALIAS = { duke: "doug", bill: "doug" };
+const PROFILES = {};
+const PROFILE_ALIAS = {};
 const profileKey = name => { const nm = cleanName(name).toLowerCase(); return PROFILE_ALIAS[nm] || nm; };
 const PERK_DEFAULT = { aim: true, god: true, snipe: true, wall: true, inv: false };
 const PERK_BUTTON = { aim: "dkAim", god: "dkGod", snipe: "dkSnipe", wall: "dkWall", inv: "dkInv", tp: "dkTp", nuke: "dkNuke" };
 const hasPerk = k => duke.on && duke.perks.includes(k);
 // SHA-256 fingerprints, used only where there's no game server (claude.ai, peer-to-peer).
 // Online through the game server, passwords are checked against the server's secrets.
-const PASSWORD_HASH = {
-  doug: "744120d75bb6e2e92c194f056307d6da7c113823649a6ef5ddcc9ff660e1043d",
-};
+const PASSWORD_HASH = {};
 const duke = { on: false, profile: null, perks: [], aim: false, god: false, snipe: false, wall: false, inv: false };
 let authKey = "", authWho = "", authedAs = null, authWait = null;
 // Which password-protected profile a name and the chosen color pick, if any
@@ -4006,22 +4103,27 @@ function rowEl(cells, cls) {
   for (const c of cells) { const s = document.createElement("span"); s.textContent = c; r.appendChild(s); }
   return r;
 }
-function lobbyCode() { return lobbyName ? lobbyName.slice(mapId.length + MAP_VERSION.length + 1) : "open"; }
+function lobbyCode() { return lobbyName ? lobbyName.slice(lobbyName.indexOf("-") + 1) : "open"; }
 function lobbyLabel() {
   const m = MAPS[mapId].name, code = lobbyCode();
-  return code === "open" ? "the open " + m + " lobby" : "party " + code.toUpperCase() + " on " + m;
+  return code === "open" ? (myGroup ? "the " + GROUP_LABEL[myGroup] : "ranked") + " on " + m : "party " + code.toUpperCase() + " on " + m;
 }
 function renderStatus() {
   const n = playersOnline();
   const st = $("#menuStatus");
   let txt;
-  if (netState === "live") txt = n === 0 ? `Online · nobody in ${lobbyLabel()} yet` : `Online · ${n} playing in ${lobbyLabel()}`;
+  if (netState === "live" && lobbyCode() === "open" && netKind === "ws" && state !== "play") {
+    const g = pop && pop.groups ? Object.keys(GROUP_LABEL).filter(k => pop.groups[k]).map(k => GROUP_LABEL[k].split(" ")[0] + " " + pop.groups[k]) : [];
+    txt = !pop || !pop.n ? "Online · nobody playing ranked yet" : `Online · ${pop.n} playing ranked` + (g.length > 1 ? " · " + g.join(" · ") : "");
+  }
+  else if (netState === "live") txt = n === 0 ? `Online · nobody in ${lobbyLabel()} yet` : `Online · ${n} playing in ${lobbyLabel()}`;
   else if (netState === "connecting") txt = "Connecting to the game server…";
   else if (netState === "searching") txt = "Looking for other players…";
   else txt = "Online play unavailable here · bot match still works";
   st.className = "status" + (netState === "live" ? " live" : "");
   st.querySelector("span").textContent = txt;
-  $("#onlineSub").textContent = netState === "offline" ? "Unavailable on this page" : "Real players only, no bots";
+  if (netState === "offline") $("#onlineSub").textContent = "Unavailable on this page";
+  if ($("#playSub")) renderPlaySub();
 }
 let hudT = 0;
 const RING = 138.2;
@@ -4112,6 +4214,7 @@ function renderRoundHud() {
   else if (round.ph === "count") title = "Round " + (round.n + 1) + " starts in";
   else if (round.ph === "live") title = "Round " + round.n;
   else title = "Round " + round.n + " over · next in";
+  if (myGroup && lobbyCode() === "open") title = GROUP_LABEL[myGroup] + " · " + title;   // tell people their lobby
   $("#roundTitle").textContent = title; $("#roundTime").textContent = time;
   rh.className = round.ph === "live" ? (left < 30 ? "live hurry" : "live") : "";
   // the last seconds of the countdown, out loud
@@ -4212,6 +4315,9 @@ function startGame(m) {
   if (!$("#notice").hidden) { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); } // seen it; clear the screen for play
   state = "play";
   $("#menu").hidden = true; $("#hud").hidden = false; $("#touch").hidden = !isTouch;
+  if (m === "bots") { const ids = Object.keys(MAPS).filter(k => k !== mapId); loadMap(ids[Math.floor(Math.random() * ids.length)]); }
+  else if (netKind === "ws") { if (serverMap && serverMap !== mapId && !partyCode) loadMap(serverMap); }
+  else if (mapId !== "arena") loadMap("arena");                           // no game server: everyone on one map
   if (m === "bots") startBots(); else { stopBots(); joinLobby(partyCode); }
   for (const r of remotes.values()) if (r.av) r.av.g.visible = false;
   respawn();
@@ -4256,7 +4362,7 @@ const API = (() => {
 })();
 let acctToken = load("cfa.tok") || "", acct = null;
 try { acct = acctToken ? JSON.parse(load("cfa.acct") || "null") : null; } catch (e) { acct = null; }
-// Perks that come with an account (the "Alex" account always has wall hacks, no switch)
+// Perks that come with an account (none right now)
 function acctPerk(k) { return !!(acct && Array.isArray(acct.perks) && acct.perks.includes(k)); }
 function mySkin() { return acct && acct.equipped && SKIN_DEFS[acct.equipped] ? acct.equipped : null; }
 async function api(op, body) {
@@ -4481,7 +4587,7 @@ renderLocker(); applyGunFinish();
 if (acctToken) api("me").catch(() => {});
 
 // One-time update notice; each device sees it until it's dismissed
-const NOTICE = { id: "rp-rules-3", text: "Ranked points changed: +30 per elimination, only −10 per death, and second place in a round now gets a third of the winner's points (+33, or +100 in rounds with 4 or more players). Also new: ★ Premium, free with notifications, unlocks online play and Call players." };
+const NOTICE = { id: "ranked-1", text: "New: ranked matchmaking. Press Play ranked and you're matched with players near your rank in the Elite, Normal or Trash lobby (up to 18 players). Every round is on a new map. Ranked points: +30 per elimination; a death costs 2 RP at Bronze up to 28 at Legend; second place gets a third of the win. Party codes now unlock at Diamond." };
 if (load("cfa.notice") !== NOTICE.id) { $("#noticeText").textContent = NOTICE.text; $("#notice").hidden = false; }
 $("#noticeOk").addEventListener("click", () => { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); });
 $("#pwForm").addEventListener("submit", async e => {
@@ -4550,7 +4656,8 @@ function renderPremium() {
   $("#openPremium").hidden = !onOwnSite;
   $("#premiumSub").textContent = premium ? "Active · you get notified when people play" : "Free · turn on notifications to play online";
   $("#openPremium").classList.toggle("on", premium);
-  $("#onlineSub").textContent = needsPremium() ? "★ Premium · free with notifications" : "Real players only, no bots";
+  $("#onlineSub").textContent = needsPremium() ? "Ranked · needs ★ Premium (free)" : "Ranked · matched by rank";
+  renderPlaySub();
   if ($("#premium").hidden) return;
   const box = $("#premiumBody"); box.replaceChildren();
   const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); for (const k of kids || []) e.append(k); return e; };
@@ -4606,11 +4713,10 @@ $("#callHud").addEventListener("click", () => { if (!isTouchUI()) callPlayers();
 function applyInvite(q) {
   const map = String(q.get("map") || ""), code = cleanCode(q.get("code") || ""), from = cleanName(q.get("from") || "") || "Someone";
   if (state !== "menu") { banner(`${from} is calling players to ${MAPS[map] ? MAPS[map].name : "a match"}`); return; }
-  if (MAPS[map] && map !== mapId) { loadMap(map); save("cfa.map", mapId); renderMapPick(); }
   if (canParty()) { codeIn.value = code.toUpperCase(); partyCode = code; save("cfa.code", partyCode); }
   else if (code) { banner(`${from} is in a private party. Party codes unlock at ${PARTY_RANK}`); return; }
   joinLobby(""); renderStatus();
-  banner(`${from} is playing ${MAPS[mapId].name}! Tap Play online to join`);
+  banner(`${from} is playing${MAPS[map] ? " " + MAPS[map].name : ""}! Tap Play ranked to join`);
 }
 {
   const q = new URLSearchParams(location.search);
@@ -4618,20 +4724,89 @@ function applyInvite(q) {
   if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => { if (e.data && e.data.join) applyInvite(new URLSearchParams(e.data.join)); });
 }
 renderPremium();
+// ======================================================================
+// Lobby: your character on a glowing stage, tabs on top, mode switch and a big Play button
+// ======================================================================
+let hk = null, heroYaw = 0.5, heroDrag = null;
+function heroKit() {
+  if (hk) return hk;
+  const r = new THREE.WebGLRenderer({ canvas: $("#hero"), antialias: true, alpha: true });
+  r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  const sc = new THREE.Scene();
+  sc.add(new THREE.HemisphereLight(0xffffff, 0x334455, 0.95));
+  const key = new THREE.DirectionalLight(0xffffff, 0.75); key.position.set(-1.5, 3, -3); sc.add(key);
+  const rim = new THREE.DirectionalLight(0xffb627, 0.7); rim.position.set(2, 2, 3); sc.add(rim);
+  const cam = new THREE.PerspectiveCamera(30, 3 / 4, 0.1, 30); cam.position.set(0, 1.4, -6.1); cam.lookAt(0, 0.95, 0);
+  // the stage: a dark disc with a glowing rim and a soft glow on the floor
+  const stage = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.15, 0.22, 40), new THREE.MeshLambertMaterial({ color: 0x1a222c }));
+  stage.position.y = -0.11; sc.add(stage);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.06, 0.035, 8, 64), new THREE.MeshBasicMaterial({ color: 0xffb627 }));
+  ring.rotation.x = Math.PI / 2; ring.position.y = 0.005; sc.add(ring);
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.2), new THREE.MeshBasicMaterial({ map: auraTex, color: 0xffb627, transparent: true, opacity: 0.55, depthWrite: false }));
+  glow.rotation.x = -Math.PI / 2; glow.position.y = 0.01; sc.add(glow);
+  hk = { r, sc, cam, av: null, key: "", w: 0, h: 0, ring, glow };
+  const c = $("#hero");
+  c.addEventListener("pointerdown", e => { heroDrag = { x: e.clientX, yaw: heroYaw }; c.setPointerCapture(e.pointerId); c.style.cursor = "grabbing"; });
+  c.addEventListener("pointermove", e => { if (heroDrag) heroYaw = heroDrag.yaw + (e.clientX - heroDrag.x) * 0.012; });
+  const up = () => { heroDrag = null; c.style.cursor = ""; };
+  c.addEventListener("pointerup", up); c.addEventListener("pointercancel", up);
+  return hk;
+}
+function updateHero(dt, t) {
+  if (state !== "menu" || $("#menu").hidden) return;
+  const k = heroKit(), c = $("#hero"), w = c.clientWidth, h = c.clientHeight;
+  if (!w || !h) return;
+  if (w !== k.w || h !== k.h) { k.w = w; k.h = h; k.r.setSize(w, h, false); k.cam.aspect = w / h; k.cam.updateProjectionMatrix(); }
+  const skin = pigMode ? "pig" : mySkin() || "default", key = skin + "|" + myColor;
+  if (key !== k.key) { if (k.av) disposeAvatar(k.av); k.av = makeAvatar(PAL[myColor], null, skin, null, k.sc); k.key = key; }
+  if (!heroDrag) heroYaw += dt * 0.45;
+  k.av.g.rotation.y = heroYaw;
+  k.av.g.position.y = Math.sin(t * 1.6) * 0.02;
+  if (k.av.anim) k.av.anim(k.av, t);
+  const col = new THREE.Color(PAL[myColor]); k.ring.material.color.copy(col); k.glow.material.color.copy(col);
+  k.glow.material.opacity = 0.45 + 0.12 * Math.sin(t * 2);
+  k.r.render(k.sc, k.cam);
+}
+function renderPlate() {
+  const R = rankOf(rankPts);
+  $("#heroName").textContent = cleanName(nick.value) || "Player";
+  $("#heroRank").textContent = R.label; $("#heroRank").style.color = R.color;
+}
+nick.addEventListener("input", renderPlate); renderPlate();
+// Ranked or a bot match; the big button plays whichever is picked
+var playMode = load("cfa.mode") === "bots" ? "bots" : "ranked";   // var: the status line can ask before this runs
+function renderPlayMode() {
+  $("#modeRanked").setAttribute("aria-pressed", String(playMode === "ranked"));
+  $("#modeBots").setAttribute("aria-pressed", String(playMode === "bots"));
+  $(".partyrow").hidden = playMode !== "ranked";
+  renderPlaySub();
+}
+function renderPlaySub() { $("#playSub").textContent = playMode === "bots" ? "Bot match · 6–8 bots" : $("#onlineSub").textContent || "Ranked · matched by rank"; }
+for (const [id, m] of [["modeRanked", "ranked"], ["modeBots", "bots"]]) $("#" + id).addEventListener("click", () => { playMode = m; save("cfa.mode", m); renderPlayMode(); });
+$("#bigPlay").addEventListener("click", () => $(playMode === "bots" ? "#playBots" : "#playOnline").click());
+renderPlayMode();
+// Tabs
+$("#tabRanks").addEventListener("click", showRanks);
+$("#menuRank").addEventListener("click", showRanks);
+$("#tabSettings").addEventListener("click", () => { $("#setSheet").hidden = false; });
+$("#setClose").addEventListener("click", () => { $("#setSheet").hidden = true; });
+$("#setSheet").addEventListener("click", e => { if (e.target.id === "setSheet") $("#setSheet").hidden = true; });
 $("#playBots").addEventListener("click", () => startGame("bots"));
 $("#resume").addEventListener("click", () => { initAudio(); requestLock(); if (isTouch || noLock) showPause(false); });
 $("#leave").addEventListener("click", () => leaveMatch());
 function leaveMatch() {
   state = "menu"; alive = false; resetAim(); spectating = false; joinPending = false; specCur = null;
-  $(".card").insertBefore($("#classField"), $(".modes"));
-  $(".card").insertBefore($("#dougField"), $("#openLocker")); renderHackPick();
+  $(".lb-side").appendChild($("#classField"));
+  $(".lb-side").appendChild($("#dougField")); renderHackPick();
   if (document.exitPointerLock && locked) document.exitPointerLock();
   showPause(false);
-  $(".card").appendChild($("#settings"));
-  $(".card").insertBefore($("#settings"), $("#keysHelp"));
+  $("#setBody").prepend($("#settings"));
   $("#hud").hidden = true; $("#touch").hidden = true; $("#menu").hidden = false;
   stopBots();
-  publish(true); renderStatus(); flushProgress();
+  myGroup = null;
+  publish(true);
+  if (lobbyCode() !== "open") joinLobby("");                             // back to watching ranked
+  renderStatus(); flushProgress();
 }
 
 // ======================================================================
@@ -4821,7 +4996,7 @@ function tick() {
   $("#hurt").style.opacity = hurt;
 
   if (state === "play") trackProgress();
-  updatePreview(dt, t);
+  updatePreview(dt, t); updateHero(dt, t);
   updateNades(dt);
   updateMud(dt);
   updateEsp();
