@@ -25,7 +25,7 @@ const MAP_IDS = ["arena", "farm", "peaks", "desert", "castle", "snow", "jungle"]
 const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math.floor(Math.random() * l.length)]; };
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 30;
+const MIN_BUILD = 31;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -199,7 +199,7 @@ export class Lobby {
       else next = { ph: "count", ends: now + T.count, n: r.n };
     }
     if (!next) { if (r.ends > now) this.ctx.storage.setAlarm(r.ends).catch(() => {}); return; }
-    next.map = next.ph === "count" ? nextMap(r.map) : r.map;
+    next.map = next.ph === "count" ? this.partyMap || nextMap(r.map) : r.map;   // parties keep their picked map
     next.sizes = r.sizes; next.won = r.won;
     if (next.ph === "count" && this.ranked()) this.regroup();
     if (next.ph === "end" && r.ph === "live") this.stat(this.roomOf(), { rounds: 1 });
@@ -312,6 +312,17 @@ export class Lobby {
       const now = { ...a, pl, g: pl && a.ranked ? (early ? "normal" : this.place(a.id)) : null };
       ws.serializeAttachment(now);
       if (now.g && early) this.regroup(); else if (now.g) this.sendGroup(ws, now);
+      if (pl && !a.ranked) {                                                   // party: whoever starts it picks the map
+        const pick = MAP_IDS.includes(d.pm) ? d.pm : null;
+        if (pick && (!this.partyMap || !this.players(ws).length)) this.partyMap = pick;
+        const r = this.round;
+        if (this.partyMap && r.map !== this.partyMap) {
+          r.map = this.partyMap;
+          const out = JSON.stringify({ t: "round", ph: r.ph, ends: r.ends, n: r.n, map: r.map, now: Date.now() });
+          for (const o of this.ctx.getWebSockets()) { try { o.send(out); } catch {} }
+        }
+      }
+      if (!this.players().length) this.partyMap = null;                       // everyone left: the next party picks again
       if (!pl) { this.tellGroup(old, ws, JSON.stringify({ t: "leave", id: a.id })); this.lastStanding(old, ws); }
       this.pop(); this.tickRound();
       if (pl) {
@@ -337,6 +348,7 @@ export class Lobby {
     }
     try { ws.close(1000, "bye"); } catch {}
     if (a.pl) { this.lastStanding(a.g, ws); this.tickRound(ws); }
+    if (!this.players(ws).length) this.partyMap = null;
     this.pop(ws);
     if (a.pl) this.stat(a.room, {});
   }
@@ -687,6 +699,13 @@ export class Accounts {
       return { added: "pending" };
     }
     if (op === "friend-accept") { const theirs = row(n, me); if (!theirs) throw new UserError("That request is gone"); both("friends"); return { ok: true }; }
+    if (op === "friend-suggest") {                              // quick add: players you aren't connected with yet
+      const known = new Set([me, ...this.sql.exec("SELECT b FROM friends WHERE a = ?", me).toArray().map(r => r.b), ...this.sql.exec("SELECT a FROM friends WHERE b = ?", me).toArray().map(r => r.a)]);
+      const people = this.sql.exec("SELECT name, display, data, created FROM users").toArray().filter(u => !known.has(u.name) && !this.banned("name", u.name))
+        .map(u => { const d = this.data(u); return { name: u.display, rank: d.rank || 0, seen: d.seen || u.created || 0 }; })
+        .sort((x, y) => y.seen - x.seen).slice(0, 200);
+      return { people };
+    }
     if (op === "friend-remove") { this.sql.exec("DELETE FROM friends WHERE (a = ? AND b = ?) OR (a = ? AND b = ?)", me, n, n, me); return { ok: true }; }
     // friends-list
     const info = x => { const u = this.user(x), d = u ? this.data(u) : {}; return { name: u ? u.display : x, rank: d.rank || 0, seen: d.seen || 0 }; };
@@ -782,8 +801,13 @@ export class Accounts {
     if (op === "spin" && OWNER_ACCOUNTS[u.name]) {      // Doug and Alex: free spins, any skin
       let r = Math.random(), rarity = "common";
       for (const [k, p] of ODDS) { if (r < p) { rarity = k; break; } r -= p; }
-      const list = SKINS[rarity];
-      return { skin: list[Math.floor(Math.random() * list.length)], rarity, account: this.view(u, d) };
+      // no repeats within a rarity until every skin of it has come up once
+      const spun = d.spun && typeof d.spun === "object" ? d.spun : {};
+      let left = SKINS[rarity].filter(k => !(spun[rarity] || []).includes(k));
+      if (!left.length) { spun[rarity] = []; left = SKINS[rarity].slice(); }
+      const skin = left[Math.floor(Math.random() * left.length)];
+      spun[rarity] = [...(spun[rarity] || []), skin]; d.spun = spun; this.saveData(u.name, d);
+      return { skin, rarity, account: this.view(u, d) };
     }
     if (op === "spin") {
       const owned = new Set(d.owned || []);
