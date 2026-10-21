@@ -25,7 +25,7 @@ const MAP_IDS = ["arena", "farm", "peaks", "desert", "castle", "snow", "jungle"]
 const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math.floor(Math.random() * l.length)]; };
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 33;
+const MIN_BUILD = 34;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)

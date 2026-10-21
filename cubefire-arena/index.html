@@ -576,7 +576,7 @@ body.pig #pigTint{display:block}
           <input type="text" id="code" maxlength="12" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="Open lobby">
         </div>
         <div class="partyrow" id="partyMapRow" hidden>
-          <label for="partyMap">Party map <em>no rank points in parties</em></label>
+          <label for="partyMap">Party map <em>half rank points, no rare spins</em></label>
           <select id="partyMap"></select>
         </div>
         <button type="button" class="bigplay" id="bigPlay"><b>Play</b><span id="playSub">Ranked · matched by rank</span></button>
@@ -662,7 +662,7 @@ body.pig #pigTint{display:block}
       <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
       <span class="lbl-sm">How ranked works</span>
       <p class="fine">Ranked puts you with players near your rank: up to 18 play at once, in groups of about 6 (Elite, Normal and Trash lobbies). Rounds last 3 minutes once 2 players are in, and every round is on a new map. Ranked points: +30 for each elimination (+5 for a headshot); a death costs 2 RP at Bronze, rising with rank to 28 at Legend; and for winning a round +100 (under 4 players) or +300 (4 or more); second place gets a third of that (+33 or +100). If everyone else leaves, the last player left wins the round.</p>
-      <p class="fine">Friends who type the same party code land in the same private match (Diamond and higher only). Leave it blank to join ranked.</p>
+      <p class="fine">Friends who type the same party code land in the same private match (Diamond and higher only). Parties give half the rank points and no rare spins. Leave it blank to join ranked.</p>
     </div>
   </div>
 </div>
@@ -2602,7 +2602,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 33;
+const BUILD = 34;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3020,8 +3020,8 @@ const roundsOn = () => netKind === "ws" && mode === "online";
 const roundLeft = () => Math.max(0, (round.endsAt - Date.now()) / 1000);
 const roundFrozen = () => roundsOn() && state === "play" && round.ph === "end";
 // Ranked only counts in online rounds that are live (or always, where there are no rounds)
-const rankedLobby = () => lobbyCode() === "open";                        // party codes never change your rank
-const rankedNow = () => state === "play" && mode === "online" && !spectating && rankedLobby() && (!roundsOn() || round.ph === "live");
+const rankedLobby = () => lobbyCode() === "open";                        // party codes: half rank points, no rare spins
+const rankedNow = () => state === "play" && mode === "online" && !spectating && (!roundsOn() || round.ph === "live");
 // Ranked: which lobby you're in, and who else is in it
 function onGroup(m) {
   const g = GROUP_LABEL[m.g] ? m.g : null, ids = new Set();
@@ -3040,8 +3040,8 @@ function onLastWin(m) {
   if (state !== "play" || mode !== "online" || spectating) return;
   const size = num(m.size) || 2;
   round.wonN = num(m.n);
-  if (rankedLobby()) addRank(size >= RP.bigRound ? RP.bigWin : RP.win);
-  pendWins++; if (size > 8) earnRareSpin();
+  addRank(size >= RP.bigRound ? RP.bigWin : RP.win);
+  pendWins++; if (size > 8 && rankedLobby()) earnRareSpin();
   banner("Everyone else left · you win round " + round.wonN + "!");
 }
 function setRound(m) {
@@ -3080,8 +3080,8 @@ function onRoundPhase(prev, ph) {
       banner(winners.length === 1 ? top.name + " wins round " + round.n + (onDeaths ? " on fewer deaths!" : "!") : "Round " + round.n + " is a tie!");
       const prize = st.filter(p => !p.sp).length >= RP.bigRound ? RP.bigWin : RP.win;
       const second = st.find(p => !winners.includes(p) && p.k > 0);         // the next-best score after the winners
-      if (winners.some(p => p.me) && !spectating) { if (rankedLobby()) addRank(prize); pendWins++; if (st.filter(p => !p.sp).length > 8) earnRareSpin(); }
-      else if (second && st.some(p => p.me && p.k === second.k && p.d === second.d) && !spectating && rankedLobby()) addRank(Math.round(prize / 3));
+      if (winners.some(p => p.me) && !spectating) { addRank(prize); pendWins++; if (st.filter(p => !p.sp).length > 8 && rankedLobby()) earnRareSpin(); }
+      else if (second && st.some(p => p.me && p.k === second.k && p.d === second.d) && !spectating) addRank(Math.round(prize / 3));
     } else banner("Round over");
     resetAim();
   } else if (ph === "wait") {
@@ -3096,6 +3096,7 @@ function startSpectate() {
 // Players you can watch while spectating
 function specTargets() { return [...remotes.values()].filter(r => activePeer(r) && r.alive && r.hasPos && !r.iv && !r.sp); }
 function addRank(delta) {
+  if (state === "play" && mode === "online" && !rankedLobby()) delta = Math.round(delta / 2);   // party codes: everything is half
   const before = rankOf(rankPts).label, old = rankPts;
   rankPts = Math.max(0, rankPts + delta); save("cfa.rank", rankPts); rankDirty = true;
   const change = rankPts - old;
@@ -4440,7 +4441,7 @@ function startGame(m) {
   else if (netKind === "ws") { if (serverMap && serverMap !== mapId && !partyCode) loadMap(serverMap); }
   else if (mapId !== "arena") loadMap("arena");                           // no game server: everyone on one map
   if (m === "bots") startBots(); else { stopBots(); joinLobby(partyCode); }
-  if (m === "online" && partyCode) banner("Party " + partyCode.toUpperCase() + " · " + MAPS[$("#partyMap").value].name + " · no rank points");
+  if (m === "online" && partyCode) banner("Party " + partyCode.toUpperCase() + " · " + MAPS[$("#partyMap").value].name + " · half rank points");
   for (const r of remotes.values()) if (r.av) r.av.g.visible = false;
   respawn();
   // you can always jump straight in, even in the middle of a round
@@ -4912,7 +4913,7 @@ function renderPlaySub() {
   let party = ""; try { party = playMode === "ranked" && canParty() ? cleanCode($("#code").value) : ""; } catch (e) {}   // may run before the rank code loads
   const pm = MAPS[$("#partyMap").value];
   $("#partyMapRow").hidden = !party;
-  $("#playSub").textContent = playMode === "bots" ? "Bot match · 6–8 bots" : party ? "Party " + party.toUpperCase() + (pm ? " · " + pm.name : "") + " · no rank" : $("#onlineSub").textContent || "Ranked · matched by rank";
+  $("#playSub").textContent = playMode === "bots" ? "Bot match · 6–8 bots" : party ? "Party " + party.toUpperCase() + (pm ? " · " + pm.name : "") + " · half RP" : $("#onlineSub").textContent || "Ranked · matched by rank";
 }
 // Party map: picked by whoever starts the party
 for (const [id, m] of Object.entries(MAPS)) { const o = document.createElement("option"); o.value = id; o.textContent = m.name; $("#partyMap").appendChild(o); }
