@@ -349,6 +349,7 @@ body.pig #pigTint{display:block}
 .lk-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .lk-row input{flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:4px;padding:9px 11px;color:var(--ink);font:600 15px var(--ui);-webkit-user-select:text;user-select:text}
 .lk-err{color:var(--hot);font-size:13px;font-weight:600}
+.btn.rarespin{background:linear-gradient(180deg,#c27bff,#8a3fe0);border-color:#c27bff;color:#fff}
 .tickets{font:400 22px var(--display);color:var(--accent)}
 .wheelwrap{position:relative;width:240px;height:240px;margin:0 auto}
 .wheelwrap canvas{width:240px;height:240px;display:block}
@@ -678,10 +679,10 @@ body.pig #pigTint{display:block}
         <div class="lk-box" id="wheelBox" hidden>
           <div class="lk-row"><span class="lbl-sm">Skin wheel</span><span class="tickets" id="tickets" style="margin-left:auto"></span></div>
           <div class="wheelwrap"><canvas id="wheel" width="480" height="480"></canvas></div>
-          <div class="lk-row"><button class="btn primary" type="button" id="spinBtn">Spin · 1 ticket</button><button class="btn" type="button" id="dailyBtn">Free daily spin</button></div>
+          <div class="lk-row"><button class="btn primary" type="button" id="spinBtn">Spin · 1 ticket</button><button class="btn" type="button" id="dailyBtn">Free daily spin</button><button class="btn rarespin" type="button" id="rareSpinBtn" hidden>Rare spin · <span id="rareCount">0</span></button></div>
           <div id="prize"></div>
           <div class="odds"><span class="r0">Common 70%</span><span class="r1">Rare 25%</span><span class="r2">Super rare 5%</span></div>
-          <p class="fine">Earn tickets: one for every 50 points (online eliminations are worth 2, bot ones 1, a round win 20), plus one free spin a day. Ultra skins land 1 spin in 100. The wheel always gives you a skin you don't have yet.</p>
+          <p class="fine">Earn tickets: one for every 50 points (online eliminations are worth 2, bot ones 1, a round win 20), plus one free spin a day. Ultra skins land 1 spin in 100. Win a round with more than 8 players for a rare spin: 5% Ultra, 60% super rare, 35% common. The wheel always gives you a skin you don't have yet.</p>
         </div>
       </div>
       <div class="lk-col lk-box">
@@ -2586,7 +2587,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 31;
+const BUILD = 33;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3014,13 +3015,18 @@ function onGroup(m) {
   if (g && g !== myGroup && state === "play" && mode === "online") banner(myGroup ? "Moved to the " + GROUP_LABEL[g] : "You're in the " + GROUP_LABEL[g]);
   myGroup = g; renderStatus();
 }
+// Winning a round with more than 8 players earns a rare spin (better odds on the wheel)
+function earnRareSpin() {
+  pendRare++; flushProgress();
+  setTimeout(() => banner(acct ? "Rare spin earned! Use it in the Locker" : "Sign in to keep rare spins you win"), 2200);
+}
 // Everyone else left in the middle of a round: you win it
 function onLastWin(m) {
   if (state !== "play" || mode !== "online" || spectating) return;
   const size = num(m.size) || 2;
   round.wonN = num(m.n);
   if (rankedLobby()) addRank(size >= RP.bigRound ? RP.bigWin : RP.win);
-  pendWins++;
+  pendWins++; if (size > 8) earnRareSpin();
   banner("Everyone else left · you win round " + round.wonN + "!");
 }
 function setRound(m) {
@@ -3054,12 +3060,13 @@ function onRoundPhase(prev, ph) {
     const st = standings(), top = st[0];
     if (round.wonN === round.n) banner("You won round " + round.n + "!");                 // already won: everyone else left
     else if (prev === "live" && top && top.k > 0) {
-      const winners = st.filter(p => p.k === top.k);
-      banner(winners.length === 1 ? top.name + " wins round " + round.n + "!" : "Round " + round.n + " is a tie!");
+      const winners = st.filter(p => p.k === top.k && p.d === top.d);       // a tie on kills goes to whoever died less
+      const onDeaths = winners.length === 1 && st.filter(p => p.k === top.k).length > 1;
+      banner(winners.length === 1 ? top.name + " wins round " + round.n + (onDeaths ? " on fewer deaths!" : "!") : "Round " + round.n + " is a tie!");
       const prize = st.filter(p => !p.sp).length >= RP.bigRound ? RP.bigWin : RP.win;
-      const second = st.find(p => p.k < top.k && p.k > 0);                  // the next-best score after the winners
-      if (winners.some(p => p.me) && !spectating) { if (rankedLobby()) addRank(prize); pendWins++; }
-      else if (second && st.some(p => p.me && p.k === second.k) && !spectating && rankedLobby()) addRank(Math.round(prize / 3));
+      const second = st.find(p => !winners.includes(p) && p.k > 0);         // the next-best score after the winners
+      if (winners.some(p => p.me) && !spectating) { if (rankedLobby()) addRank(prize); pendWins++; if (st.filter(p => !p.sp).length > 8) earnRareSpin(); }
+      else if (second && st.some(p => p.me && p.k === second.k && p.d === second.d) && !spectating && rankedLobby()) addRank(Math.round(prize / 3));
     } else banner("Round over");
     resetAim();
   } else if (ph === "wait") {
@@ -3672,10 +3679,23 @@ const liveNades = [];
 const nadeGeo = new THREE.BoxGeometry(0.24, 0.3, 0.24), nadeMat = lam(0x3f5f2c);
 const boomGeo = new THREE.SphereGeometry(1, 12, 8);
 // owner: "me", a bot, or null for another player's grenade (visual only)
+const trailMat = new THREE.LineDashedMaterial({ color: 0xffd36b, dashSize: 0.35, gapSize: 0.2, transparent: true, opacity: 0.9, depthWrite: false });
+const markGeo = new THREE.RingGeometry(0.55, 0.75, 28), markMat = new THREE.MeshBasicMaterial({ color: 0xff7a2a, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
 function spawnNade(o, v, owner) {
   const mesh = new THREE.Mesh(nadeGeo, nadeMat); mesh.position.copy(o); scene.add(mesh);
-  liveNades.push({ pos: o.clone(), vel: v.clone(), t: 0, mesh, owner });
+  const n = { pos: o.clone(), vel: v.clone(), t: 0, mesh, owner };
+  if (owner === "me") {
+    // the path it will take (same physics, run ahead) and a ring where it goes off
+    const sim = { pos: o.clone(), vel: v.clone() }, pts = [sim.pos.clone()], h = 1 / 120;
+    for (let t = 0; t < NADE.fuse; t += h) { stepNade(sim, h); if (Math.round(t / h) % 4 === 0) pts.push(sim.pos.clone()); }
+    pts.push(sim.pos.clone());
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), trailMat.clone()); line.computeLineDistances(); line.renderOrder = 2;
+    const mark = new THREE.Mesh(markGeo, markMat.clone()); mark.rotation.x = -Math.PI / 2; mark.position.copy(sim.pos); mark.position.y = Math.floor(sim.pos.y + 0.05) + 0.06;
+    scene.add(line, mark); n.trail = line; n.mark = mark;
+  }
+  liveNades.push(n);
 }
+function clearTrail(n) { for (const o of [n.trail, n.mark]) if (o) { scene.remove(o); o.geometry !== markGeo && o.geometry.dispose(); o.material.dispose(); } n.trail = n.mark = null; }
 function throwGrenade() {
   const t = now();
   if (!alive || paused || state !== "play" || nades <= 0 || t < nadeReady || roundFrozen()) return;
@@ -3705,7 +3725,11 @@ function updateNades(dt) {
     n.t += dt;
     for (let k = 0; k < 4; k++) stepNade(n, dt / 4);
     n.mesh.position.copy(n.pos); n.mesh.rotation.x += dt * 9; n.mesh.rotation.z += dt * 6;
-    if (n.t >= NADE.fuse) { explode(n); scene.remove(n.mesh); liveNades.splice(i, 1); }
+    if (n.trail) {                                      // the path fades as the fuse burns; the ring pulses
+      const k = n.t / NADE.fuse; n.trail.material.opacity = 0.9 * (1 - k * 0.6);
+      n.mark.material.opacity = 0.55 + 0.35 * Math.sin(n.t * 14); n.mark.scale.setScalar(1 + 0.15 * Math.sin(n.t * 14));
+    }
+    if (n.t >= NADE.fuse) { explode(n); clearTrail(n); scene.remove(n.mesh); liveNades.splice(i, 1); }
   }
   shake *= Math.exp(-8 * dt);
 }
@@ -3741,7 +3765,7 @@ function explode(n) {
     hitAny = true;
     dmgNumber(chest, dm, "nade");
     if (tg.kind === "peer") {
-      hitsOut.push({ t: tg.r.peer, s: ++hitSeq, w: NADE_W, dm, hs: 0 });
+      hitsOut.push({ t: tg.r.peer, s: ++hitSeq, w: NADE_W, dm, hs: 0, gn: 1 });   // gn: a grenade, which still counts if you've died
       tg.r.lastHitByMe = { w: NADE_W };
       while (hitsOut.length > 6) hitsOut.shift();
     } else {
@@ -4469,16 +4493,16 @@ function setAcct(a) {
 }
 function signOutLocal() { acct = null; acctToken = ""; save("cfa.tok", ""); save("cfa.acct", ""); applyGunFinish(); renderLocker(); publish(true); renderAcctUI(); }
 // Points toward tickets (online eliminations 2, bot ones 1) and round wins, sent every so often
-let pendPts = 0, pendWins = 0, rankDirty = false, lastKills = 0, flushing = false;
+let pendPts = 0, pendWins = 0, pendRare = 0, rankDirty = false, lastKills = 0, flushing = false;
 function trackProgress() {
   if (kills > lastKills) pendPts += (kills - lastKills) * (mode === "online" ? 2 : 1);
   lastKills = kills;
 }
 async function flushProgress() {
-  if (!acctToken || flushing || (!pendPts && !pendWins && !rankDirty)) return;
-  const pts = Math.min(pendPts, 100), wins = Math.min(pendWins, 3);
-  pendPts -= pts; pendWins -= wins; rankDirty = false; flushing = true;
-  try { await api("progress", { pts, wins, rank: rankPts }); } catch (e) { pendPts += pts; pendWins += wins; }
+  if (!acctToken || flushing || (!pendPts && !pendWins && !pendRare && !rankDirty)) return;
+  const pts = Math.min(pendPts, 100), wins = Math.min(pendWins, 3), rare = Math.min(pendRare, 1);
+  pendPts -= pts; pendWins -= wins; pendRare -= rare; rankDirty = false; flushing = true;
+  try { await api("progress", { pts, wins, rare, rank: rankPts }); } catch (e) { pendPts += pts; pendWins += wins; pendRare += rare; }
   flushing = false;
 }
 setInterval(flushProgress, 20000);
@@ -4596,6 +4620,9 @@ function renderLocker() {
     $("#spinBtn").disabled = wheelSpinning || (!acct.unlimited && (acct.tickets < 1 || WHEEL_SKINS.every(k => acct.owned.includes(k))));
     $("#spinBtn").textContent = acct.unlimited ? "Spin" : "Spin · 1 ticket";
     $("#dailyBtn").hidden = !acct.daily;
+    $("#rareSpinBtn").hidden = !(acct.unlimited || acct.rareSpins > 0);
+    $("#rareCount").textContent = acct.unlimited ? "∞" : acct.rareSpins || 0;
+    $("#rareSpinBtn").disabled = wheelSpinning || (!acct.unlimited && WHEEL_SKINS.every(k => acct.owned.includes(k)));
     if (!wheelSpinning) drawWheel();
   }
   // wearing + every skin
@@ -4642,12 +4669,12 @@ $("#pauseLocker").addEventListener("click", openLocker);
 $("#lockerClose").addEventListener("click", () => { $("#locker").hidden = true; });
 $("#locker").addEventListener("click", e => { if (e.target.id === "locker") $("#locker").hidden = true; });
 $("#dailyBtn").addEventListener("click", async () => { try { await api("daily"); } catch (e) { banner(e.message); } });
-$("#spinBtn").addEventListener("click", async () => {
+async function doSpin(rare) {
   if (wheelSpinning || !acct) return;
-  $("#spinBtn").disabled = true; $("#prize").replaceChildren();
+  $("#spinBtn").disabled = true; $("#rareSpinBtn").disabled = true; $("#prize").replaceChildren();
   let r;
   const keep = acct;
-  try { r = await api("spin"); } catch (e) { $("#prize").textContent = e.message; $("#spinBtn").disabled = false; return; }
+  try { r = await api("spin", rare ? { rare: 1 } : {}); } catch (e) { $("#prize").textContent = e.message; $("#spinBtn").disabled = false; $("#rareSpinBtn").disabled = false; return; }
   const rarity = { ultra: 4, super: 2, rare: 1 }[r.rarity] || 0, won = r.account;
   acct = { ...won, owned: keep.owned, equipped: keep.equipped };   // don't reveal the prize until the wheel stops
   wheelSpinning = true; renderLocker();
@@ -4665,7 +4692,9 @@ $("#spinBtn").addEventListener("click", async () => {
     else if (rarity === 2) { blip(880, 0.15, 0.12); blip(1320, 0.15, 0.12, "square", 0.12); blip(1760, 0.3, 0.12, "square", 0.24); }
     else blip(rarity ? 1320 : 990, 0.2, 0.1);
   });
-});
+}
+$("#spinBtn").addEventListener("click", () => doSpin(false));
+$("#rareSpinBtn").addEventListener("click", () => doSpin(true));
 renderLocker(); applyGunFinish();
 if (acctToken) api("me").catch(() => {});
 

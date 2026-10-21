@@ -25,7 +25,7 @@ const MAP_IDS = ["arena", "farm", "peaks", "desert", "castle", "snow", "jungle"]
 const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math.floor(Math.random() * l.length)]; };
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 31;
+const MIN_BUILD = 33;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -115,10 +115,11 @@ export class Lobby {
       if (!h || typeof h.s !== "number" || P.dropped.has(h.s)) continue;
       if (h.s > P.lastSeq) {
         P.lastSeq = h.s;
-        if ((P.dead || !P.al) && !h.nk) {                                            // fired after being killed
+        if ((P.dead || !P.al) && !h.nk && !h.gn) {                                   // fired after being killed (grenades already thrown still count)
           P.dropped.add(h.s); if (P.dropped.size > 64) P.dropped.delete(P.dropped.values().next().value);
           continue;
         }
+        if (h.gn) h.dm = Math.min(150, Number(h.dm) || 0);                                // a grenade does at most 150
         const T = this.ps.get(String(h.t));
         if (T && T.al && !T.dead && !(T.spawnUntil > now) && this.round.ph !== "end") {
           T.hp -= Math.max(0, Math.min(999, Number(h.dm) || 0)); T.lastHitAt = now;
@@ -384,6 +385,8 @@ const ALL_SKINS = [...SKINS.common, ...SKINS.rare, ...SKINS.super, ...SKINS.ultr
 const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200], ["diamondwarden", 1800], ["masterphantom", 2500], ["champion", 3500], ["mythic", 8000], ["legend", 15000]];
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["ultra", 0.01], ["super", 0.04], ["rare", 0.25], ["common", 0.7]];
+// Rare spins (won by winning a round with more than 8 players): 5% ultra, 60% super rare, 35% common
+const RARE_ODDS = [["ultra", 0.05], ["super", 0.6], ["common", 0.35]];
 // Spins are hard to earn: 50 points each (online elimination 2, bot one 1, round win 20)
 const START_TICKETS = 1, PTS_PER_TICKET = 50, PTS_PER_WIN = 20;
 // Accounts that own every skin and spin for free; each opens only with its Worker secret
@@ -618,8 +621,8 @@ export class Accounts {
   data(u) { try { return JSON.parse(u.data) || {}; } catch { return {}; } }
   saveData(name, d) { this.sql.exec("UPDATE users SET data = ? WHERE name = ?", JSON.stringify(d), name); }
   view(u, d) {
-    if (OWNER_ACCOUNTS[u.name]) return { name: u.display, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k)], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
-    return { name: u.display, tickets: d.tickets || 0, owned: [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0))], equipped: d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
+    if (OWNER_ACCOUNTS[u.name]) return { name: u.display, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k)], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false, rareSpins: 999, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
+    return { name: u.display, tickets: d.tickets || 0, owned: [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0))], equipped: d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), rareSpins: d.rareSpins || 0, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
   }
   async session(name) {
     const token = hex(crypto.getRandomValues(new Uint8Array(24)));
@@ -785,6 +788,7 @@ export class Accounts {
     if (op === "progress") {
       const pts = Math.max(0, Math.min(100, Math.floor(Number(body.pts) || 0)));
       const wins = Math.max(0, Math.min(3, Math.floor(Number(body.wins) || 0)));
+      d.rareSpins = (d.rareSpins || 0) + Math.max(0, Math.min(1, Math.floor(Number(body.rare) || 0)));   // a big round win
       d.bank = (d.bank || 0) + pts + wins * PTS_PER_WIN;
       d.tickets = (d.tickets || 0) + Math.floor(d.bank / PTS_PER_TICKET);
       d.bank %= PTS_PER_TICKET;
@@ -798,9 +802,10 @@ export class Accounts {
       d.equipped = skin; this.saveData(u.name, d); return { account: this.view(u, d) };
     }
     if (op === "spin") this.bump("spins");
+    const odds = body.rare ? RARE_ODDS : ODDS;
     if (op === "spin" && OWNER_ACCOUNTS[u.name]) {      // Doug and Alex: free spins, any skin
       let r = Math.random(), rarity = "common";
-      for (const [k, p] of ODDS) { if (r < p) { rarity = k; break; } r -= p; }
+      for (const [k, p] of odds) { if (r < p) { rarity = k; break; } r -= p; }
       // no repeats within a rarity until every skin of it has come up once
       const spun = d.spun && typeof d.spun === "object" ? d.spun : {};
       let left = SKINS[rarity].filter(k => !(spun[rarity] || []).includes(k));
@@ -812,18 +817,19 @@ export class Accounts {
     if (op === "spin") {
       const owned = new Set(d.owned || []);
       if (ALL_SKINS.every(s => owned.has(s))) throw new UserError("You already have every skin!");
-      if ((d.tickets || 0) < 1) throw new UserError("No spins left. Get eliminations, win rounds, or come back tomorrow");
+      if (body.rare ? (d.rareSpins || 0) < 1 : (d.tickets || 0) < 1) throw new UserError(body.rare ? "No rare spins. Win a round with more than 8 players to get one" : "No spins left. Get eliminations, win rounds, or come back tomorrow");
       // roll a rarity, then a skin of that rarity you don't have (or the nearest rarity that has one;
       // ultras only come from an ultra roll, unless they're all that's left)
       let r = Math.random(), rarity = "common";
-      for (const [k, p] of ODDS) { if (r < p) { rarity = k; break; } r -= p; }
+      for (const [k, p] of odds) { if (r < p) { rarity = k; break; } r -= p; }
       const order = { ultra: ["ultra", "super", "rare", "common"], super: ["super", "rare", "common", "ultra"], rare: ["rare", "common", "super", "ultra"], common: ["common", "rare", "super", "ultra"] }[rarity];
       let skin = null;
       for (const k of order) {
         const left = SKINS[k].filter(s => !owned.has(s));
         if (left.length) { rarity = k; skin = left[Math.floor(Math.random() * left.length)]; break; }
       }
-      d.tickets -= 1; d.owned = [...owned, skin];
+      if (body.rare) d.rareSpins -= 1; else d.tickets -= 1;
+      d.owned = [...owned, skin];
       this.saveData(u.name, d);
       return { skin, rarity, account: this.view(u, d) };
     }
