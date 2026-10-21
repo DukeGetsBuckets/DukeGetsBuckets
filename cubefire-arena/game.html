@@ -646,7 +646,7 @@ body.pig #pigTint{display:block}
       </ul>
       <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
       <span class="lbl-sm">How ranked works</span>
-      <p class="fine">Ranked puts you with players near your rank: up to 18 play at once, in groups of about 6 (Elite, Normal and Trash lobbies). Rounds last 3 minutes once 2 players are in, and every round is on a new map. Ranked points: +30 for each elimination (+5 for a headshot); a death costs 2 RP at Bronze, rising with rank to 28 at Legend; and for winning a round +100 (under 4 players) or +300 (4 or more); second place gets a third of that (+33 or +100). If everyone else leaves, the last player left wins the round.</p>
+      <p class="fine">Ranked puts you with players near your rank: up to 60 play at once, in lobbies of about 6 (Elite, Normal and Trash, with more of each when it's busy). Rounds last 3 minutes once 2 players are in, and every round is on a new map. Ranked points: +30 for each elimination (+5 for a headshot); a death costs 2 RP at Bronze, rising with rank to 28 at Legend; and for winning a round +100 (under 4 players) or +300 (4 or more); second place gets a third of that (+33 or +100). If everyone else leaves, the last player left wins the round.</p>
       <p class="fine">Friends who type the same party code land in the same private match (Diamond and higher only). Parties give half the rank points and no rare spins. Leave it blank to join ranked.</p>
     </div>
   </div>
@@ -2587,7 +2587,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 35;
+const BUILD = 36;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2607,9 +2607,11 @@ function setNet(s) { netState = s; renderStatus(); }
 const MAP_VERSION = "v4"; // bump when map layouts change so mismatched versions never share a lobby
 const lobbyKey = code => (code ? "party" : "ranked") + MAP_VERSION + "-" + (code || "open");
 // Ranked: the server sorts players by rank into lobbies of about 6
-const GROUP_LABEL = { elite: "Elite lobby", normal: "Normal lobby", trash: "Trash lobby" };
+// Lobby names: elite, normal, trash, numbered when there are several of a tier (elite-2 → "Elite lobby 2")
+const TIER_NAME = { elite: "Elite", normal: "Normal", trash: "Trash" };
+const groupLabel = g => { const [t, n] = String(g || "").split("-"); return TIER_NAME[t] ? TIER_NAME[t] + " lobby" + (n ? " " + n : "") : null; };
+const groupRank = g => { const [t, n] = String(g || "").split("-"); return ["trash", "normal", "elite"].indexOf(t) * 100 - (Number(n) || 0); };
 let myGroup = null, nextGroup = null, pop = null, serverMap = null;
-const GROUP_ORDER = ["trash", "normal", "elite"];
 
 function serverUrl(name) {
   const local = location.host === SERVER_HOST || /^(localhost|127\.0\.0\.1):87\d\d$/.test(location.host);
@@ -2650,10 +2652,10 @@ function connectServer(name) {
       renderStatus();
     } else if (m.t === "leave" && m.id) removeRemote(String(m.id));
     else if (m.t === "group") { nextGroup = null; onGroup(m); }
-    else if (m.t === "next" && GROUP_LABEL[m.g] && state === "play" && mode === "online") {    // the lobby you'll be in next round
+    else if (m.t === "next" && groupLabel(m.g) && state === "play" && mode === "online") {    // the lobby you'll be in next round
       nextGroup = m.g;
-      const up = GROUP_ORDER.indexOf(m.g) - GROUP_ORDER.indexOf(myGroup);
-      setTimeout(() => banner(!myGroup || !up ? "Next round: staying in the " + GROUP_LABEL[m.g] : (up > 0 ? "Next round: moving up to the " : "Next round: moving down to the ") + GROUP_LABEL[m.g]), 2600);
+      const up = groupRank(m.g) - groupRank(myGroup);
+      setTimeout(() => banner(!myGroup || !up ? "Next round: staying in the " + groupLabel(m.g) : (up > 0 ? "Next round: moving up to the " : "Next round: moving down to the ") + groupLabel(m.g)), 2600);
     }
     else if (m.t === "pop") { pop = { n: num(m.n) || 0, groups: m.groups && typeof m.groups === "object" ? m.groups : {} }; renderStatus(); }
     else if (m.t === "lastwin") onLastWin(m);
@@ -3015,10 +3017,10 @@ const rankedLobby = () => lobbyCode() === "open";                        // part
 const rankedNow = () => state === "play" && mode === "online" && !spectating && (!roundsOn() || round.ph === "live");
 // Ranked: which lobby you're in, and who else is in it
 function onGroup(m) {
-  const g = GROUP_LABEL[m.g] ? m.g : null, ids = new Set();
+  const g = groupLabel(m.g) ? m.g : null, ids = new Set();
   for (const p of Array.isArray(m.peers) ? m.peers : []) if (p && p.id && p.d) { ids.add(String(p.id)); onPeer({ peer: String(p.id), presence: p.d, kind: "viewer", sameTab: false }); }
   for (const id of [...remotes.keys()]) if (!ids.has(id)) removeRemote(id);
-  if (g && g !== myGroup && state === "play" && mode === "online") banner(myGroup ? "Moved to the " + GROUP_LABEL[g] : "You're in the " + GROUP_LABEL[g]);
+  if (g && g !== myGroup && state === "play" && mode === "online") banner(myGroup ? "Moved to the " + groupLabel(g) : "You're in the " + groupLabel(g));
   myGroup = g; renderStatus();
 }
 // Winning a round with more than 8 players earns a rare spin (better odds on the wheel)
@@ -4218,14 +4220,15 @@ function rowEl(cells, cls) {
 function lobbyCode() { return lobbyName ? lobbyName.slice(lobbyName.indexOf("-") + 1) : "open"; }
 function lobbyLabel() {
   const m = MAPS[mapId].name, code = lobbyCode();
-  return code === "open" ? (myGroup ? "the " + GROUP_LABEL[myGroup] : "ranked") + " on " + m : "party " + code.toUpperCase() + " on " + m;
+  return code === "open" ? (myGroup ? "the " + groupLabel(myGroup) : "ranked") + " on " + m : "party " + code.toUpperCase() + " on " + m;
 }
 function renderStatus() {
   const n = playersOnline();
   const st = $("#menuStatus");
   let txt;
   if (netState === "live" && lobbyCode() === "open" && netKind === "ws" && state !== "play") {
-    const g = pop && pop.groups ? Object.keys(GROUP_LABEL).filter(k => pop.groups[k]).map(k => GROUP_LABEL[k].split(" ")[0] + " " + pop.groups[k]) : [];
+    const tier = {}; for (const [k, n] of Object.entries(pop && pop.groups || {})) { const t = k.split("-")[0]; if (TIER_NAME[t]) tier[t] = (tier[t] || 0) + (num(n) || 0); }
+    const g = Object.keys(TIER_NAME).filter(t => tier[t]).map(t => TIER_NAME[t] + " " + tier[t]);
     txt = !pop || !pop.n ? "Online · nobody playing ranked yet" : `Online · ${pop.n} playing ranked` + (g.length > 1 ? " · " + g.join(" · ") : "");
   }
   else if (netState === "live") txt = n === 0 ? `Online · nobody in ${lobbyLabel()} yet` : `Online · ${n} playing in ${lobbyLabel()}`;
@@ -4325,8 +4328,8 @@ function renderRoundHud() {
   if (round.ph === "wait") { title = "Warm-up"; time = "waiting for players · " + (1 + playersOnline()) + "/2"; }
   else if (round.ph === "count") title = "Round " + (round.n + 1) + " starts in";
   else if (round.ph === "live") title = "Round " + round.n;
-  else title = "Round " + round.n + " over · next" + (nextGroup ? ": " + GROUP_LABEL[nextGroup] : "") + " in";
-  if (myGroup && lobbyCode() === "open" && round.ph !== "end") title = GROUP_LABEL[myGroup] + " · " + title;   // tell people their lobby
+  else title = "Round " + round.n + " over · next" + (nextGroup ? ": " + groupLabel(nextGroup) : "") + " in";
+  if (myGroup && lobbyCode() === "open" && round.ph !== "end") title = groupLabel(myGroup) + " · " + title;   // tell people their lobby
   else if (lobbyCode() !== "open") title = "Party " + lobbyCode().toUpperCase() + " · " + title;
   $("#roundTitle").textContent = title; $("#roundTime").textContent = time;
   rh.className = round.ph === "live" ? (left < 30 ? "live hurry" : "live") : "";
@@ -4706,7 +4709,7 @@ renderLocker(); applyGunFinish();
 if (acctToken) api("me").catch(() => {});
 
 // One-time update notice; each device sees it until it's dismissed
-const NOTICE = { id: "ranked-1", text: "New: ranked matchmaking. Press Play ranked and you're matched with players near your rank in the Elite, Normal or Trash lobby (up to 18 players). Every round is on a new map. Ranked points: +30 per elimination; a death costs 2 RP at Bronze up to 28 at Legend; second place gets a third of the win. Party codes now unlock at Diamond." };
+const NOTICE = { id: "ranked-1", text: "New: ranked matchmaking. Press Play ranked and you're matched with players near your rank in the Elite, Normal or Trash lobby (up to 60 players). Every round is on a new map. Ranked points: +30 per elimination; a death costs 2 RP at Bronze up to 28 at Legend; second place gets a third of the win. Party codes now unlock at Diamond." };
 if (load("cfa.notice") !== NOTICE.id) { $("#noticeText").textContent = NOTICE.text; $("#notice").hidden = false; }
 $("#noticeOk").addEventListener("click", () => { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); });
 $("#pwForm").addEventListener("submit", async e => {

@@ -15,17 +15,24 @@
 // (DOUG_PASSWORD; set with `wrangler secret put`). Anyone else using a
 // protected name and color is refused.
 
-const MAX_PLAYERS = 24;   // sockets per lobby, including people still in the menu
-// Ranked: one lobby where players are sorted by rank into groups of about GROUP_SIZE
-// (Elite, Normal, Trash), each with its own fights; up to RANKED_MAX playing at once.
-const GROUP_SIZE = 6, RANKED_MAX = 18;
-const GROUP_NAMES = [["normal"], ["elite", "normal"], ["elite", "normal", "trash"]];
+const MAX_PLAYERS = 400;  // sockets per lobby, including people still in the menu (they cost almost nothing)
+// Ranked: one lobby where players are sorted by rank into groups of about GROUP_SIZE,
+// each with its own fights; up to RANKED_MAX playing at once. Groups are Elite, Normal and
+// Trash by rank; with more players there are several of each (elite-1, elite-2, ...).
+const GROUP_SIZE = 6, MAX_GROUPS = 10, RANKED_MAX = GROUP_SIZE * MAX_GROUPS;
+function groupNames(k) {
+  if (k === 1) return ["normal"];
+  if (k === 2) return ["elite", "normal"];
+  const tiers = [], per = [Math.round(k / 3), 0, 0]; per[2] = Math.round(k / 3); per[1] = k - per[0] - per[2];
+  ["elite", "normal", "trash"].forEach((t, i) => { for (let n = 1; n <= per[i]; n++) tiers.push(per[i] > 1 ? t + "-" + n : t); });
+  return tiers;
+}
 // Every round is played on a new map (must match MAPS in the game page)
 const MAP_IDS = ["arena", "farm", "peaks", "desert", "castle", "snow", "jungle"];
 const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math.floor(Math.random() * l.length)]; };
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 35;
+const MIN_BUILD = 36;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -87,6 +94,8 @@ export class Lobby {
     this.last = new Map(); // player id -> latest state, handed to newcomers
     this.round = { ph: "wait", ends: 0, n: 0, map: nextMap(null), sizes: {}, won: [] };
     this.ps = new Map(); // player id -> what the server knows about their health (see referee)
+    this.atts = new Map();     // socket -> attachment, so busy lobbies don't decode it on every message
+    this.groups = null;        // ranked group -> sockets in it (rebuilt after the lobby wakes up)
   }
 
   // No trading kills. Each game decides its own hits, so when two players shoot each other
@@ -137,16 +146,27 @@ export class Lobby {
     let n = 0;
     for (const ws of this.ctx.getWebSockets()) {
       if (ws === except) continue;
-      const a = ws.deserializeAttachment();
+      const a = this.att(ws);
       if (a && a.pl) n++;
     }
     return n;
   }
+  att(ws) { let a = this.atts.get(ws); if (a === undefined) { a = ws.deserializeAttachment() || null; this.atts.set(ws, a); } return a; }
+  setAtt(ws, a) {
+    const old = this.atts.get(ws);
+    ws.serializeAttachment(a); this.atts.set(ws, a);
+    if (this.groups && (old && old.g) !== a.g) { if (old && old.g) this.groups.get(old.g)?.delete(ws); if (a.g) { if (!this.groups.has(a.g)) this.groups.set(a.g, new Set()); this.groups.get(a.g).add(ws); } }
+  }
+  groupSocks(g) {
+    if (!this.groups) { this.groups = new Map(); for (const ws of this.ctx.getWebSockets()) { const a = this.att(ws); if (a && a.g) { if (!this.groups.has(a.g)) this.groups.set(a.g, new Set()); this.groups.get(a.g).add(ws); } } }
+    return this.groups.get(g) || [];
+  }
+  forget(ws) { const a = this.atts.get(ws); if (a && a.g && this.groups) this.groups.get(a.g)?.delete(ws); this.atts.delete(ws); }
   // ---- ranked groups (kept in each socket's attachment as g)
-  ranked() { for (const ws of this.ctx.getWebSockets()) { const a = ws.deserializeAttachment(); if (a) return !!a.ranked; } return false; }
+  ranked() { for (const ws of this.ctx.getWebSockets()) { const a = this.att(ws); if (a) return !!a.ranked; } return false; }
   players(except) {
     const out = [];
-    for (const ws of this.ctx.getWebSockets()) { const a = ws.deserializeAttachment(); if (ws !== except && a && a.pl) out.push({ ws, a }); }
+    for (const ws of this.ctx.getWebSockets()) { const a = this.att(ws); if (ws !== except && a && a.pl) out.push({ ws, a }); }
     return out;
   }
   rankOf(id) { const d = this.last.get(id); return Math.max(0, Number(d && d.rk) || 0); }
@@ -167,7 +187,7 @@ export class Lobby {
   // Everyone playing, sorted by their current rank and split into even groups of up to 6
   plan() {
     const ps = this.players().sort((x, y) => this.rankOf(y.a.id) - this.rankOf(x.a.id));
-    const k = Math.min(3, Math.max(1, Math.ceil(ps.length / GROUP_SIZE))), names = GROUP_NAMES[k - 1];
+    const k = Math.min(MAX_GROUPS, Math.max(1, Math.ceil(ps.length / GROUP_SIZE))), names = groupNames(k);
     const base = Math.floor(ps.length / k), extra = ps.length % k;
     let i = 0;
     names.forEach((g, gi) => { for (let n = base + (gi < extra ? 1 : 0); n > 0; n--, i++) ps[i].g = g; });
@@ -178,15 +198,18 @@ export class Lobby {
   // ...and move them as the next countdown starts (all lobbies share one round clock)
   regroup() {
     const ps = this.plan();
-    for (const p of ps) { p.a = { ...p.a, g: p.g }; p.ws.serializeAttachment(p.a); }
+    for (const p of ps) { p.a = { ...p.a, g: p.g }; this.setAtt(p.ws, p.a); }
     for (const p of ps) this.sendGroup(p.ws, p.a);
   }
-  // How many are playing (and in which group), for the menu
-  pop(except) {
+  // How many are playing (and in which group), for the menu; sent at most about once a second
+  popMsg(except) {
     const groups = {}, ps = this.players(except);
     for (const p of ps) if (p.a.g) groups[p.a.g] = (groups[p.a.g] || 0) + 1;
-    const out = JSON.stringify({ t: "pop", n: ps.length, groups });
-    for (const ws of this.ctx.getWebSockets()) if (ws !== except) { try { ws.send(out); } catch {} }
+    return JSON.stringify({ t: "pop", n: ps.length, groups });
+  }
+  pop() {
+    if (this.popT) return;
+    this.popT = setTimeout(() => { this.popT = null; const out = this.popMsg(); for (const ws of this.ctx.getWebSockets()) { try { ws.send(out); } catch {} } }, 800);
   }
   // The last one left in a group (or the lobby) mid-round wins that round
   lastStanding(g, except) {
@@ -230,12 +253,12 @@ export class Lobby {
     const kills = this.kills || 0; this.kills = 0;
     accounts(this.env).fetch("https://internal/internal/stat", { method: "POST", body: JSON.stringify({ room, n: this.players().length, kills, ...extra }) }).catch(() => {});
   }
-  roomOf() { for (const ws of this.ctx.getWebSockets()) { const a = ws.deserializeAttachment(); if (a && a.room) return a.room; } return ""; }
+  roomOf() { for (const ws of this.ctx.getWebSockets()) { const a = this.att(ws); if (a && a.room) return a.room; } return ""; }
   // Only the game server itself calls these (the public /ws route only forwards socket upgrades)
   async adminFetch(request) {
     const path = new URL(request.url).pathname;
     let b = {}; try { b = await request.json(); } catch {}
-    const socks = this.ctx.getWebSockets().map(ws => ({ ws, a: ws.deserializeAttachment() })).filter(x => x.a);
+    const socks = this.ctx.getWebSockets().map(ws => ({ ws, a: this.att(ws) })).filter(x => x.a);
     if (path === "/state") return Response.json({ round: { ph: this.round.ph, n: this.round.n, map: this.round.map }, players: socks.map(({ a }) => {
       const d = this.last.get(a.id) || {};
       return { id: a.id, name: String(d.n || "?").slice(0, 24), pl: !!a.pl, g: a.g || null, rk: Number(d.rk) || 0, k: Number(d.k) || 0, d: Number(d.d) || 0, afk: !!d.afk, perks: a.perks || [] };
@@ -261,35 +284,35 @@ export class Lobby {
     const [client, server] = Object.values(pair);
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 10);
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ id, auth: false, ranked, room, ipk });
+    this.setAtt(server, { id, auth: false, ranked, room, ipk });
     const peers = [];
     for (const ws of sockets) {
-      const a = ws.deserializeAttachment();
+      const a = this.att(ws);
       if (!ranked && a && this.last.has(a.id)) peers.push({ id: a.id, d: this.last.get(a.id) });   // ranked: sent with the group
     }
     const r = this.round;
     server.send(JSON.stringify({ t: "welcome", id, peers, round: { ph: r.ph, ends: r.ends, n: r.n, map: r.map }, now: Date.now() }));
-    this.pop();
+    server.send(this.popMsg());
     return new Response(null, { status: 101, webSocket: client });
   }
 
   webSocketMessage(ws, message) {
     if (typeof message !== "string" || message.length > MAX_MESSAGE) return;
-    const a = ws.deserializeAttachment();
+    const a = this.att(ws);
     if (!a) return;
     let d;
     try { d = JSON.parse(message); } catch { return; }
     if (!d || typeof d !== "object" || Array.isArray(d)) return;
     if (d.t === "acct") {                                        // hacks the admin gave this account
       accounts(this.env).fetch("https://internal/internal/perks", { method: "POST", body: JSON.stringify({ token: String(d.token || "") }) })
-        .then(r => r.json()).then(r => { const cur = ws.deserializeAttachment(); if (cur) ws.serializeAttachment({ ...cur, perks: Array.isArray(r.perks) ? r.perks : [] }); }).catch(() => {});
+        .then(r => r.json()).then(r => { const cur = this.att(ws); if (cur) this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [] }); }).catch(() => {});
       return;
     }
     if (d.t === "auth") {
       const who = typeof d.who === "string" && PROTECTED[d.who] ? d.who : null;
       const secret = who && this.env && this.env[who.toUpperCase() + "_PASSWORD"];
       const ok = !!secret && typeof d.key === "string" && d.key === secret;
-      ws.serializeAttachment({ ...a, auth: ok ? who : false });
+      this.setAtt(ws, { ...a, auth: ok ? who : false });
       try { ws.send(JSON.stringify({ t: "auth", ok })); } catch {}
       return;
     }
@@ -312,16 +335,15 @@ export class Lobby {
     this.referee(a, d);
     this.last.set(a.id, d);
     const out = JSON.stringify({ t: "st", id: a.id, d });
-    for (const other of this.ctx.getWebSockets()) {
+    for (const other of a.ranked ? (a.g ? this.groupSocks(a.g) : []) : this.ctx.getWebSockets()) {   // ranked: only your group
       if (other === ws) continue;
-      if (a.ranked) { const o = other.deserializeAttachment(); if (!a.g || !o || o.g !== a.g) continue; }   // ranked: only your group
       try { other.send(out); } catch {}
     }
     if (!!a.pl !== pl) {                                                                // joined or left a match
       const old = a.g;
       const early = this.round.ph === "wait" || this.round.ph === "count";       // no fighting yet: re-sort everyone
       const now = { ...a, pl, g: pl && a.ranked ? (early ? "normal" : this.place(a.id)) : null };
-      ws.serializeAttachment(now);
+      this.setAtt(ws, now);
       if (now.g && early) this.regroup(); else if (now.g) this.sendGroup(ws, now);
       if (pl && !a.ranked) {                                                   // party: whoever starts it picks the map
         const pick = MAP_IDS.includes(d.pm) ? d.pm : null;
@@ -350,7 +372,7 @@ export class Lobby {
   webSocketError(ws) { this.leave(ws); }
 
   leave(ws) {
-    const a = ws.deserializeAttachment();
+    const a = this.att(ws);
     if (!a) return;
     this.last.delete(a.id); this.ps.delete(a.id);
     const out = JSON.stringify({ t: "leave", id: a.id });
@@ -360,13 +382,13 @@ export class Lobby {
     try { ws.close(1000, "bye"); } catch {}
     if (a.pl) { this.lastStanding(a.g, ws); this.tickRound(ws); }
     if (!this.players(ws).length) this.partyMap = null;
-    this.pop(ws);
+    this.forget(ws); this.pop();
     if (a.pl) this.stat(a.room, {});
   }
   tellGroup(g, except, out) {
     for (const ws of this.ctx.getWebSockets()) {
       if (ws === except) continue;
-      const a = ws.deserializeAttachment(); if (g && (!a || a.g !== g)) continue;
+      const a = this.att(ws); if (g && (!a || a.g !== g)) continue;
       try { ws.send(out); } catch {}
     }
   }
