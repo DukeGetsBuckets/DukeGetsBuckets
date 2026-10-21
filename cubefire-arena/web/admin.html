@@ -146,7 +146,8 @@ const $ = s => document.querySelector(s);
 const RANKS = [["Bronze", 0, "#d0925a"], ["Silver", 300, "#c9d3dd"], ["Gold", 700, "#ffc93c"], ["Platinum", 1200, "#5fe0d2"], ["Diamond", 1800, "#7fb7ff"], ["Master", 2500, "#c27bff"], ["Champion", 3500, "#ff5d7a"], ["Mythic", 8000, "#ff8f3a"], ["Legend", 15000, "#fff08a"]];
 const rankOf = rp => { let r = RANKS[0]; for (const R of RANKS) if (rp >= R[1]) r = R; return r; };
 const HACKS = [["aim", "Aimbot"], ["god", "God mode"], ["snipe", "Auto sniper"], ["wall", "Wall hacks"], ["inv", "Invisible"], ["tp", "Teleport"], ["nuke", "Nuke"]];
-const GROUP = { elite: "Elite", normal: "Normal", trash: "Trash" };
+const GROUP = { pro: "Pro", elite: "Elite", normal: "Normal", trash: "Trash", worst: "Worst Possible" };
+const lobbyName = g => { const [t, n] = String(g).split("-"); return (GROUP[t] || t) + " lobby" + (n ? " " + n : ""); };
 let token = sessionStorage.getItem("cfa.admin") || "", data = null, users = [], sortKey = "rank", sortDir = -1, openHack = null, showTable = false;
 
 async function api(op, body) {
@@ -204,7 +205,7 @@ function renderOnline() {
   $("#onlineNote").textContent = rows.length ? "" : "Nobody is online right now";
   const head = el("tr", {}, ["Name", "Where", "Status", "RP", "K / D", "Ping", ""].map((h, i) => el("th", { textContent: h, className: i === 3 || i === 5 ? "num" : "" })));
   $("#online").replaceChildren(head, ...rows.map(p => {
-    const where = p.room.startsWith("ranked") ? (p.g ? GROUP[p.g] + " lobby" : "Ranked menu") : "Party " + p.room.split("-").slice(1).join("-").toUpperCase();
+    const where = p.room.startsWith("ranked") ? (p.g ? lobbyName(p.g) : "Ranked menu") : "Party " + p.room.split("-").slice(1).join("-").toUpperCase();
     const status = !p.pl ? "In the menu" : p.afk ? "Away" : "Playing" + (p.map ? " · " + p.map : "");
     const acts = el("div", { className: "actions" });
     if (p.pl) acts.append(btn("Kill", "danger small", () => act("admin-kill", p, "Killed " + p.name)));

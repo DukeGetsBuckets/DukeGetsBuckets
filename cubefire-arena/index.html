@@ -101,7 +101,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 .lb-foot{grid-area:foot;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .lb-foot .status{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 14px;max-width:min(520px,100%)}
 .playbox{display:grid;gap:8px;width:min(340px,100%);margin-left:auto}
-.modeswitch{display:grid;grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px;gap:3px}
+.modeswitch{display:grid;grid-template-columns:repeat(3,1fr);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px;gap:3px}
 .modeswitch button{border:0;background:transparent;border-radius:4px;padding:8px 6px;font:400 14px var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .modeswitch button[aria-pressed="true"]{background:rgba(255,182,39,.2);color:var(--accent)}
 .partyrow{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 6px 6px 12px}
@@ -572,11 +572,11 @@ body.pig #pigTint{display:block}
       <div class="status" id="menuStatus"><i></i><span>Connecting to the arena…</span></div>
       <div class="playbox">
         <div class="modeswitch" role="group" aria-label="Mode">
-          <button type="button" id="modeRanked" aria-pressed="true">Ranked</button><button type="button" id="modeBots" aria-pressed="false">Bot match</button>
+          <button type="button" id="modeRanked" aria-pressed="true">Ranked</button><button type="button" id="modeParty" aria-pressed="false">Party</button><button type="button" id="modeBots" aria-pressed="false">Bots</button>
         </div>
         <div class="partyrow">
-          <label for="code">Party <em id="codeLock">optional</em></label>
-          <input type="text" id="code" maxlength="12" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="Open lobby">
+          <label for="code">Party code <em id="codeLock">friends use the same code</em></label>
+          <input type="text" id="code" maxlength="12" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. PALS1">
         </div>
         <div class="partyrow" id="partyMapRow" hidden>
           <label for="partyMap">Party map <em>half rank points, no rare spins</em></label>
@@ -664,8 +664,8 @@ body.pig #pigTint{display:block}
       </ul>
       <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
       <span class="lbl-sm">How ranked works</span>
-      <p class="fine">Ranked puts you with players near your rank: up to 60 play at once, in lobbies of about 6 (Elite, Normal and Trash, with more of each when it's busy). Rounds last 3 minutes once 2 players are in, and every round is on a new map. Ranked points: +30 for each elimination (+5 for a headshot); a death costs 2 RP at Bronze, rising with rank to 28 at Legend; and for winning a round +100 (under 4 players) or +300 (4 or more); second place gets a third of that (+33 or +100). If everyone else leaves, the last player left wins the round.</p>
-      <p class="fine">Friends who type the same party code land in the same private match (Diamond and higher only). Parties give half the rank points and no rare spins. Leave it blank to join ranked.</p>
+      <p class="fine">Ranked puts you with players near your rank in lobbies of up to 6 (from Pro down to Worst Possible), up to 60 players at once. You only switch lobbies between rounds. Rounds last 3 minutes once 2 players are in, and every round is on a new map. Ranked points: +30 for each elimination (+5 for a headshot); a death costs 2 RP at Bronze, rising with rank to 28 at Legend; and for winning a round +100 (under 4 players) or +300 (4 or more); second place gets a third of that (+33 or +100). If everyone else leaves, the last player left wins the round.</p>
+      <p class="fine">Friends who type the same party code land in the same private match Parties are open to everyone, with no player limit; they give half the rank points (wins and losses) and no rare spins. Leave it blank to join ranked.</p>
     </div>
   </div>
 </div>
@@ -2605,7 +2605,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 37;
+const BUILD = 40;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2617,7 +2617,7 @@ const remotes = new Map(), heard = new Map();
 // AFK: a player counts as away after AFK_IDLE seconds without touching any control, or
 // while their game is in the background. Away players are hidden from everyone else.
 // Players we stop hearing from for STALE seconds are treated the same way.
-const AFK_IDLE = 45, STALE = 6;
+const AFK_IDLE = 45, STALE = 8;
 let lastInputT = now();
 const iAmAfk = () => document.hidden || now() - lastInputT > AFK_IDLE;
 const activePeer = r => r.pl && !r.afk && now() - r.seen < STALE;
@@ -2626,19 +2626,25 @@ const MAP_VERSION = "v4"; // bump when map layouts change so mismatched versions
 const lobbyKey = code => (code ? "party" : "ranked") + MAP_VERSION + "-" + (code || "open");
 // Ranked: the server sorts players by rank into lobbies of about 6
 // Lobby names: elite, normal, trash, numbered when there are several of a tier (elite-2 → "Elite lobby 2")
-const TIER_NAME = { elite: "Elite", normal: "Normal", trash: "Trash" };
+// Ranked lobbies have a fixed id (L1, L2, ...) and a name by average rank, best to worst
+const TIER_NAME = { pro: "Pro", elite: "Elite", normal: "Normal", trash: "Trash", worst: "Worst Possible" };
 const groupLabel = g => { const [t, n] = String(g || "").split("-"); return TIER_NAME[t] ? TIER_NAME[t] + " lobby" + (n ? " " + n : "") : null; };
-const groupRank = g => { const [t, n] = String(g || "").split("-"); return ["trash", "normal", "elite"].indexOf(t) * 100 - (Number(n) || 0); };
-let myGroup = null, nextGroup = null, pop = null, serverMap = null;
+const groupRank = g => { const [t, n] = String(g || "").split("-"); return ["worst", "trash", "normal", "elite", "pro"].indexOf(t) * 100 - (Number(n) || 0); };
+let myGroup = null, myGroupName = null, nextGroup = null, pop = null, serverMap = null;
 // Ping: the round trip to the game server, measured every 2 seconds
 let pingMs = null;
 setInterval(() => { if (netKind === "ws" && sock && sock.readyState === 1) { try { sock.send(JSON.stringify({ t: "ping", c: performance.now() })); } catch (e) {} } }, 2000);
 
+const PID = (() => {                                // this game's player id, kept across reconnects and reloads
+  let id = ""; try { id = sessionStorage.getItem("cfa.pid") || ""; } catch (e) {}
+  if (!/^[a-z0-9]{12}$/.test(id)) { id = [...crypto.getRandomValues(new Uint8Array(6))].map(b => b.toString(16).padStart(2, "0")).join(""); try { sessionStorage.setItem("cfa.pid", id); } catch (e) {} }
+  return id;
+})();
 function serverUrl(name) {
   const local = location.host === SERVER_HOST || /^(localhost|127\.0\.0\.1):87\d\d$/.test(location.host);
   const host = local ? location.host : SERVER_HOST;
   const proto = local && location.protocol === "http:" ? "ws:" : "wss:";
-  return proto + "//" + host + "/ws?room=" + encodeURIComponent(name) + "&v=" + BUILD;
+  return proto + "//" + host + "/ws?room=" + encodeURIComponent(name) + "&v=" + BUILD + "&pid=" + PID;
 }
 // Resolves true once the game server answers, false if it can't be reached
 function probeServer() {
@@ -2674,10 +2680,10 @@ function connectServer(name) {
     } else if (m.t === "leave" && m.id) removeRemote(String(m.id));
     else if (m.t === "pong" && num(m.c) !== null) { const rtt = performance.now() - m.c; pingMs = Math.round(pingMs == null ? rtt : pingMs * 0.6 + rtt * 0.4); }
     else if (m.t === "group") { nextGroup = null; onGroup(m); }
-    else if (m.t === "next" && groupLabel(m.g) && state === "play" && mode === "online") {    // the lobby you'll be in next round
-      nextGroup = m.g;
-      const up = groupRank(m.g) - groupRank(myGroup);
-      setTimeout(() => banner(!myGroup || !up ? "Next round: staying in the " + groupLabel(m.g) : (up > 0 ? "Next round: moving up to the " : "Next round: moving down to the ") + groupLabel(m.g)), 2600);
+    else if (m.t === "next" && groupLabel(m.name) && state === "play" && mode === "online") {    // the lobby you'll be in next round
+      nextGroup = m.name;
+      const same = m.g === myGroup, up = groupRank(m.name) - groupRank(myGroupName), label = groupLabel(m.name);
+      setTimeout(() => banner(same ? (m.name === myGroupName ? "Next round: same lobby" : "Next round: your lobby becomes the " + label) : !up ? "Next round: moving to the " + label : (up > 0 ? "Next round: moving up to the " : "Next round: moving down to the ") + label), 2600);
     }
     else if (m.t === "pop") { pop = { n: num(m.n) || 0, groups: m.groups && typeof m.groups === "object" ? m.groups : {} }; renderStatus(); }
     else if (m.t === "lastwin") onLastWin(m);
@@ -2699,8 +2705,8 @@ function connectServer(name) {
   s.onclose = () => {
     if (sock !== s) return;
     if (mustRefresh) { sock = null; setNet("offline"); return; }
-    sock = null; clearRemotes(); setNet("connecting");
-    const wait = Math.min(8000, 600 * 2 ** sockRetry++);
+    sock = null; setNet("connecting");                  // keep the other players on screen; they catch up when it's back
+    const wait = Math.min(5000, 300 * 2 ** sockRetry++);
     setTimeout(() => { if (!sock && lobbyName === name) connectServer(name); }, wait);
   };
 }
@@ -3039,11 +3045,14 @@ const rankedLobby = () => lobbyCode() === "open";                        // part
 const rankedNow = () => state === "play" && mode === "online" && !spectating && (!roundsOn() || round.ph === "live");
 // Ranked: which lobby you're in, and who else is in it
 function onGroup(m) {
-  const g = groupLabel(m.g) ? m.g : null, ids = new Set();
+  const g = m.g ? String(m.g) : null, name = groupLabel(m.name) ? m.name : null, ids = new Set();
   for (const p of Array.isArray(m.peers) ? m.peers : []) if (p && p.id && p.d) { ids.add(String(p.id)); onPeer({ peer: String(p.id), presence: p.d, kind: "viewer", sameTab: false }); }
   for (const id of [...remotes.keys()]) if (!ids.has(id)) removeRemote(id);
-  if (g && g !== myGroup && state === "play" && mode === "online") banner(myGroup ? "Moved to the " + groupLabel(g) : "You're in the " + groupLabel(g));
-  myGroup = g; renderStatus();
+  if (g && name && state === "play" && mode === "online") {
+    if (g !== myGroup) banner(myGroup ? "Moved to the " + groupLabel(name) : "You're in the " + groupLabel(name));
+    else if (name !== myGroupName) banner("Your lobby is now the " + groupLabel(name));
+  }
+  myGroup = g; myGroupName = name; renderStatus();
 }
 // Winning a round with more than 8 players earns a rare spin (better odds on the wheel)
 function earnRareSpin() {
@@ -3135,17 +3144,9 @@ function renderRank() {
   if (!$("#ranks").hidden) showRanks();
   renderPartyLock();
 }
-// Party codes (private matches) are only for Diamond and higher
-const PARTY_RANK = "Diamond";
-const partyMin = () => RANKS.find(R => R.name === PARTY_RANK).min;
-const canParty = () => rankPts >= partyMin();
-function renderPartyLock() {
-  const inp = $("#code"), ok = canParty(); if (!inp) return;
-  inp.disabled = !ok;
-  if (!ok) inp.value = "";
-  inp.placeholder = ok ? "Open lobby" : "Locked";
-  $("#codeLock").textContent = ok ? "optional" : PARTY_RANK + "+ (" + partyMin() + " RP)";
-}
+// Party codes (private matches): open to every rank, any number of players
+const canParty = () => true;
+function renderPartyLock() {}
 // Every rank and its levels with the points each one starts at; yours is highlighted
 function rankSteps() {
   const steps = [];
@@ -4242,7 +4243,7 @@ function rowEl(cells, cls) {
 function lobbyCode() { return lobbyName ? lobbyName.slice(lobbyName.indexOf("-") + 1) : "open"; }
 function lobbyLabel() {
   const m = MAPS[mapId].name, code = lobbyCode();
-  return code === "open" ? (myGroup ? "the " + groupLabel(myGroup) : "ranked") + " on " + m : "party " + code.toUpperCase() + " on " + m;
+  return code === "open" ? (myGroupName ? "the " + groupLabel(myGroupName) : "ranked") + " on " + m : "party " + code.toUpperCase() + " on " + m;
 }
 function renderStatus() {
   const n = playersOnline();
@@ -4359,7 +4360,7 @@ function renderRoundHud() {
   else if (round.ph === "count") title = "Round " + (round.n + 1) + " starts in";
   else if (round.ph === "live") title = "Round " + round.n;
   else title = "Round " + round.n + " over · next" + (nextGroup ? ": " + groupLabel(nextGroup) : "") + " in";
-  if (myGroup && lobbyCode() === "open" && round.ph !== "end") title = groupLabel(myGroup) + " · " + title;   // tell people their lobby
+  if (myGroupName && lobbyCode() === "open" && round.ph !== "end") title = groupLabel(myGroupName) + " · " + title;   // tell people their lobby
   else if (lobbyCode() !== "open") title = "Party " + lobbyCode().toUpperCase() + " · " + title;
   $("#roundTitle").textContent = title; $("#roundTime").textContent = time;
   rh.className = round.ph === "live" ? (left < 30 ? "live hurry" : "live") : "";
@@ -4451,7 +4452,7 @@ renderGfx();
 function startGame(m) {
   initAudio();
   myName = cleanName(nick.value) || myName;
-  partyCode = canParty() ? cleanCode(codeIn.value) : "";
+  partyCode = playMode === "party" ? cleanCode(codeIn.value) : "";   // Ranked always joins ranked, even with a code typed
   save("cfa.name", myName); save("cfa.color", myColor); if (canParty()) save("cfa.code", partyCode);
   mode = m; kills = 0; lastKills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null; spectating = false; joinPending = false;
   if (myName.toLowerCase() === "mason" && myColor !== PIG_EXIT_COLOR) { enablePig(); renderSlots(); renderClassPick(); }
@@ -4739,7 +4740,7 @@ renderLocker(); applyGunFinish();
 if (acctToken) api("me").catch(() => {});
 
 // One-time update notice; each device sees it until it's dismissed
-const NOTICE = { id: "ranked-1", text: "New: ranked matchmaking. Press Play ranked and you're matched with players near your rank in the Elite, Normal or Trash lobby (up to 60 players). Every round is on a new map. Ranked points: +30 per elimination; a death costs 2 RP at Bronze up to 28 at Legend; second place gets a third of the win. Party codes now unlock at Diamond." };
+const NOTICE = { id: "ranked-1", text: "New: ranked matchmaking. Press Play ranked and you're matched with players near your rank in lobbies of up to 6, from Pro down to Worst Possible. Every round is on a new map. Ranked points: +30 per elimination; a death costs 2 RP at Bronze up to 28 at Legend; second place gets a third of the win. Party codes are open to everyone." };
 if (load("cfa.notice") !== NOTICE.id) { $("#noticeText").textContent = NOTICE.text; $("#notice").hidden = false; }
 $("#noticeOk").addEventListener("click", () => { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); });
 $("#pwForm").addEventListener("submit", async e => {
@@ -4865,8 +4866,7 @@ $("#callHud").addEventListener("click", () => { if (!isTouchUI()) callPlayers();
 function applyInvite(q) {
   const map = String(q.get("map") || ""), code = cleanCode(q.get("code") || ""), from = cleanName(q.get("from") || "") || "Someone";
   if (state !== "menu") { banner(`${from} is calling players to ${MAPS[map] ? MAPS[map].name : "a match"}`); return; }
-  if (canParty()) { codeIn.value = code.toUpperCase(); partyCode = code; save("cfa.code", partyCode); }
-  else if (code) { banner(`${from} is in a private party. Party codes unlock at ${PARTY_RANK}`); return; }
+  if (code) { codeIn.value = code.toUpperCase(); partyCode = code; save("cfa.code", partyCode); playMode = "party"; save("cfa.mode", "party"); renderPlayMode(); }
   joinLobby(""); renderStatus();
   banner(`${from} is playing${MAPS[map] ? " " + MAPS[map].name : ""}! Tap Play ranked to join`);
 }
@@ -4926,26 +4926,28 @@ function renderPlate() {
 }
 nick.addEventListener("input", renderPlate); renderPlate();
 // Ranked or a bot match; the big button plays whichever is picked
-var playMode = load("cfa.mode") === "bots" ? "bots" : "ranked";   // var: the status line can ask before this runs
+var playMode = ["bots", "party"].includes(load("cfa.mode")) ? load("cfa.mode") : "ranked";   // var: the status line can ask before this runs
 function renderPlayMode() {
-  $("#modeRanked").setAttribute("aria-pressed", String(playMode === "ranked"));
-  $("#modeBots").setAttribute("aria-pressed", String(playMode === "bots"));
-  $(".partyrow").hidden = playMode !== "ranked";
+  for (const [id, m] of [["modeRanked", "ranked"], ["modeParty", "party"], ["modeBots", "bots"]]) $("#" + id).setAttribute("aria-pressed", String(playMode === m));
+  $(".partyrow").hidden = playMode !== "party";
   renderPlaySub();
 }
 function renderPlaySub() {
-  let party = ""; try { party = playMode === "ranked" && canParty() ? cleanCode($("#code").value) : ""; } catch (e) {}   // may run before the rank code loads
+  let party = ""; try { party = playMode === "party" ? cleanCode($("#code").value) : ""; } catch (e) {}   // may run before the page finishes loading
   const pm = MAPS[$("#partyMap").value];
-  $("#partyMapRow").hidden = !party;
-  $("#playSub").textContent = playMode === "bots" ? "Bot match · 6–8 bots" : party ? "Party " + party.toUpperCase() + (pm ? " · " + pm.name : "") + " · half RP" : $("#onlineSub").textContent || "Ranked · matched by rank";
+  $("#partyMapRow").hidden = playMode !== "party";
+  $("#playSub").textContent = playMode === "bots" ? "Bot match · 6–8 bots" : playMode === "party" ? (party ? "Party " + party.toUpperCase() + (pm ? " · " + pm.name : "") + " · half RP" : "Type a party code above") : $("#onlineSub").textContent || "Ranked · matched by rank";
 }
 // Party map: picked by whoever starts the party
 for (const [id, m] of Object.entries(MAPS)) { const o = document.createElement("option"); o.value = id; o.textContent = m.name; $("#partyMap").appendChild(o); }
 $("#partyMap").value = MAPS[load("cfa.pmap")] ? load("cfa.pmap") : "arena";
 $("#partyMap").addEventListener("change", () => { save("cfa.pmap", $("#partyMap").value); renderPlaySub(); });
 codeIn.addEventListener("input", renderPlaySub);
-for (const [id, m] of [["modeRanked", "ranked"], ["modeBots", "bots"]]) $("#" + id).addEventListener("click", () => { playMode = m; save("cfa.mode", m); renderPlayMode(); });
-$("#bigPlay").addEventListener("click", () => $(playMode === "bots" ? "#playBots" : "#playOnline").click());
+for (const [id, m] of [["modeRanked", "ranked"], ["modeParty", "party"], ["modeBots", "bots"]]) $("#" + id).addEventListener("click", () => { playMode = m; save("cfa.mode", m); renderPlayMode(); if (m === "party" && !codeIn.value.trim()) codeIn.focus(); });
+$("#bigPlay").addEventListener("click", () => {
+  if (playMode === "party" && !cleanCode(codeIn.value)) { banner("Type a party code first"); codeIn.focus(); return; }
+  $(playMode === "bots" ? "#playBots" : "#playOnline").click();
+});
 renderPlayMode();
 // Tabs
 $("#tabRanks").addEventListener("click", showRanks);
@@ -5037,7 +5039,7 @@ function leaveMatch() {
   $("#setBody").prepend($("#settings"));
   $("#hud").hidden = true; $("#touch").hidden = true; $("#menu").hidden = false;
   stopBots();
-  myGroup = null; nextGroup = null;
+  myGroup = null; myGroupName = null; nextGroup = null;
   publish(true);
   if (lobbyCode() !== "open") joinLobby("");                             // back to watching ranked
   renderStatus(); flushProgress();

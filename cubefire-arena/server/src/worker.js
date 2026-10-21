@@ -16,23 +16,26 @@
 // protected name and color is refused.
 
 const MAX_PLAYERS = 400;  // sockets per lobby, including people still in the menu (they cost almost nothing)
-// Ranked: one lobby where players are sorted by rank into groups of about GROUP_SIZE,
-// each with its own fights; up to RANKED_MAX playing at once. Groups are Elite, Normal and
-// Trash by rank; with more players there are several of each (elite-1, elite-2, ...).
+// Ranked: one lobby where players are split by rank into groups ("lobbies") of at most
+// GROUP_SIZE, each with its own fights; up to RANKED_MAX playing at once. Each group has a fixed
+// id (L1, L2, ...) and a name by its average rank, from Pro down to Worst Possible.
 const GROUP_SIZE = 6, MAX_GROUPS = 10, RANKED_MAX = GROUP_SIZE * MAX_GROUPS;
-function groupNames(k) {
-  if (k === 1) return ["normal"];
-  if (k === 2) return ["elite", "normal"];
-  const tiers = [], per = [Math.round(k / 3), 0, 0]; per[2] = Math.round(k / 3); per[1] = k - per[0] - per[2];
-  ["elite", "normal", "trash"].forEach((t, i) => { for (let n = 1; n <= per[i]; n++) tiers.push(per[i] > 1 ? t + "-" + n : t); });
-  return tiers;
+const SWAP_GAP = 150;   // between rounds, a player this many RP above someone in the lobby above swaps with them
+const TIERS = ["pro", "elite", "normal", "trash", "worst"];   // best to worst
+function tierNames(k) {
+  if (k <= 1) return ["normal"];
+  const pick = { 2: [0, 2], 3: [0, 2, 4], 4: [0, 1, 3, 4] }[k];
+  const raw = pick ? pick.map(i => TIERS[i]) : Array.from({ length: k }, (_, i) => TIERS[Math.min(4, Math.floor(i * 5 / k))]);
+  const count = {}, seen = {}; raw.forEach(x => { count[x] = (count[x] || 0) + 1; });
+  return raw.map(x => count[x] > 1 ? x + "-" + (seen[x] = (seen[x] || 0) + 1) : x);
 }
 // Every round is played on a new map (must match MAPS in the game page)
 const MAP_IDS = ["arena", "farm", "peaks", "desert", "castle", "snow", "jungle"];
 const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math.floor(Math.random() * l.length)]; };
-// Oldest game copy allowed online. Older copies (including any that still have the
-// removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 37;
+// Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
+// so everyone playing gets sent back to reload: raise it only when an older copy can't work with
+// this server any more, not for every update.
+const MIN_BUILD = 40;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -172,44 +175,79 @@ export class Lobby {
   rankOf(id) { const d = this.last.get(id); return Math.max(0, Number(d && d.rk) || 0); }
   sendGroup(ws, a) {
     const peers = this.players(ws).filter(p => p.a.g === a.g && this.last.has(p.a.id)).map(p => ({ id: p.a.id, d: this.last.get(p.a.id) }));
-    try { ws.send(JSON.stringify({ t: "group", g: a.g, peers })); } catch {}
+    try { ws.send(JSON.stringify({ t: "group", g: a.g, name: a.gn, peers })); } catch {}
   }
-  // Someone joining mid-round goes to the fullest lobby that still has room (closest rank breaks a
-  // tie); if every lobby is full they join the closest-ranked one until the round ends
+  newGid(used) { for (let n = 1; ; n++) if (!used.has("L" + n)) return "L" + n; }
+  // Someone joining mid-round goes to the fullest lobby that still has room (closest rank breaks
+  // a tie). A lobby never has more than 6: if they're all full, a new one opens.
   place(id) {
     const groups = new Map();
-    for (const p of this.players()) if (p.a.g) { const l = groups.get(p.a.g) || []; l.push(this.rankOf(p.a.id)); groups.set(p.a.g, l); }
-    if (!groups.size) return "normal";
-    const rk = this.rankOf(id), gap = l => Math.abs(l.reduce((s, v) => s + v, 0) / l.length - rk);
-    const open = [...groups].filter(([, l]) => l.length < GROUP_SIZE);
-    if (open.length) return open.sort((x, y) => y[1].length - x[1].length || gap(x[1]) - gap(y[1]))[0][0];
-    return [...groups].sort((x, y) => gap(x[1]) - gap(y[1]))[0][0];
+    for (const p of this.players()) if (p.a.g) { const x = groups.get(p.a.g) || { rks: [], gn: p.a.gn }; x.rks.push(this.rankOf(p.a.id)); groups.set(p.a.g, x); }
+    if (!groups.size) return { g: "L1", gn: "normal" };
+    const rk = this.rankOf(id), gap = x => Math.abs(x.rks.reduce((s, v) => s + v, 0) / x.rks.length - rk);
+    const open = [...groups].filter(([, x]) => x.rks.length < GROUP_SIZE);
+    if (open.length) { const [g, x] = open.sort((p, q) => q[1].rks.length - p[1].rks.length || gap(p[1]) - gap(q[1]))[0]; return { g, gn: x.gn }; }
+    // all full: a new lobby, named like the closest-ranked one (numbered so the names stay different)
+    const near = [...groups.values()].sort((p, q) => gap(p) - gap(q))[0], base = String(near.gn || "normal").split("-")[0];
+    const names = new Set([...groups.values()].map(x => x.gn));
+    let gn = base; for (let n = 2; names.has(gn); n++) gn = base + "-" + n;
+    return { g: this.newGid(new Set(groups.keys())), gn };
   }
-  // At each countdown: everyone playing, sorted by rank, split into even groups of up to 6
-  // Everyone playing, sorted by their current rank. Full lobbies come first: each one gets 6
-  // before another opens (the last one never has just 1: 7 players are 5 + 2)
+  // Between rounds: as few moves as possible. Everyone keeps their lobby unless a lobby is over 6,
+  // small lobbies can merge into fuller ones, a lone player joins another lobby, new players fill
+  // the fullest lobbies, and a player clearly better than someone in the lobby above swaps with
+  // them. Then lobbies are named by average rank (Pro at the top down to Worst Possible).
   plan() {
-    const ps = this.players().sort((x, y) => this.rankOf(y.a.id) - this.rankOf(x.a.id));
-    const k = Math.min(MAX_GROUPS, Math.max(1, Math.ceil(ps.length / GROUP_SIZE))), names = groupNames(k);
-    const sizes = names.map(() => GROUP_SIZE); sizes[k - 1] = ps.length - GROUP_SIZE * (k - 1);
-    if (k > 1 && sizes[k - 1] === 1) { sizes[k - 2]--; sizes[k - 1]++; }
-    let i = 0;
-    names.forEach((g, gi) => { for (let n = sizes[gi]; n > 0 && i < ps.length; n--, i++) ps[i].g = g; });
-    for (; i < ps.length; i++) ps[i].g = names[k - 1];          // (only past the 60-player limit)
-    return ps;
+    const ps = this.players(), rk = p => this.rankOf(p.a.id);
+    const avg = l => l.reduce((s, p) => s + rk(p), 0) / l.length;
+    const groups = new Map();
+    for (const p of ps) if (p.a.g) { if (!groups.has(p.a.g)) groups.set(p.a.g, []); groups.get(p.a.g).push(p); }
+    const loose = ps.filter(p => !p.a.g);
+    for (const l of groups.values()) { l.sort((x, y) => rk(y) - rk(x)); while (l.length > GROUP_SIZE) loose.push(l.pop()); }
+    for (let merged = true; merged;) {                          // fuller lobbies: merge any two that fit in one
+      merged = false;
+      const list = [...groups].sort((x, y) => x[1].length - y[1].length);
+      outer: for (const [gi, li] of list) for (const [gj, lj] of list) {
+        if (gi !== gj && li.length + lj.length <= GROUP_SIZE && li.length <= lj.length) { lj.push(...li); groups.delete(gi); merged = true; break outer; }
+      }
+    }
+    loose.sort((x, y) => rk(y) - rk(x));
+    for (const p of loose) {
+      const open = [...groups].filter(([, l]) => l.length < GROUP_SIZE).sort((x, y) => y[1].length - x[1].length || Math.abs(avg(x[1]) - rk(p)) - Math.abs(avg(y[1]) - rk(p)));
+      if (open.length) open[0][1].push(p); else groups.set(this.newGid(new Set(groups.keys())), [p]);
+    }
+    for (let pass = 0; pass < 3; pass++) {                      // keep the order: swap clear mismatches
+      const o = [...groups.values()].sort((x, y) => avg(y) - avg(x));
+      for (let i = 0; i + 1 < o.length; i++) {
+        const hi = o[i], lo = o[i + 1], up = lo.reduce((m, p) => rk(p) > rk(m) ? p : m), down = hi.reduce((m, p) => rk(p) < rk(m) ? p : m);
+        if (rk(up) > rk(down) + SWAP_GAP) { hi[hi.indexOf(down)] = up; lo[lo.indexOf(up)] = down; }
+      }
+    }
+    for (const [g, l] of [...groups]) {                         // nobody plays alone if another lobby has room
+      if (l.length !== 1 || groups.size < 2) continue;
+      const open = [...groups].filter(([h, m]) => h !== g && m.length < GROUP_SIZE).sort((x, y) => Math.abs(avg(x[1]) - rk(l[0])) - Math.abs(avg(y[1]) - rk(l[0])));
+      if (open.length) { open[0][1].push(l[0]); groups.delete(g); }
+      else {                                                    // every other lobby is full: borrow its closest-ranked player
+        const near = [...groups].filter(([h, m]) => h !== g && m.length >= 3).sort((x, y) => Math.abs(avg(x[1]) - rk(l[0])) - Math.abs(avg(y[1]) - rk(l[0])))[0];
+        if (near) { const m = near[1], pick = m.reduce((q, p) => Math.abs(rk(p) - rk(l[0])) < Math.abs(rk(q) - rk(l[0])) ? p : q); m.splice(m.indexOf(pick), 1); l.push(pick); }
+      }
+    }
+    const sorted = [...groups].sort((x, y) => avg(y[1]) - avg(x[1])), names = tierNames(sorted.length), out = [];
+    sorted.forEach(([g, l], i) => { for (const p of l) out.push({ ...p, g, gn: names[i] }); });
+    return out;
   }
   // When a round ends, tell each player which lobby they'll be in next
-  announce() { for (const p of this.plan()) { try { p.ws.send(JSON.stringify({ t: "next", g: p.g })); } catch {} } }
+  announce() { for (const p of this.plan()) { try { p.ws.send(JSON.stringify({ t: "next", g: p.g, name: p.gn })); } catch {} } }
   // ...and move them as the next countdown starts (all lobbies share one round clock)
   regroup() {
     const ps = this.plan();
-    for (const p of ps) { p.a = { ...p.a, g: p.g }; this.setAtt(p.ws, p.a); }
+    for (const p of ps) { p.a = { ...p.a, g: p.g, gn: p.gn }; this.setAtt(p.ws, p.a); }
     for (const p of ps) this.sendGroup(p.ws, p.a);
   }
   // How many are playing (and in which group), for the menu; sent at most about once a second
   popMsg(except) {
     const groups = {}, ps = this.players(except);
-    for (const p of ps) if (p.a.g) groups[p.a.g] = (groups[p.a.g] || 0) + 1;
+    for (const p of ps) if (p.a.gn) groups[p.a.gn] = (groups[p.a.gn] || 0) + 1;   // by lobby name, for the menu
     return JSON.stringify({ t: "pop", n: ps.length, groups });
   }
   pop() {
@@ -266,7 +304,7 @@ export class Lobby {
     const socks = this.ctx.getWebSockets().map(ws => ({ ws, a: this.att(ws) })).filter(x => x.a);
     if (path === "/state") return Response.json({ round: { ph: this.round.ph, n: this.round.n, map: this.round.map }, players: socks.map(({ a }) => {
       const d = this.last.get(a.id) || {};
-      return { id: a.id, name: String(d.n || "?").slice(0, 24), pl: !!a.pl, g: a.g || null, rk: Number(d.rk) || 0, k: Number(d.k) || 0, d: Number(d.d) || 0, afk: !!d.afk, perks: a.perks || [], ping: Number(d.pg) || null };
+      return { id: a.id, name: String(d.n || "?").slice(0, 24), pl: !!a.pl, g: a.gn || null, rk: Number(d.rk) || 0, k: Number(d.k) || 0, d: Number(d.d) || 0, afk: !!d.afk, perks: a.perks || [], ping: Number(d.pg) || null };
     }) });
     if (path === "/act") {
       if (b.act === "closeall") { for (const { ws } of socks) { try { ws.send(JSON.stringify({ t: "blocked", why: String(b.msg || "") })); ws.close(4003, "Closed"); } catch {} } return Response.json({ ok: true }); }
@@ -287,9 +325,17 @@ export class Lobby {
     if (sockets.length >= MAX_PLAYERS) return new Response("Lobby is full", { status: 503 });
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
-    const id = crypto.randomUUID().replace(/-/g, "").slice(0, 10);
+    // Each game keeps its player id across reconnects (a Wi-Fi blip, a server restart), so it takes
+    // over its old place instead of everyone seeing it leave and join again
+    const want = String(new URL(request.url).searchParams.get("pid") || "").replace(/[^a-z0-9]/gi, "").slice(0, 16);
+    const id = want.length >= 8 ? want : crypto.randomUUID().replace(/-/g, "").slice(0, 10);
+    let carry = {};
+    for (const ws of sockets) {
+      const o = this.att(ws);
+      if (o && o.id === id && !o.replaced) { carry = { pl: o.pl, g: o.g, gn: o.gn, perks: o.perks, auth: o.auth }; this.setAtt(ws, { ...o, replaced: true, pl: false, g: null }); try { ws.close(4005, "Reconnected"); } catch {} }
+    }
     this.ctx.acceptWebSocket(server);
-    this.setAtt(server, { id, auth: false, ranked, room, ipk });
+    this.setAtt(server, { id, auth: false, ranked, room, ipk, ...carry });
     const peers = [];
     for (const ws of sockets) {
       const a = this.att(ws);
@@ -298,10 +344,14 @@ export class Lobby {
     const r = this.round;
     server.send(JSON.stringify({ t: "welcome", id, peers, round: { ph: r.ph, ends: r.ends, n: r.n, map: r.map }, now: Date.now() }));
     server.send(this.popMsg());
+    if (carry.g) this.sendGroup(server, this.att(server));             // straight back into your lobby
     return new Response(null, { status: 101, webSocket: client });
   }
 
   webSocketMessage(ws, message) {
+    try { this.onMessage(ws, message); } catch (e) { console.log("message error", e && e.message); }
+  }
+  onMessage(ws, message) {
     if (typeof message !== "string" || message.length > MAX_MESSAGE) return;
     const a = this.att(ws);
     if (!a) return;
@@ -347,10 +397,10 @@ export class Lobby {
     }
     if (!!a.pl !== pl) {                                                                // joined or left a match
       const old = a.g;
-      const early = this.round.ph === "wait" || this.round.ph === "count";       // no fighting yet: re-sort everyone
-      const now = { ...a, pl, g: pl && a.ranked ? (early ? "normal" : this.place(a.id)) : null };
+      const seat = pl && a.ranked ? this.place(a.id) : null;               // lobbies only change between rounds
+      const now = { ...a, pl, g: seat ? seat.g : null, gn: seat ? seat.gn : null };
       this.setAtt(ws, now);
-      if (now.g && early) this.regroup(); else if (now.g) this.sendGroup(ws, now);
+      if (now.g) this.sendGroup(ws, now);
       if (pl && !a.ranked) {                                                   // party: whoever starts it picks the map
         const pick = MAP_IDS.includes(d.pm) ? d.pm : null;
         if (pick && (!this.partyMap || !this.players(ws).length)) this.partyMap = pick;
@@ -380,6 +430,7 @@ export class Lobby {
   leave(ws) {
     const a = this.att(ws);
     if (!a) return;
+    if (a.replaced) { this.forget(ws); return; }                     // the same player reconnected: not a real leave
     this.last.delete(a.id); this.ps.delete(a.id);
     const out = JSON.stringify({ t: "leave", id: a.id });
     for (const other of this.ctx.getWebSockets()) {
