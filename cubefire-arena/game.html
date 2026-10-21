@@ -249,6 +249,16 @@ body.pig #pigTint{display:block}
 .rankrow.here{border-color:var(--accent);background:rgba(255,182,39,.1)}
 .rankrow.here em{color:var(--accent)}
 .rankrow.locked{opacity:.6}
+.lb-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.lb-head b{font:400 18px var(--display);letter-spacing:.03em}
+.lb{display:grid;gap:4px;max-height:340px;overflow-y:auto}
+.lbrow{display:grid;grid-template-columns:34px minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:7px 12px;border:1px solid var(--line);border-radius:6px;background:rgba(255,255,255,.03);font-weight:600;font-variant-numeric:tabular-nums}
+.lbrow i{font-style:normal;font:400 15px var(--display);color:var(--muted)}
+.lbrow:nth-child(1) i{color:#ffd23a}.lbrow:nth-child(2) i{color:#d9e1e8}.lbrow:nth-child(3) i{color:#e0995a}
+.lbrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbrow b{font:400 14px var(--display);letter-spacing:.03em}
+.lbrow em{font-style:normal;font-size:12px;color:var(--muted)}
+.lbrow.me{border-color:var(--accent);background:rgba(255,182,39,.1)}
 .linkbtn{border:1px solid var(--line);background:rgba(255,255,255,.06);border-radius:4px;padding:4px 10px;font-weight:700;font-size:12px;letter-spacing:.04em;margin-left:auto}
 #locker{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.78);padding:16px;z-index:6;overflow-y:auto}
 #locker .card{width:min(860px,100%);gap:14px}
@@ -417,7 +427,7 @@ body.pig #pigTint{display:block}
         <input type="text" id="nick" maxlength="24" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Your name">
       </div>
       <div class="field">
-        <label for="code">Party code <em>optional</em></label>
+        <label for="code">Party code <em id="codeLock">optional</em></label>
         <input type="text" id="code" maxlength="12" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="Open lobby">
       </div>
     </div>
@@ -481,7 +491,7 @@ body.pig #pigTint{display:block}
     </ul>
     <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
     <p class="fine">Online matches are played in 3-minute rounds once 2 players are in; you can jump in at any time, even mid-round. Ranked: +30 for each elimination (+5 for a headshot), −10 for each death, and for winning a round +100 (under 4 players) or +300 (4 or more); second place gets a third of that (+33 or +100). From Champion up, eliminations give 18 and deaths cost 17.</p>
-    <p class="fine">Friends who type the same party code land in the same private match. Leave it blank to join the open arena.</p>
+    <p class="fine">Friends who type the same party code land in the same private match (Champion I and higher only). Leave it blank to join the open arena.</p>
   </div>
 </div>
 
@@ -529,6 +539,8 @@ body.pig #pigTint{display:block}
   <div class="card" role="dialog" aria-labelledby="ranksTitle">
     <h2 id="ranksTitle">Ranks</h2>
     <div class="rankme" id="rankMe"></div>
+    <div class="lb-head"><b>Leaderboard</b><span class="fine" id="lbNote"></span></div>
+    <div class="lb" id="leaderboard"></div>
     <div class="ranklist" id="rankList"></div>
     <p class="fine">+30 RP for each elimination (+5 for a headshot); −10 RP for each death. Winning a round gives +100 RP, or +300 RP when 4 or more players are in it, and second place gets a third of that (+33 or +100 RP). From Champion up it gets much harder: eliminations give 18 RP and deaths cost 17. Only online rounds count. Every rank but Legend has three levels: III, II, then I.</p>
     <div class="btns"><button class="btn primary" type="button" id="ranksClose">Close</button></div>
@@ -2410,7 +2422,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 24;
+const BUILD = 26;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2885,6 +2897,18 @@ function renderRank() {
   open.addEventListener("click", showRanks);
   m.replaceChildren(a, b, c, open);
   if (!$("#ranks").hidden) showRanks();
+  renderPartyLock();
+}
+// Party codes (private matches) are only for Champion I and higher
+const PARTY_RANK = "Champion I";
+const partyMin = () => rankSteps().find(s => s.label === PARTY_RANK).min;
+const canParty = () => rankPts >= partyMin();
+function renderPartyLock() {
+  const inp = $("#code"), ok = canParty(); if (!inp) return;
+  inp.disabled = !ok;
+  if (!ok) inp.value = "";
+  inp.placeholder = ok ? "Open lobby" : "Unlocks at " + PARTY_RANK;
+  $("#codeLock").textContent = ok ? "optional" : PARTY_RANK + "+ (" + partyMin() + " RP)";
 }
 // Every rank and its levels with the points each one starts at; yours is highlighted
 function rankSteps() {
@@ -2925,6 +2949,25 @@ function showRanks() {
     row.append(dia, mid, em); list.appendChild(row);
   });
   $("#ranks").hidden = false;
+  loadLeaderboard();
+}
+// Leaderboard: the highest-ranked accounts (ranks are saved on accounts)
+let lbAt = 0, lbRows = null;
+async function loadLeaderboard() {
+  const box = $("#leaderboard"), note = $("#lbNote");
+  if (!lbRows || performance.now() - lbAt > 20000) {
+    if (!lbRows) { box.replaceChildren(); note.textContent = "Loading…"; }
+    try { lbRows = (await api("top")).top; lbAt = performance.now(); }
+    catch (e) { box.replaceChildren(); note.textContent = API ? "Open the game's own site to see the leaderboard" : "Couldn't load the leaderboard"; return; }
+  }
+  note.textContent = acct ? "Top " + lbRows.length + " players" : "Sign in from the Locker to get on it";
+  box.replaceChildren(...lbRows.map((r, i) => {
+    const row = document.createElement("div"), n = document.createElement("i"), who = document.createElement("span"), rk = document.createElement("b"), pts = document.createElement("em"), R = rankOf(r.rank);
+    row.className = "lbrow" + (acct && acct.name.toLowerCase() === r.name.toLowerCase() ? " me" : "");
+    n.textContent = "#" + (i + 1); who.textContent = r.name; rk.textContent = R.label; rk.style.color = R.color; pts.textContent = r.rank + " RP";
+    row.append(n, who, rk, pts); return row;
+  }));
+  if (!lbRows.length) note.textContent = "Nobody yet. Play online rounds to get on it";
 }
 $("#ranksClose").addEventListener("click", () => { $("#ranks").hidden = true; });
 $("#ranks").addEventListener("click", e => { if (e.target.id === "ranks") $("#ranks").hidden = true; });
@@ -4082,7 +4125,8 @@ function leavePig() {
   save("cfa.pig", "0"); save("cfa.color", myColor);
   location.reload();
 }
-const codeIn = $("#code"); codeIn.value = partyCode.toUpperCase();
+const codeIn = $("#code"); codeIn.value = partyCode.toUpperCase(); renderPartyLock();
+if (!canParty()) partyCode = "";
 const sw = $("#swatches");
 PAL.forEach((c, i) => {
   const b = document.createElement("button"); b.type = "button"; b.style.background = c;
@@ -4143,8 +4187,8 @@ renderGfx();
 function startGame(m) {
   initAudio();
   myName = cleanName(nick.value) || myName;
-  partyCode = cleanCode(codeIn.value);
-  save("cfa.name", myName); save("cfa.color", myColor); save("cfa.code", partyCode);
+  partyCode = canParty() ? cleanCode(codeIn.value) : "";
+  save("cfa.name", myName); save("cfa.color", myColor); if (canParty()) save("cfa.code", partyCode);
   mode = m; kills = 0; lastKills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null; spectating = false; joinPending = false;
   if (myName.toLowerCase() === "mason" && myColor !== PIG_EXIT_COLOR) { enablePig(); renderSlots(); renderClassPick(); }
   guns[W_ID.paint].userData.ballMat.color.set(PAL[myColor]);              // paint in your armor color
@@ -4548,7 +4592,8 @@ function applyInvite(q) {
   const map = String(q.get("map") || ""), code = cleanCode(q.get("code") || ""), from = cleanName(q.get("from") || "") || "Someone";
   if (state !== "menu") { banner(`${from} is calling players to ${MAPS[map] ? MAPS[map].name : "a match"}`); return; }
   if (MAPS[map] && map !== mapId) { loadMap(map); save("cfa.map", mapId); renderMapPick(); }
-  codeIn.value = code.toUpperCase(); partyCode = code; save("cfa.code", partyCode);
+  if (canParty()) { codeIn.value = code.toUpperCase(); partyCode = code; save("cfa.code", partyCode); }
+  else if (code) { banner(`${from} is in a private party. Party codes unlock at ${PARTY_RANK}`); return; }
   joinLobby(""); renderStatus();
   banner(`${from} is playing ${MAPS[mapId].name}! Tap Play online to join`);
 }

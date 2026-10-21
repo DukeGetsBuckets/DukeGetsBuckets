@@ -15,7 +15,7 @@
 const MAX_PLAYERS = 16;
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 24;
+const MIN_BUILD = 26;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -434,6 +434,10 @@ export class Accounts {
       }
       this.fails.delete(name);
       return { token: await this.session(name), account: this.view(u, this.data(u)) };
+    }
+    if (op === "top") {                                    // leaderboard: the 20 highest-ranked accounts
+      const top = this.sql.exec("SELECT display, CAST(json_extract(data, '$.rank') AS INTEGER) AS rank FROM users WHERE CAST(json_extract(data, '$.rank') AS INTEGER) > 0 ORDER BY rank DESC, created ASC LIMIT 20").toArray();
+      return { top: top.map(r => ({ name: r.display, rank: r.rank })) };
     }
     const u = this.who(body), d = this.data(u);
     if (op === "me") return { account: this.view(u, d) };
