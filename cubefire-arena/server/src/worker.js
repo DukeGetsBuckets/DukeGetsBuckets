@@ -20,7 +20,8 @@ const MAX_PLAYERS = 400;  // sockets per lobby, including people still in the me
 // GROUP_SIZE, each with its own fights; up to RANKED_MAX playing at once. Each group has a fixed
 // id (L1, L2, ...) and a name by its average rank, from Pro down to Worst Possible.
 const GROUP_SIZE = 6, MAX_GROUPS = 10, RANKED_MAX = GROUP_SIZE * MAX_GROUPS;
-const SWAP_GAP = 150;   // between rounds, a player this many RP above someone in the lobby above swaps with them
+const SWAP_GAP = 150;
+const GHOST_MS = 10000, DROP_MS = 60000;   // silent this long: not counted as playing / disconnected   // between rounds, a player this many RP above someone in the lobby above swaps with them
 const TIERS = ["pro", "elite", "normal", "trash", "worst"];   // best to worst
 function tierNames(k) {
   if (k <= 1) return ["normal"];
@@ -98,6 +99,7 @@ export class Lobby {
     this.round = { ph: "wait", ends: 0, n: 0, map: nextMap(null), sizes: {}, won: [] };
     this.ps = new Map(); // player id -> what the server knows about their health (see referee)
     this.atts = new Map();     // socket -> attachment, so busy lobbies don't decode it on every message
+    this.seen = new Map();     // player id -> when we last heard from them
     this.groups = null;        // ranked group -> sockets in it (rebuilt after the lobby wakes up)
   }
 
@@ -167,10 +169,17 @@ export class Lobby {
   forget(ws) { const a = this.atts.get(ws); if (a && a.g && this.groups) this.groups.get(a.g)?.delete(ws); this.atts.delete(ws); }
   // ---- ranked groups (kept in each socket's attachment as g)
   ranked() { for (const ws of this.ctx.getWebSockets()) { const a = this.att(ws); if (a) return !!a.ranked; } return false; }
+  // Players in a match. Anyone silent for 10 s (an iPad that went to sleep, an app swiped away
+  // without closing its connection) doesn't count, so nobody gets sorted into a lobby of ghosts.
   players(except) {
-    const out = [];
-    for (const ws of this.ctx.getWebSockets()) { const a = this.att(ws); if (ws !== except && a && a.pl) out.push({ ws, a }); }
+    const out = [], now = Date.now();
+    for (const ws of this.ctx.getWebSockets()) { const a = this.att(ws); if (ws !== except && a && a.pl && now - (this.seen.get(a.id) || now) < GHOST_MS) out.push({ ws, a }); }
     return out;
+  }
+  // Connections silent for a minute are closed (they never said goodbye)
+  sweep() {
+    const now = Date.now(); if (now < (this.sweepAt || 0)) return; this.sweepAt = now + 5000;
+    for (const ws of this.ctx.getWebSockets()) { const a = this.att(ws); if (a && !a.replaced && now - (this.seen.get(a.id) || now) > DROP_MS) { try { ws.close(4006, "Timed out"); } catch {} this.leave(ws); } }
   }
   rankOf(id) { const d = this.last.get(id); return Math.max(0, Number(d && d.rk) || 0); }
   sendGroup(ws, a) {
@@ -335,7 +344,7 @@ export class Lobby {
       if (o && o.id === id && !o.replaced) { carry = { pl: o.pl, g: o.g, gn: o.gn, perks: o.perks, auth: o.auth }; this.setAtt(ws, { ...o, replaced: true, pl: false, g: null }); try { ws.close(4005, "Reconnected"); } catch {} }
     }
     this.ctx.acceptWebSocket(server);
-    this.setAtt(server, { id, auth: false, ranked, room, ipk, ...carry });
+    this.setAtt(server, { id, auth: false, ranked, room, ipk, ...carry }); this.seen.set(id, Date.now());
     const peers = [];
     for (const ws of sockets) {
       const a = this.att(ws);
@@ -355,6 +364,7 @@ export class Lobby {
     if (typeof message !== "string" || message.length > MAX_MESSAGE) return;
     const a = this.att(ws);
     if (!a) return;
+    this.seen.set(a.id, Date.now()); this.sweep();
     let d;
     try { d = JSON.parse(message); } catch { return; }
     if (!d || typeof d !== "object" || Array.isArray(d)) return;
@@ -431,6 +441,8 @@ export class Lobby {
     const a = this.att(ws);
     if (!a) return;
     if (a.replaced) { this.forget(ws); return; }                     // the same player reconnected: not a real leave
+    if (a.gone) return;                                                  // (a timed-out socket can close twice)
+    this.atts.set(ws, { ...a, gone: true }); try { ws.serializeAttachment({ ...a, gone: true }); } catch {}
     this.last.delete(a.id); this.ps.delete(a.id);
     const out = JSON.stringify({ t: "leave", id: a.id });
     for (const other of this.ctx.getWebSockets()) {
@@ -757,6 +769,7 @@ export class Accounts {
     if (op === "push-unsub") { this.sql.exec("DELETE FROM push WHERE endpoint = ?", endpoint); return { premium: false }; }
     if (op === "push-call") {
       if (!me) throw new UserError("Turn on notifications to become Premium first");
+      if (body.code) throw new UserError("You can only call friends to ranked. Private matches are join-by-code only");
       if (!acct) throw new UserError("Sign in to call your friends");
       const friends = this.friendsOf(acct);
       if (!friends.length) throw new UserError("Add friends first (Friends tab), then you can call them");
@@ -764,8 +777,9 @@ export class Accounts {
       if (wait > 0) throw new UserError(`You can call your friends again in ${Math.ceil(wait / 60000)} min`);
       this.sql.exec("UPDATE push SET lastCall = ? WHERE endpoint = ?", now, endpoint); this.lastCallAt = now; this.bump("calls");
       const name = (this.user(acct) || {}).display || cleanText(body.name, 16) || "Your friend", mapName = cleanText(body.mapName, 24) || "the arena";
-      const q = new URLSearchParams({ join: "1", map: cleanText(body.map, 16).replace(/[^a-z]/g, ""), code: cleanText(body.code, 12).replace(/[^\w-]/g, ""), from: name });
-      const message = { title: "Cubefire Arena", body: `${name} is playing ${mapName}${body.code ? " (party " + cleanText(body.code, 12).toUpperCase() + ")" : ""}. Tap to join!`, url: "/?" + q };
+      // calls are for ranked only: never a party code (private matches are join-by-code only)
+      const q = new URLSearchParams({ join: "1", map: cleanText(body.map, 16).replace(/[^a-z]/g, ""), from: name });
+      const message = { title: "Cubefire Arena", body: `${name} is playing ranked on ${mapName}. Tap to join!`, url: "/?" + q };
       const subs = this.sql.exec(`SELECT * FROM push WHERE endpoint != ? AND acct IN (${friends.map(() => "?").join(",")})`, endpoint, ...friends).toArray();
       let sent = 0;
       for (let i = 0; i < subs.length; i += 20) {

@@ -665,7 +665,7 @@ body.pig #pigTint{display:block}
       <p class="fine" id="touchHelp" hidden>Drag on the left side to move, drag on the right side to look. Hold the big Fire button to aim and shoot at once. Jump, Dash, Duck, Reload and Nade sit around it, and you can press several at once; tap a weapon at the top to switch.</p>
       <span class="lbl-sm">How ranked works</span>
       <p class="fine">Ranked puts you with players near your rank in lobbies of up to 6 (from Pro down to Worst Possible), up to 60 players at once. You only switch lobbies between rounds. Rounds last 3 minutes once 2 players are in, and every round is on a new map. Ranked points: +30 for each elimination (+5 for a headshot); a death costs 2 RP at Bronze, rising with rank to 28 at Legend; and for winning a round +100 (under 4 players) or +300 (4 or more); second place gets a third of that (+33 or +100). If everyone else leaves, the last player left wins the round.</p>
-      <p class="fine">Friends who type the same party code land in the same private match Parties are open to everyone, with no player limit; they give half the rank points (wins and losses) and no rare spins. Leave it blank to join ranked.</p>
+      <p class="fine">Friends who type the same party code land in the same private match Parties are open to everyone, with no player limit, and the only way in is typing the code (you can't call friends to one); they give half the rank points (wins and losses) and no rare spins. Leave it blank to join ranked.</p>
     </div>
   </div>
 </div>
@@ -2605,7 +2605,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 40;
+const BUILD = 41;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -4325,9 +4325,10 @@ function renderHud(t) {
     parts.push(`<b class="${cls(-fps, -50, -30)}">${fps} fps</b>`);
     $("#netStat").innerHTML = parts.join("");
   }
-  const callable = mode === "online" && state === "play" && (roundsOn() ? round.ph === "wait" : playersOnline() === 0);
+  const canCall = mode === "online" && rankedLobby();                // no inviting to private matches
+  const callable = canCall && state === "play" && (roundsOn() ? round.ph === "wait" : playersOnline() === 0);
   if ($("#callHud").hidden === callable) $("#callHud").hidden = !callable;
-  if ($("#callPlayers").hidden === (mode === "online")) $("#callPlayers").hidden = mode !== "online";
+  if ($("#callPlayers").hidden === canCall) $("#callPlayers").hidden = !canCall;
   if (!alive && state === "play" && !spectating) $("#deathSub").textContent = "Respawning in " + Math.max(1, Math.ceil(respawnAt - t));
   $("#spec").hidden = !spectating;
   if (spectating) {
@@ -4854,9 +4855,10 @@ $("#premium").addEventListener("click", e => { if (e.target.id === "premium") $(
 let callBusy = false;
 async function callPlayers() {
   if (callBusy || mode !== "online" || state !== "play") return;
+  if (lobbyCode() !== "open") { banner("You can only call friends to ranked. Private matches are join-by-code only"); return; }
   if (!premium) { showPause(true); openPremium("Calling friends is a Premium feature."); return; }
   callBusy = true;
-  try { const r = await api("push-call", { endpoint: pushEndpoint, name: myName, map: mapId, mapName: MAPS[mapId].name, code: partyCode }); banner(r.sent ? `Called your friends! ${r.sent} notified` : "Called! None of your friends have notifications on yet"); }
+  try { const r = await api("push-call", { endpoint: pushEndpoint, name: myName, map: mapId, mapName: MAPS[mapId].name }); banner(r.sent ? `Called your friends! ${r.sent} notified` : "Called! None of your friends have notifications on yet"); }
   catch (e) { banner(e.message); }
   callBusy = false;
 }
@@ -4864,9 +4866,10 @@ $("#callPlayers").addEventListener("click", () => { callPlayers(); resumeFromPau
 $("#callHud").addEventListener("click", () => { if (!isTouchUI()) callPlayers(); });
 // Opening a "come play" notification: pick that map and party, ready to join
 function applyInvite(q) {
-  const map = String(q.get("map") || ""), code = cleanCode(q.get("code") || ""), from = cleanName(q.get("from") || "") || "Someone";
+  const map = String(q.get("map") || ""), from = cleanName(q.get("from") || "") || "Someone";
   if (state !== "menu") { banner(`${from} is calling players to ${MAPS[map] ? MAPS[map].name : "a match"}`); return; }
-  if (code) { codeIn.value = code.toUpperCase(); partyCode = code; save("cfa.code", partyCode); playMode = "party"; save("cfa.mode", "party"); renderPlayMode(); }
+  // (an invite never carries a party code: private matches are join-by-code only)
+  playMode = "ranked"; save("cfa.mode", "ranked"); renderPlayMode();
   joinLobby(""); renderStatus();
   banner(`${from} is playing${MAPS[map] ? " " + MAPS[map].name : ""}! Tap Play ranked to join`);
 }
