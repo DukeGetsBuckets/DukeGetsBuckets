@@ -25,7 +25,7 @@ const MAP_IDS = ["arena", "farm", "peaks", "desert", "castle", "snow", "jungle"]
 const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math.floor(Math.random() * l.length)]; };
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 29;
+const MIN_BUILD = 30;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -393,11 +393,12 @@ async function hashPw(password, salt) {
 // VAPID_PRIVATE secret (a P-256 JWK). Premium players can "call" everyone to their map.
 //   POST /api/push-key    POST /api/push-sub {sub}     POST /api/push-check {endpoint}
 //   POST /api/push-unsub {endpoint}   POST /api/push-call {endpoint, name, map, mapName, code}
+// A call only goes to the caller's friends (both signed in; the subscription remembers its account).
 // ======================================================================
 const PUSH_SUBJECT = "https://cubefire-arena.secret321.workers.dev";
 // Only real push services, so the server can't be pointed at any other address
 const PUSH_HOSTS = /(^|\.)push\.apple\.com$|^fcm\.googleapis\.com$|(^|\.)push\.services\.mozilla\.com$|(^|\.)notify\.windows\.com$/;
-const CALL_EACH_MS = 5 * 60000, CALL_ANY_MS = 30000;   // one call per player every 5 min; one per 30 s overall
+const CALL_EACH_MS = 2 * 60000;   // one call per player every 2 min
 const enc = new TextEncoder();
 const b64u = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const unb64u = s => Uint8Array.from(atob(String(s).replace(/-/g, "+").replace(/_/g, "/") + "===".slice((String(s).length + 3) % 4)), c => c.charCodeAt(0));
@@ -456,6 +457,9 @@ export class Accounts {
     this.sql.exec("CREATE TABLE IF NOT EXISTS seen (day TEXT, who TEXT, PRIMARY KEY (day, who))");
     this.sql.exec("CREATE TABLE IF NOT EXISTS admins (token TEXT PRIMARY KEY, exp INTEGER)");
     this.rooms = new Map();   // live lobbies -> { n, at }, so the dashboard can list who's online
+    // friends: a -> b 'pending' is a request; accepted friends have a 'friends' row each way
+    this.sql.exec("CREATE TABLE IF NOT EXISTS friends (a TEXT, b TEXT, status TEXT, at INTEGER, PRIMARY KEY (a, b))");
+    try { this.sql.exec("ALTER TABLE push ADD COLUMN acct TEXT"); } catch {}   // which account a subscription belongs to
     this.lastCallAt = 0;
     this.fails = new Map(); // name -> { n, until }: slows down password guessing
   }
@@ -482,6 +486,7 @@ export class Accounts {
     else this.sql.exec(`UPDATE daily SET ${field} = ${field} + ? WHERE day = ?`, by, today());
   }
   banned(kind, val) { return !!val && !!this.sql.exec("SELECT 1 FROM bans WHERE kind = ? AND val = ?", kind, String(val)).toArray()[0]; }
+  requestsFor(name) { return this.sql.exec("SELECT COUNT(*) AS c FROM friends WHERE b = ? AND status = 'pending'", name).toArray()[0].c; }
   perksOf(name) { const r = this.sql.exec("SELECT list FROM perks WHERE name = ?", name).toArray()[0]; try { return r ? JSON.parse(r.list) : []; } catch { return []; } }
   async internal(op, b) {
     if (op === "gate") {
@@ -601,8 +606,8 @@ export class Accounts {
   data(u) { try { return JSON.parse(u.data) || {}; } catch { return {}; } }
   saveData(name, d) { this.sql.exec("UPDATE users SET data = ? WHERE name = ?", JSON.stringify(d), name); }
   view(u, d) {
-    if (OWNER_ACCOUNTS[u.name]) return { name: u.display, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k)], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false, perks: this.perksOf(u.name) };
-    return { name: u.display, tickets: d.tickets || 0, owned: [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0))], equipped: d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), perks: this.perksOf(u.name) };
+    if (OWNER_ACCOUNTS[u.name]) return { name: u.display, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k)], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
+    return { name: u.display, tickets: d.tickets || 0, owned: [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0))], equipped: d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
   }
   async session(name) {
     const token = hex(crypto.getRandomValues(new Uint8Array(24)));
@@ -626,8 +631,11 @@ export class Accounts {
     const test = this.env && this.env.PUSH_TEST === "1" && u.protocol === "http:" && u.hostname === "127.0.0.1";   // local testing only
     return (u.protocol === "https:" && PUSH_HOSTS.test(u.hostname)) || test ? u.href : null;
   }
+  sessionName(token) { const t = String(token || ""), r = t && this.sql.exec("SELECT name FROM sessions WHERE token = ?", t).toArray()[0]; return r ? r.name : null; }
+  friendsOf(name) { return this.sql.exec("SELECT b FROM friends WHERE a = ? AND status = 'friends'", name).toArray().map(r => r.b); }
   async pushOp(op, body) {
     const jwk = this.vapid();
+    const acct = this.sessionName(body.token);
     if (op === "push-key") return { key: vapidPublic(jwk) };
     const sub = body.sub && typeof body.sub === "object" ? body.sub : {};
     const endpoint = this.pushEndpoint(op === "push-sub" ? sub.endpoint : body.endpoint);
@@ -636,29 +644,57 @@ export class Accounts {
       const keys = sub.keys || {}, p256dh = String(keys.p256dh || ""), auth = String(keys.auth || "");
       let ok = false; try { ok = unb64u(p256dh).length === 65 && unb64u(auth).length === 16; } catch {}
       if (!ok) throw new UserError("Couldn't turn on notifications. Try again");
-      this.sql.exec("INSERT OR REPLACE INTO push (endpoint, p256dh, auth, created, lastCall) VALUES (?, ?, ?, ?, COALESCE((SELECT lastCall FROM push WHERE endpoint = ?), 0))", endpoint, p256dh, auth, Date.now(), endpoint);
+      this.sql.exec("INSERT OR REPLACE INTO push (endpoint, p256dh, auth, created, lastCall, acct) VALUES (?, ?, ?, ?, COALESCE((SELECT lastCall FROM push WHERE endpoint = ?), 0), ?)", endpoint, p256dh, auth, Date.now(), endpoint, acct);
       return { premium: true };
     }
     const me = this.sql.exec("SELECT * FROM push WHERE endpoint = ?", endpoint).toArray()[0];
+    if (me && acct && me.acct !== acct) this.sql.exec("UPDATE push SET acct = ? WHERE endpoint = ?", acct, endpoint);   // signed in since
     if (op === "push-check") return { premium: !!me };
     if (op === "push-unsub") { this.sql.exec("DELETE FROM push WHERE endpoint = ?", endpoint); return { premium: false }; }
     if (op === "push-call") {
       if (!me) throw new UserError("Turn on notifications to become Premium first");
-      const now = Date.now(), wait = Math.max(me.lastCall + CALL_EACH_MS, this.lastCallAt + CALL_ANY_MS) - now;
-      if (wait > 0) throw new UserError(wait > 60000 ? `You can call players again in ${Math.ceil(wait / 60000)} min` : "Someone just called players. Try again in a moment");
+      if (!acct) throw new UserError("Sign in to call your friends");
+      const friends = this.friendsOf(acct);
+      if (!friends.length) throw new UserError("Add friends first (Friends tab), then you can call them");
+      const now = Date.now(), wait = me.lastCall + CALL_EACH_MS - now;
+      if (wait > 0) throw new UserError(`You can call your friends again in ${Math.ceil(wait / 60000)} min`);
       this.sql.exec("UPDATE push SET lastCall = ? WHERE endpoint = ?", now, endpoint); this.lastCallAt = now; this.bump("calls");
-      const name = cleanText(body.name, 16) || "Someone", mapName = cleanText(body.mapName, 24) || "the arena";
+      const name = (this.user(acct) || {}).display || cleanText(body.name, 16) || "Your friend", mapName = cleanText(body.mapName, 24) || "the arena";
       const q = new URLSearchParams({ join: "1", map: cleanText(body.map, 16).replace(/[^a-z]/g, ""), code: cleanText(body.code, 12).replace(/[^\w-]/g, ""), from: name });
       const message = { title: "Cubefire Arena", body: `${name} is playing ${mapName}${body.code ? " (party " + cleanText(body.code, 12).toUpperCase() + ")" : ""}. Tap to join!`, url: "/?" + q };
-      const subs = this.sql.exec("SELECT * FROM push WHERE endpoint != ?", endpoint).toArray();
+      const subs = this.sql.exec(`SELECT * FROM push WHERE endpoint != ? AND acct IN (${friends.map(() => "?").join(",")})`, endpoint, ...friends).toArray();
       let sent = 0;
       for (let i = 0; i < subs.length; i += 20) {
         const res = await Promise.all(subs.slice(i, i + 20).map(s => sendPush(jwk, s, message)));
         res.forEach((st, k) => { if (st >= 200 && st < 300) sent++; else if (st === 404 || st === 410) this.sql.exec("DELETE FROM push WHERE endpoint = ?", subs[i + k].endpoint); });
       }
-      return { sent };
+      return { sent, friends: friends.length };
     }
     throw new UserError("Unknown request");
+  }
+  friendOp(op, me, b) {
+    const n = String(b.name || "").trim().toLowerCase(), row = (a, x) => this.sql.exec("SELECT status FROM friends WHERE a = ? AND b = ?", a, x).toArray()[0];
+    const both = st => { this.sql.exec("INSERT OR REPLACE INTO friends VALUES (?, ?, ?, ?)", me, n, st, Date.now()); this.sql.exec("INSERT OR REPLACE INTO friends VALUES (?, ?, ?, ?)", n, me, st, Date.now()); };
+    if (op === "friend-add") {
+      if (!n) throw new UserError("Type a friend's account name");
+      if (n === me) throw new UserError("That's your own account");
+      if (!this.user(n)) throw new UserError("No player has an account called " + String(b.name).trim());
+      const mine = row(me, n), theirs = row(n, me);
+      if (mine && mine.status === "friends") throw new UserError("You're already friends");
+      if (this.sql.exec("SELECT COUNT(*) AS c FROM friends WHERE a = ?", me).toArray()[0].c >= 100) throw new UserError("You can have up to 100 friends");
+      if (theirs && theirs.status === "pending") { both("friends"); return { added: "friends" }; }   // they asked you first: you're friends
+      this.sql.exec("INSERT OR IGNORE INTO friends VALUES (?, ?, 'pending', ?)", me, n, Date.now());
+      return { added: "pending" };
+    }
+    if (op === "friend-accept") { const theirs = row(n, me); if (!theirs) throw new UserError("That request is gone"); both("friends"); return { ok: true }; }
+    if (op === "friend-remove") { this.sql.exec("DELETE FROM friends WHERE (a = ? AND b = ?) OR (a = ? AND b = ?)", me, n, n, me); return { ok: true }; }
+    // friends-list
+    const info = x => { const u = this.user(x), d = u ? this.data(u) : {}; return { name: u ? u.display : x, rank: d.rank || 0, seen: d.seen || 0 }; };
+    return {
+      friends: this.friendsOf(me).map(info).sort((x, y) => y.seen - x.seen),
+      incoming: this.sql.exec("SELECT a FROM friends WHERE b = ? AND status = 'pending'", me).toArray().map(r => info(r.a)),
+      outgoing: this.sql.exec("SELECT b FROM friends WHERE a = ? AND status = 'pending'", me).toArray().map(r => info(r.b)),
+    };
   }
 
   async handle(op, body) {
@@ -720,6 +756,7 @@ export class Accounts {
     const u = this.who(body), d = this.data(u);
     if (Date.now() - (d.seen || 0) > 300000) { d.seen = Date.now(); this.saveData(u.name, d); }   // last seen, for the dashboard
     if (op === "me") return { account: this.view(u, d) };
+    if (op.startsWith("friend")) return { ...this.friendOp(op, u.name, body), account: this.view(u, d) };
     if (op === "logout") { this.sql.exec("DELETE FROM sessions WHERE token = ?", String(body.token)); return { ok: true }; }
     if (op === "daily") {
       if (d.lastDaily === today()) throw new UserError("Come back tomorrow for another free spin");

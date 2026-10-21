@@ -99,6 +99,31 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 .bigplay span{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.8}
 .bigplay:hover{filter:brightness(1.06)}
 .bigplay:active{transform:translateY(4px);box-shadow:0 2px 0 #b8700a,0 8px 20px rgba(0,0,0,.45)}
+.signin{flex:none;border:0;border-radius:6px;padding:9px 16px;background:var(--accent);color:#1a1205;font:400 15px var(--display);letter-spacing:.04em;text-transform:uppercase;box-shadow:0 3px 0 #b8700a}
+.acctchip{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:8px 12px;font-weight:700;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acctchip::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:7px}
+.signcall{display:grid;gap:6px;border:1px solid var(--accent);background:rgba(255,182,39,.1);border-radius:6px;padding:10px 12px}
+.signcall b{font:400 15px var(--display);letter-spacing:.02em;color:var(--accent)}
+.signcall span{font-size:12px;color:var(--muted)}
+.tab .badge{position:absolute;top:2px;right:2px;min-width:18px;height:18px;border-radius:9px;background:var(--hot);color:#fff;font:700 11px/18px var(--ui);text-align:center;padding:0 4px;box-sizing:border-box}
+#signin,#friendsSheet{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.78);padding:16px;z-index:7;overflow-y:auto}
+#signin .card,#friendsSheet .card{max-width:440px;gap:10px}
+#signin h2,#friendsSheet h2{font:400 26px var(--display);margin:0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+#signin input,.faddrow input{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:4px;padding:10px 12px;color:var(--ink);font:600 16px var(--ui);-webkit-user-select:text;user-select:text;min-width:0;width:100%;box-sizing:border-box}
+#friendsBody{display:grid;gap:8px}
+#friendsBody p{margin:0}
+.faddrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.frow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:rgba(255,255,255,.03)}
+.frow span{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow b{font:400 13px var(--display)}
+.frow .btns{gap:6px}
+#signin{z-index:21}
+#getApp{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(ellipse at center,rgba(20,28,38,.92),rgba(8,12,18,.98));padding:16px;z-index:20;overflow-y:auto}
+#getApp .card{max-width:440px;justify-items:center;text-align:center;gap:12px}
+#getApp img{border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+#getApp h2{font:400 28px var(--display);margin:0}
+#getApp p{margin:0}
+#getApp .pm-steps{text-align:left}
 #setSheet{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.78);padding:16px;z-index:6;overflow-y:auto}
 #setSheet .card{max-width:560px;gap:12px}
 #setSheet h2{font:400 26px var(--display);margin:0;display:flex;justify-content:space-between;align-items:center;gap:10px}
@@ -409,7 +434,7 @@ body.pig #pigTint{display:block}
   <div id="mudSplat"></div>
   <div id="scope" hidden></div>
   <div id="waiting" hidden></div>
-  <button type="button" id="callHud" hidden>Call players to join</button>
+  <button type="button" id="callHud" hidden>Call friends to join</button>
   <div id="roundHud" hidden><b id="roundTitle"></b><span id="roundTime"></span></div>
   <div id="spec" hidden><b id="specWho"></b><span id="specSub"></span></div>
   <div id="rpPop"></div>
@@ -475,13 +500,21 @@ body.pig #pigTint{display:block}
         <button type="button" class="tab on" id="tabPlay">Play</button>
         <button type="button" class="tab" id="openLocker">Locker<span id="lockerSub" class="sr"></span></button>
         <button type="button" class="tab" id="tabRanks">Ranks</button>
+        <button type="button" class="tab" id="tabFriends">Friends<i class="badge" id="friendBadge" hidden></i></button>
         <button type="button" class="tab prem" id="openPremium" hidden>★ Premium<span id="premiumSub" class="sr"></span></button>
         <button type="button" class="tab" id="tabSettings">Settings</button>
       </nav>
+      <button type="button" class="signin" id="signInBtn">Sign in</button>
+      <button type="button" class="acctchip" id="acctChip" hidden></button>
       <button type="button" class="rankbadge" id="menuRank" aria-label="Your rank"></button>
     </header>
 
     <aside class="lb-side">
+      <div class="signcall" id="signCall">
+        <b>Sign in to save your progress</b>
+        <span>Keep your rank and skins on every device, and add friends.</span>
+        <button type="button" class="btn primary" id="signCallBtn">Sign in / Create account</button>
+      </div>
       <div class="field">
         <label for="nick">Callsign</label>
         <input type="text" id="nick" maxlength="24" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Your name">
@@ -530,6 +563,39 @@ body.pig #pigTint{display:block}
         </div>
       </div>
     </footer>
+  </div>
+</div>
+
+<div id="signin" hidden>
+  <form class="card" id="siForm" role="dialog" aria-labelledby="siTitle" autocomplete="on">
+    <h2 id="siTitle">Sign in <button class="btn" type="button" id="siClose">Close</button></h2>
+    <p class="fine">One account keeps your rank, skins, spins and friends on every device. New here? Pick a name and password, then tap Create account.</p>
+    <input type="text" id="siName" placeholder="Account name" maxlength="16" autocomplete="username" autocapitalize="off" spellcheck="false">
+    <input type="password" id="siPw" placeholder="Password" maxlength="64" autocomplete="current-password">
+    <p class="pm-why" id="siErr" hidden></p>
+    <div class="btns"><button class="btn primary" type="button" id="siLogin">Sign in</button><button class="btn" type="button" id="siCreate">Create account</button></div>
+  </form>
+</div>
+
+<div id="friendsSheet" hidden>
+  <div class="card" role="dialog" aria-labelledby="frTitle">
+    <h2 id="frTitle">Friends <button class="btn" type="button" id="friendsClose">Close</button></h2>
+    <div id="friendsBody"></div>
+  </div>
+</div>
+
+<div id="getApp" hidden>
+  <div class="card">
+    <img src="icon-192.png" alt="" width="84" height="84">
+    <h2>Get the Cubefire app</h2>
+    <p>Cubefire now plays as an app from your Home Screen: full screen, faster, and with notifications when friends call you.</p>
+    <ol class="pm-steps">
+      <li>Tap the <b>Share</b> button <svg class="pm-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M8 7l4-4 4 4M6 11v9h12v-9"/></svg> at the top of Safari.</li>
+      <li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+      <li>Close Safari and open <b>Cubefire</b> from your Home Screen.</li>
+    </ol>
+    <p class="fine" id="getAppSave">The app starts fresh, so sign in here first to keep your rank, then sign in again inside the app.</p>
+    <div class="btns" id="getAppSign"><button class="btn" type="button" id="getAppSignBtn">Save my rank: sign in</button></div>
   </div>
 </div>
 
@@ -660,7 +726,7 @@ body.pig #pigTint{display:block}
       <button class="btn primary" id="resume" type="button">Resume</button>
       <button class="btn" id="pauseRanks" type="button">Ranks</button>
       <button class="btn" id="pauseLocker" type="button">Locker</button>
-      <button class="btn" id="callPlayers" type="button" hidden>Call players</button>
+      <button class="btn" id="callPlayers" type="button" hidden>Call friends</button>
       <button class="btn" id="leave" type="button">Leave match</button>
     </div>
   </div>
@@ -2513,7 +2579,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 29;
+const BUILD = 30;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3030,7 +3096,7 @@ function renderPartyLock() {
   const inp = $("#code"), ok = canParty(); if (!inp) return;
   inp.disabled = !ok;
   if (!ok) inp.value = "";
-  inp.placeholder = ok ? "Open lobby" : "Unlocks at " + PARTY_RANK;
+  inp.placeholder = ok ? "Open lobby" : "Locked";
   $("#codeLock").textContent = ok ? "optional" : PARTY_RANK + "+ (" + partyMin() + " RP)";
 }
 // Every rank and its levels with the points each one starts at; yours is highlighted
@@ -4388,9 +4454,9 @@ function setAcct(a) {
   acct = a; save("cfa.acct", JSON.stringify(a));
   if (acctHacks().join() !== hacksBefore) { applyDuke(); if (sock && sock.readyState === 1) sock.send(JSON.stringify({ t: "acct", token: acctToken })); }
   if (typeof a.rank === "number" && a.rank !== rankPts) { rankPts = a.rank; save("cfa.rank", rankPts); renderRank(); }
-  applyGunFinish(); renderLocker(); publish(true);
+  applyGunFinish(); renderLocker(); publish(true); renderAcctUI();
 }
-function signOutLocal() { acct = null; acctToken = ""; save("cfa.tok", ""); save("cfa.acct", ""); applyGunFinish(); renderLocker(); publish(true); }
+function signOutLocal() { acct = null; acctToken = ""; save("cfa.tok", ""); save("cfa.acct", ""); applyGunFinish(); renderLocker(); publish(true); renderAcctUI(); }
 // Points toward tickets (online eliminations 2, bot ones 1) and round wins, sent every so often
 let pendPts = 0, pendWins = 0, rankDirty = false, lastKills = 0, flushing = false;
 function trackProgress() {
@@ -4671,7 +4737,7 @@ function renderPremium() {
   if (premiumWhy) box.append(el("p", { className: "pm-why", textContent: premiumWhy }));
   if (premium) {
     box.append(el("p", { className: "pm-ok", textContent: "★ You're Premium" }),
-      el("p", { textContent: "You can play online, and you'll get a notification when someone calls players to a match. In a match, tap Call players to notify everyone." }));
+      el("p", { textContent: "You can play online, and you'll get a notification when a friend calls you to a match. In a match, tap Call friends to notify your friends." }));
     const off = el("button", { type: "button", className: "btn", textContent: "Turn off notifications (ends Premium)" });
     off.addEventListener("click", leavePremium); box.append(el("div", { className: "btns" }, [off]));
     return;
@@ -4697,19 +4763,19 @@ function renderPremium() {
   }
   const go = el("button", { type: "button", className: "btn primary pm-go", textContent: premiumBusy ? "Turning on…" : "Turn on notifications", disabled: premiumBusy });
   go.addEventListener("click", becomePremium);
-  box.append(el("div", { className: "btns" }, [go]), el("p", { className: "fine", textContent: "When your iPad asks, tap Allow. You'll only get a notification when someone calls players to a match." }));
+  box.append(el("div", { className: "btns" }, [go]), el("p", { className: "fine", textContent: "When your iPad asks, tap Allow. You'll only get a notification when a friend calls you to a match." }));
 }
 function openPremium(why) { premiumWhy = why || ""; $("#premium").hidden = false; renderPremium(); }
 $("#openPremium").addEventListener("click", () => openPremium());
 $("#premiumClose").addEventListener("click", () => { $("#premium").hidden = true; });
 $("#premium").addEventListener("click", e => { if (e.target.id === "premium") $("#premium").hidden = true; });
-// Call players: notify every Premium player to come to this map
+// Call friends: notify your friends (who have notifications on) to come to this map
 let callBusy = false;
 async function callPlayers() {
   if (callBusy || mode !== "online" || state !== "play") return;
-  if (!premium) { showPause(true); openPremium("Calling players is a Premium feature."); return; }
+  if (!premium) { showPause(true); openPremium("Calling friends is a Premium feature."); return; }
   callBusy = true;
-  try { const r = await api("push-call", { endpoint: pushEndpoint, name: myName, map: mapId, mapName: MAPS[mapId].name, code: partyCode }); banner(r.sent ? `Called players! ${r.sent} notified` : "Called players! Nobody else has Premium yet"); }
+  try { const r = await api("push-call", { endpoint: pushEndpoint, name: myName, map: mapId, mapName: MAPS[mapId].name, code: partyCode }); banner(r.sent ? `Called your friends! ${r.sent} notified` : "Called! None of your friends have notifications on yet"); }
   catch (e) { banner(e.message); }
   callBusy = false;
 }
@@ -4797,6 +4863,66 @@ $("#menuRank").addEventListener("click", showRanks);
 $("#tabSettings").addEventListener("click", () => { $("#setSheet").hidden = false; });
 $("#setClose").addEventListener("click", () => { $("#setSheet").hidden = true; });
 $("#setSheet").addEventListener("click", e => { if (e.target.id === "setSheet") $("#setSheet").hidden = true; });
+// ---- Sign in: a button on the lobby, its own sheet
+function renderAcctUI() {
+  $("#signInBtn").hidden = !!acct; $("#acctChip").hidden = !acct; $("#signCall").hidden = !!acct;
+  if (acct) $("#acctChip").textContent = acct.name;
+  const n = acct && acct.requests || 0;
+  $("#friendBadge").hidden = !n; $("#friendBadge").textContent = n;
+  if (!$("#friendsSheet").hidden) renderFriends();
+  if (typeof renderGetApp === "function" && $("#getAppSign")) renderGetApp();
+}
+function openSignIn() { $("#siErr").hidden = true; $("#signin").hidden = false; $("#siName").focus(); }
+async function signInAs(op) {
+  const btn = op === "login" ? $("#siLogin") : $("#siCreate"); btn.disabled = true; $("#siErr").hidden = true;
+  try { await api(op, { name: $("#siName").value, password: $("#siPw").value, rank: rankPts }); $("#siPw").value = ""; $("#signin").hidden = true; banner("Signed in as " + acct.name); }
+  catch (e) { $("#siErr").textContent = e.message; $("#siErr").hidden = false; }
+  btn.disabled = false;
+}
+$("#signInBtn").addEventListener("click", openSignIn);
+$("#signCallBtn").addEventListener("click", openSignIn);
+$("#acctChip").addEventListener("click", openLocker);
+$("#siLogin").addEventListener("click", () => signInAs("login"));
+$("#siCreate").addEventListener("click", () => signInAs("signup"));
+$("#siForm").addEventListener("submit", e => { e.preventDefault(); signInAs("login"); });
+$("#siClose").addEventListener("click", () => { $("#signin").hidden = true; });
+$("#signin").addEventListener("click", e => { if (e.target.id === "signin") $("#signin").hidden = true; });
+// ---- Friends: add by account name; calls from a match only reach your friends
+let friendData = null;
+async function renderFriends(reload) {
+  const box = $("#friendsBody"); $("#friendsSheet").hidden = false;
+  const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); for (const k of kids || []) e.append(k); return e; };
+  if (!acct) {
+    const b = el("button", { type: "button", className: "btn primary", textContent: "Sign in / Create account" }); b.addEventListener("click", openSignIn);
+    box.replaceChildren(el("p", { textContent: "Sign in to add friends. Your friends get a notification when you tap Call friends in a match, and only friends can call you." }), el("div", { className: "btns" }, [b]));
+    return;
+  }
+  if (reload || !friendData) { try { friendData = await api("friends-list"); } catch (e) { box.replaceChildren(el("p", { className: "pm-why", textContent: e.message })); return; } }
+  const act = async (op, name, done) => { try { await api(op, { name }); if (done) banner(done); } catch (e) { banner(e.message); } renderFriends(true); };
+  const row = (f, buttons) => { const R = rankOf(f.rank), rk = el("b", { textContent: R.label }); rk.style.color = R.color;
+    return el("div", { className: "frow" }, [el("span", { textContent: f.name }), rk, el("div", { className: "btns" }, buttons.map(([t, cls, fn]) => { const b = el("button", { type: "button", className: "btn " + cls, textContent: t }); b.addEventListener("click", fn); return b; }))]); };
+  const inp = el("input", { type: "text", placeholder: "Friend's account name", maxLength: 16 }); inp.setAttribute("autocapitalize", "off"); inp.setAttribute("spellcheck", "false");
+  const add = el("button", { type: "button", className: "btn primary", textContent: "Add friend" });
+  const doAdd = async () => { const n = inp.value.trim(); if (!n) return; try { const r = await api("friend-add", { name: n }); banner(r.added === "friends" ? "You and " + n + " are friends!" : "Friend request sent to " + n); } catch (e) { banner(e.message); } renderFriends(true); };
+  add.addEventListener("click", doAdd); inp.addEventListener("keydown", e => { if (e.key === "Enter") doAdd(); });
+  const parts = [el("div", { className: "faddrow" }, [inp, add]), el("p", { className: "fine", textContent: "Your account name is " + acct.name + ". Friends you add get a request to accept." })];
+  if (friendData.incoming.length) parts.push(el("span", { className: "lbl-sm", textContent: "Friend requests" }), ...friendData.incoming.map(f => row(f, [["Accept", "primary", () => act("friend-accept", f.name, "You and " + f.name + " are friends!")], ["Decline", "", () => act("friend-remove", f.name)]])));
+  parts.push(el("span", { className: "lbl-sm", textContent: "Friends (" + friendData.friends.length + ")" }));
+  if (!friendData.friends.length) parts.push(el("p", { className: "fine", textContent: "No friends yet. Add someone by their account name." }));
+  parts.push(...friendData.friends.map(f => row(f, [["Remove", "", () => { if (confirm("Remove " + f.name + " from your friends?")) act("friend-remove", f.name); }]])));
+  if (friendData.outgoing.length) parts.push(el("span", { className: "lbl-sm", textContent: "Waiting for them to accept" }), ...friendData.outgoing.map(f => row(f, [["Cancel", "", () => act("friend-remove", f.name)]])));
+  if (!premium && onOwnSite) { const pb = el("button", { type: "button", className: "btn", textContent: "★ Turn on notifications" }); pb.addEventListener("click", () => openPremium()); parts.push(el("p", { className: "fine", textContent: "Turn on notifications (★ Premium) to hear when your friends call you." }), el("div", { className: "btns" }, [pb])); }
+  box.replaceChildren(...parts);
+}
+$("#tabFriends").addEventListener("click", () => renderFriends(true));
+$("#friendsClose").addEventListener("click", () => { $("#friendsSheet").hidden = true; });
+$("#friendsSheet").addEventListener("click", e => { if (e.target.id === "friendsSheet") $("#friendsSheet").hidden = true; });
+renderAcctUI();
+// ---- iPad and iPhone: play from the Home Screen app, not Safari
+if (onOwnSite && isIOS && !isStandalone()) $("#getApp").hidden = false;
+$("#getAppSignBtn").addEventListener("click", openSignIn);
+function renderGetApp() { $("#getAppSign").hidden = !!acct; $("#getAppSave").textContent = acct ? "You're signed in as " + acct.name + ". Sign in with the same account inside the app to keep your rank, skins and friends." : "The app starts fresh, so sign in here first to keep your rank, then sign in again inside the app."; }
+renderGetApp();
 $("#blockedRetry").addEventListener("click", () => location.reload());
 $("#playBots").addEventListener("click", () => startGame("bots"));
 $("#resume").addEventListener("click", () => { initAudio(); requestLock(); if (isTouch || noLock) showPause(false); });
