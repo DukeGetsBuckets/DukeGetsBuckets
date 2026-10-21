@@ -273,6 +273,10 @@ body.pig #pigTint{display:block}
 #board .row.win{color:var(--accent);font-weight:700}
 
 /* pause */
+#blocked{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.85);padding:16px;z-index:9}
+#blocked .card{text-align:center;justify-items:center}
+#blocked h2{font:400 26px var(--display);margin:0}
+#blocked p{margin:0;color:var(--muted)}
 #refresh{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.78);padding:16px;z-index:7}
 #refresh .card{text-align:center;justify-items:center}
 #refresh h2{font:400 26px var(--display);margin:0}
@@ -586,6 +590,14 @@ body.pig #pigTint{display:block}
       <p class="fine">Ranked puts you with players near your rank: up to 18 play at once, in groups of about 6 (Elite, Normal and Trash lobbies). Rounds last 3 minutes once 2 players are in, and every round is on a new map. Ranked points: +30 for each elimination (+5 for a headshot); a death costs 2 RP at Bronze, rising with rank to 28 at Legend; and for winning a round +100 (under 4 players) or +300 (4 or more); second place gets a third of that (+33 or +100). If everyone else leaves, the last player left wins the round.</p>
       <p class="fine">Friends who type the same party code land in the same private match (Diamond and higher only). Leave it blank to join ranked.</p>
     </div>
+  </div>
+</div>
+
+<div id="blocked" hidden>
+  <div class="card">
+    <h2>Can't play online</h2>
+    <p id="blockedWhy"></p>
+    <div class="btns"><button class="btn primary" type="button" id="blockedRetry">Try again</button></div>
   </div>
 </div>
 
@@ -2516,7 +2528,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 28;
+const BUILD = 29;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2562,6 +2574,7 @@ function connectServer(name) {
   s.onopen = () => {
     sockRetry = 0; setNet("live");
     if (authKey) s.send(JSON.stringify({ t: "auth", key: authKey, who: authWho }));
+    if (acctToken) s.send(JSON.stringify({ t: "acct", token: acctToken }));
     publish(true);
   };
   s.onmessage = e => {
@@ -2582,6 +2595,9 @@ function connectServer(name) {
     else if (m.t === "full" && state === "play" && mode === "online") { leaveMatch(); banner(`Ranked is full (${num(m.max) || 18} players). Try again in a minute`); }
     else if (m.t === "round") setRound(m);
     else if (m.t === "update") { mustRefresh = true; autoReload(); }
+    else if (m.t === "blocked") { mustRefresh = true; if (state === "play") leaveMatch(); $("#blockedWhy").textContent = String(m.why || "The game is closed right now."); $("#blocked").hidden = false; }
+    else if (m.t === "kicked") { if (state === "play" && mode === "online") leaveMatch(); banner(String(m.why || "An admin removed you from the match.")); }
+    else if (m.t === "smite" && state === "play" && mode === "online" && alive) die({ name: "an admin", pos: me.pos.clone() }, true);
     else if (m.t === "auth") { authedAs = m.ok ? authWho : null; if (authWait) authWait(!!m.ok); }
     else if (m.t === "denied" && state === "play" && mode === "online") {
       // signed in already: the server lost it (a reconnect), so sign in again instead of leaving
@@ -3100,6 +3116,9 @@ const DOUG_COLOR = 2; // green in PAL
 const PROFILES = {};
 const PROFILE_ALIAS = {};
 const profileKey = name => { const nm = cleanName(name).toLowerCase(); return PROFILE_ALIAS[nm] || nm; };
+// Hacks the admin gave your signed-in account (the server enforces god mode, invisible and nuke)
+const acctHacks = () => { try { return acct && Array.isArray(acct.perks) ? acct.perks.filter(k => PERK_BUTTON[k]) : []; } catch (e) { return []; } };   // try: asked before the account loads at startup
+const perksFor = who => who === "acct" ? acctHacks() : PROFILES[who] ? PROFILES[who].perks : [];
 const PERK_DEFAULT = { aim: true, god: true, snipe: true, wall: true, inv: false };
 const PERK_BUTTON = { aim: "dkAim", god: "dkGod", snipe: "dkSnipe", wall: "dkWall", inv: "dkInv", tp: "dkTp", nuke: "dkNuke" };
 const hasPerk = k => duke.on && duke.perks.includes(k);
@@ -3139,8 +3158,10 @@ function applyDuke() {
   const nm = profileKey(myName), prof = PROFILES[nm];
   let profile = prof && myColor === prof.color ? nm : null;
   if (profile && PROFILES[profile].password && !(mode === "bots" || authedAs === profile)) profile = null;
-  if (profile !== duke.profile) {                       // new profile: reset switches to its defaults
-    duke.profile = profile; duke.perks = profile ? PROFILES[profile].perks : [];
+  if (!profile && acctHacks().length) profile = "acct";
+  const perks = profile ? perksFor(profile) : [];
+  if (profile !== duke.profile || perks.join() !== duke.perks.join()) {   // new hacks: reset switches to their defaults
+    duke.profile = profile; duke.perks = perks;
     for (const k of Object.keys(PERK_DEFAULT)) duke[k] = duke.perks.includes(k) && !!dkPicks[k];
   }
   duke.on = !!profile;
@@ -3175,7 +3196,7 @@ const espGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.9, 1.95, 0.9));
 const espMat = new THREE.LineBasicMaterial({ color: 0xffe14a, depthTest: false, depthWrite: false, transparent: true });
 const espBoxes = [];
 function updateEsp() {
-  const list = state === "play" && ((duke.on && duke.wall) || acctPerk("wall")) ? enemies() : [];
+  const list = state === "play" && duke.on && duke.wall ? enemies() : [];
   while (espBoxes.length < list.length) { const l = new THREE.LineSegments(espGeo, espMat); l.renderOrder = 999; scene.add(l); espBoxes.push(l); }
   espBoxes.forEach((l, i) => {
     const tg = list[i]; l.visible = !!tg;
@@ -3211,7 +3232,7 @@ function teleportCycle() {
 let nukeReadyAt = 0, nukeSeq = 0, lastNuke = null;
 function fireNuke() {
   if (!hasPerk("nuke") || now() < nukeReadyAt || state !== "play" || !alive) return;
-  nukeReadyAt = now() + (PROFILES[duke.profile].nukeWait || 0);
+  nukeReadyAt = now() + ((PROFILES[duke.profile] || {}).nukeWait || 0);
   hitsOut.length = 0;                    // earlier hits were already delivered; make room for everyone
   const list = mode === "online"
     ? [...remotes.values()].filter(r => r.pl && r.alive).map(r => ({ kind: "peer", r, pos: r.pos }))
@@ -3255,7 +3276,7 @@ const HACKS = [["aim", "Aimbot"], ["god", "God mode"], ["snipe", "Auto sniper"],
 let dkPicks = { ...PERK_DEFAULT };
 try { const sv = JSON.parse(load("cfa.dkpicks") || "null"); if (sv && typeof sv === "object") for (const [k] of HACKS) if (typeof sv[k] === "boolean") dkPicks[k] = sv[k]; } catch (e) {}
 const COLOR_NAMES = ["red", "orange", "green", "blue", "purple", "pink", "white", "teal"];   // PAL order
-const dougPicked = () => { const nm = profileKey(state === "play" ? myName : nick.value), prof = PROFILES[nm]; return prof && myColor === prof.color ? nm : null; };
+const dougPicked = () => { const nm = profileKey(state === "play" ? myName : nick.value), prof = PROFILES[nm]; return prof && myColor === prof.color ? nm : acctHacks().length ? "acct" : null; };
 function renderHackPick() {
   const f = $("#dougField"); if (!f) return;
   const who = dougPicked(), typed = profileKey(state === "play" ? myName : nick.value), want = PROFILES[typed];
@@ -3270,10 +3291,10 @@ function renderHackPick() {
   }
   if (f.hidden) return;
   const shown = cleanName(state === "play" ? myName : nick.value) || who;
-  $("#hackWho").textContent = shown[0].toUpperCase() + shown.slice(1) + "'s hacks";
+  $("#hackWho").textContent = who === "acct" ? "Your hacks" : shown[0].toUpperCase() + shown.slice(1) + "'s hacks";
   const box = $("#hackPick"); box.replaceChildren();
   for (const [k, label] of HACKS) {
-    if (!PROFILES[who].perks.includes(k)) continue;              // only this profile's hacks
+    if (!perksFor(who).includes(k)) continue;                     // only these hacks
     const b = document.createElement("button"); b.type = "button"; b.textContent = label;
     b.setAttribute("aria-pressed", String(!!dkPicks[k]));
     b.addEventListener("click", () => {
@@ -3347,8 +3368,8 @@ function takeDamage(dm, src, head, unblockable) {
   blip(head ? 180 : 140, 0.12, 0.12, "sawtooth");
   if (hp <= 0) die(src);
 }
-function die(src) {
-  if (rankedNow()) addRank(-rpLoss(RP.death));
+function die(src, free) {
+  if (rankedNow() && !free) addRank(-rpLoss(RP.death));          // free: the admin's kill button costs no points
   hp = 0; alive = false; deaths++; streak = 0;
   respawnAt = now() + 3;
   dthOut = { s: ++deathSeq, by: src.peer || null };
@@ -4362,8 +4383,6 @@ const API = (() => {
 })();
 let acctToken = load("cfa.tok") || "", acct = null;
 try { acct = acctToken ? JSON.parse(load("cfa.acct") || "null") : null; } catch (e) { acct = null; }
-// Perks that come with an account (none right now)
-function acctPerk(k) { return !!(acct && Array.isArray(acct.perks) && acct.perks.includes(k)); }
 function mySkin() { return acct && acct.equipped && SKIN_DEFS[acct.equipped] ? acct.equipped : null; }
 async function api(op, body) {
   let res;
@@ -4380,7 +4399,9 @@ async function api(op, body) {
   return j;
 }
 function setAcct(a) {
+  const hacksBefore = acctHacks().join();
   acct = a; save("cfa.acct", JSON.stringify(a));
+  if (acctHacks().join() !== hacksBefore) { applyDuke(); if (sock && sock.readyState === 1) sock.send(JSON.stringify({ t: "acct", token: acctToken })); }
   if (typeof a.rank === "number" && a.rank !== rankPts) { rankPts = a.rank; save("cfa.rank", rankPts); renderRank(); }
   applyGunFinish(); renderLocker(); publish(true);
 }
@@ -4791,6 +4812,7 @@ $("#menuRank").addEventListener("click", showRanks);
 $("#tabSettings").addEventListener("click", () => { $("#setSheet").hidden = false; });
 $("#setClose").addEventListener("click", () => { $("#setSheet").hidden = true; });
 $("#setSheet").addEventListener("click", e => { if (e.target.id === "setSheet") $("#setSheet").hidden = true; });
+$("#blockedRetry").addEventListener("click", () => location.reload());
 $("#playBots").addEventListener("click", () => startGame("bots"));
 $("#resume").addEventListener("click", () => { initAudio(); requestLock(); if (isTouch || noLock) showPause(false); });
 $("#leave").addEventListener("click", () => leaveMatch());

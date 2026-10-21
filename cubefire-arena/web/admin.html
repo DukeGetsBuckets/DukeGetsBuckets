@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Cubefire Admin</title>
+<link rel="icon" href="icon-192.png">
+<style>
+/* Cubefire Arena admin dashboard: usage, players, bans, hacks and the kill switch */
+:root{
+  --bg:#0b1016;--panel:#121922;--panel2:#18212c;--ink:#f3efe4;--muted:#9ba6b2;--line:rgba(243,239,228,.12);
+  --accent:#ffb627;--hot:#ff4f5e;--ok:#5fd17a;--grid:rgba(243,239,228,.08);
+  --ui:"Chakra Petch",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 var(--ui)}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:6px;padding:7px 12px;font-weight:600}
+button:hover{border-color:rgba(243,239,228,.3)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#1a1205}
+button.danger{border-color:rgba(255,79,94,.5);color:#ffb3b9}
+button.danger:hover{background:rgba(255,79,94,.15)}
+button.small{padding:4px 9px;font-size:13px}
+input{font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+input:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+h1{font-size:22px;margin:0;letter-spacing:.02em}
+h1 span{color:var(--accent)}
+h2{font-size:15px;margin:0;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.wrap{max-width:1280px;margin:0 auto;padding:16px}
+.login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.login form{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:24px;display:grid;gap:12px;width:min(360px,100%)}
+.err{color:var(--hot);font-weight:600;margin:0}
+.muted{color:var(--muted)}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.top .grow{flex:1}
+.kill{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.kill.on{border-color:var(--hot);background:rgba(255,79,94,.12)}
+.kill b{font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.kill.on b{color:var(--hot)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.tile span{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tile b{display:block;font-size:28px;font-variant-numeric:tabular-nums;margin-top:2px}
+.tile small{color:var(--muted);font-size:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:16px;min-width:0}
+.card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.card-head h2{flex:1}
+.charts{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.chart{background:var(--panel2);border-radius:8px;padding:10px 12px}
+.chart h3{margin:0 0 2px;font-size:14px}
+.chart p{margin:0 0 6px;font-size:12px;color:var(--muted)}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
+.cols .card{margin-bottom:0}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel)}
+th.sort{cursor:pointer}
+th.sort:hover{color:var(--ink)}
+td.num,th.num{text-align:right}
+tr:hover td{background:rgba(243,239,228,.03)}
+.chip{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:1px 7px;margin-right:3px}
+.chip.hack{border-color:rgba(255,182,39,.5);color:var(--accent)}
+.chip.ban{border-color:rgba(255,79,94,.6);color:#ffb3b9}
+.actions{display:flex;gap:4px;flex-wrap:nowrap}
+.hackedit{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:8px 0}
+.hackedit label{display:flex;gap:5px;align-items:center;font-weight:600}
+.rankbar{display:grid;grid-template-columns:90px minmax(0,1fr) 44px;gap:8px;align-items:center;margin:5px 0;font-size:14px}
+.rankbar .track{height:14px;background:var(--grid);border-radius:4px;overflow:hidden}
+.rankbar .fill{height:100%;border-radius:0 4px 4px 0}
+.list{margin:0;padding:0;list-style:none;display:grid;gap:4px}
+.list li{display:flex;justify-content:space-between;gap:10px;font-size:14px;border-bottom:1px solid var(--line);padding:4px 0}
+#tip{position:fixed;pointer-events:none;background:#05080c;border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:13px;z-index:10;box-shadow:0 8px 20px rgba(0,0,0,.5)}
+#tip b{display:block}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--accent);border-radius:8px;padding:10px 16px;font-weight:600;z-index:11}
+</style>
+</head>
+<body>
+<div class="login" id="login">
+  <form id="loginForm">
+    <h1>Cube<span>fire</span> Admin</h1>
+    <p class="muted">Sign in with the admin password (Doug's password).</p>
+    <input type="password" id="pw" placeholder="Password" autocomplete="current-password" required>
+    <p class="err" id="loginErr" hidden></p>
+    <button class="primary" type="submit">Sign in</button>
+  </form>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <div class="top">
+    <h1>Cube<span>fire</span> Admin</h1>
+    <span class="muted" id="updated"></span>
+    <span class="grow"></span>
+    <div class="kill" id="killBox">
+      <b id="killState">Game is open</b>
+      <input id="killMsg" placeholder="Message players see when closed" maxlength="160" size="28">
+      <button class="danger" id="killBtn" type="button">Kill switch</button>
+    </div>
+    <button type="button" id="refresh">Refresh</button>
+    <button type="button" id="logout">Sign out</button>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="card">
+    <div class="card-head"><h2>Online now</h2><span class="muted" id="onlineNote"></span></div>
+    <div class="tablewrap"><table id="online"></table></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Usage · last 14 days</h2><button type="button" class="small" id="tableToggle">Show as table</button></div>
+    <div class="charts" id="charts"></div>
+    <div class="tablewrap" id="dayTableWrap" hidden><table id="dayTable"></table></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Users</h2><input id="search" placeholder="Search names" size="18"><span class="muted" id="userCount"></span></div>
+    <div class="tablewrap" style="max-height:620px;overflow-y:auto"><table id="users"></table></div>
+  </section>
+
+  <div class="cols">
+      <section class="card">
+        <div class="card-head"><h2>Accounts by rank</h2></div>
+        <div id="ranks"></div>
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>Most owned skins</h2><span class="muted" id="ultra"></span></div>
+        <ul class="list" id="skins"></ul>
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>Bans</h2></div>
+        <div style="display:flex;gap:6px;margin-bottom:8px"><input id="banName" placeholder="Name to ban" style="flex:1"><button class="danger" type="button" id="banBtn">Ban name</button></div>
+        <div class="tablewrap"><table id="bans"></table></div>
+      </section>
+  </div>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const RANKS = [["Bronze", 0, "#d0925a"], ["Silver", 300, "#c9d3dd"], ["Gold", 700, "#ffc93c"], ["Platinum", 1200, "#5fe0d2"], ["Diamond", 1800, "#7fb7ff"], ["Master", 2500, "#c27bff"], ["Champion", 3500, "#ff5d7a"], ["Mythic", 8000, "#ff8f3a"], ["Legend", 15000, "#fff08a"]];
+const rankOf = rp => { let r = RANKS[0]; for (const R of RANKS) if (rp >= R[1]) r = R; return r; };
+const HACKS = [["aim", "Aimbot"], ["god", "God mode"], ["snipe", "Auto sniper"], ["wall", "Wall hacks"], ["inv", "Invisible"], ["tp", "Teleport"], ["nuke", "Nuke"]];
+const GROUP = { elite: "Elite", normal: "Normal", trash: "Trash" };
+let token = sessionStorage.getItem("cfa.admin") || "", data = null, users = [], sortKey = "rank", sortDir = -1, openHack = null, showTable = false;
+
+async function api(op, body) {
+  const res = await fetch("/api/" + op, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(body || {}), admin: token }) });
+  let j = {}; try { j = await res.json(); } catch (e) {}
+  if (!res.ok || j.error) { if (j.error === "Please sign in again") signOut(); throw new Error(j.error || "Something went wrong"); }
+  return j;
+}
+function toast(t) { const d = document.createElement("div"); d.className = "toast"; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); }
+const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); for (const k of kids || []) e.append(k); return e; };
+const ago = t => { if (!t) return "—"; const s = (Date.now() - t) / 1000; return s < 90 ? "just now" : s < 5400 ? Math.round(s / 60) + " min ago" : s < 129600 ? Math.round(s / 3600) + " h ago" : Math.round(s / 86400) + " days ago"; };
+const day = d => new Date(d + "T12:00:00Z").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+// ---- sign in
+$("#loginForm").addEventListener("submit", async e => {
+  e.preventDefault(); $("#loginErr").hidden = true;
+  try { token = (await api("admin-login", { password: $("#pw").value })).token; sessionStorage.setItem("cfa.admin", token); $("#pw").value = ""; start(); }
+  catch (err) { $("#loginErr").textContent = err.message; $("#loginErr").hidden = false; }
+});
+function signOut() { token = ""; sessionStorage.removeItem("cfa.admin"); $("#app").hidden = true; $("#login").hidden = false; }
+$("#logout").addEventListener("click", signOut);
+let timer = null;
+function start() { $("#login").hidden = true; $("#app").hidden = false; load(); clearInterval(timer); timer = setInterval(() => { if (!document.hidden) loadOverview(); }, 15000); }
+async function load() { await Promise.all([loadOverview(), loadUsers()]); }
+async function loadOverview() { try { data = await api("admin-overview"); renderOverview(); } catch (e) { if (token) toast(e.message); } }
+async function loadUsers() { try { users = (await api("admin-users")).users; renderUsers(); } catch (e) { if (token) toast(e.message); } }
+$("#refresh").addEventListener("click", load);
+
+// ---- overview
+function renderOverview() {
+  $("#updated").textContent = "Updated " + new Date().toLocaleTimeString();
+  const d = data.days, t = d[d.length - 1], playing = data.online.filter(p => p.pl);
+  const tiles = [
+    ["Online now", data.online.length, playing.length + " in a match"],
+    ["Players today", t.unique, (d[d.length - 2] || {}).unique + " yesterday"],
+    ["Visits today", t.visits, "page opens"],
+    ["Rounds today", t.rounds, t.kills + " eliminations"],
+    ["Peak today", t.peak, "playing at once"],
+    ["Accounts", data.totals.accounts, t.signups + " new today"],
+    ["Premium", data.totals.premium, "notifications on"],
+    ["Spins today", t.spins, t.calls + " player calls"],
+    ["Banned", data.totals.bans, data.totals.hacked + " with hacks"],
+  ];
+  $("#tiles").replaceChildren(...tiles.map(([k, v, s]) => el("div", { className: "tile" }, [el("span", { textContent: k }), el("b", { textContent: v }), el("small", { textContent: s })])));
+  // kill switch
+  $("#killBox").classList.toggle("on", data.kill);
+  $("#killState").textContent = data.kill ? "Game is CLOSED" : "Game is open";
+  $("#killBtn").textContent = data.kill ? "Reopen the game" : "Kill switch";
+  $("#killBtn").className = data.kill ? "primary" : "danger";
+  if (document.activeElement !== $("#killMsg")) $("#killMsg").value = data.killmsg;
+  renderOnline(); renderCharts(); renderRanks(); renderSkins(); renderBans();
+}
+function renderOnline() {
+  const rows = data.online.slice().sort((a, b) => b.pl - a.pl || b.rk - a.rk);
+  $("#onlineNote").textContent = rows.length ? "" : "Nobody is online right now";
+  const head = el("tr", {}, ["Name", "Where", "Status", "RP", "K / D", ""].map((h, i) => el("th", { textContent: h, className: i === 3 ? "num" : "" })));
+  $("#online").replaceChildren(head, ...rows.map(p => {
+    const where = p.room.startsWith("ranked") ? (p.g ? GROUP[p.g] + " lobby" : "Ranked menu") : "Party " + p.room.split("-").slice(1).join("-").toUpperCase();
+    const status = !p.pl ? "In the menu" : p.afk ? "Away" : "Playing" + (p.map ? " · " + p.map : "");
+    const acts = el("div", { className: "actions" });
+    if (p.pl) acts.append(btn("Kill", "danger small", () => act("admin-kill", p, "Killed " + p.name)));
+    acts.append(btn("Kick", "small", () => act("admin-kick", p, "Kicked " + p.name)),
+      btn("Ban", "danger small", () => { if (confirm("Ban " + p.name + "? They and their device can't play until you unban them.")) act("admin-ban", { ...p, reason: "Banned from the dashboard" }, "Banned " + p.name); }));
+    const R = rankOf(p.rk);
+    return el("tr", {}, [el("td", { textContent: p.name }), el("td", { textContent: where }), el("td", { textContent: status }),
+      el("td", { className: "num", innerHTML: `<span style="color:${R[2]}">${R[0]}</span> ${p.rk}` }), el("td", { textContent: p.pl ? p.k + " / " + p.d : "—" }), el("td", {}, [acts])]);
+  }));
+}
+function btn(text, cls, fn) { const b = el("button", { type: "button", className: cls, textContent: text }); b.addEventListener("click", fn); return b; }
+async function act(op, p, done) { try { await api(op, { room: p.room, id: p.id, reason: p.reason }); toast(done); loadOverview(); } catch (e) { toast(e.message); } }
+
+// ---- charts: one measure each, single series, hover for the exact value
+const METRICS = [["unique", "Players", "different players in a match"], ["visits", "Visits", "times the game was opened"], ["rounds", "Rounds", "online rounds played"], ["kills", "Eliminations", "online eliminations"], ["peak", "Peak players", "most playing at once"], ["signups", "New accounts", "accounts made"]];
+function renderCharts() {
+  const d = data.days;
+  $("#charts").replaceChildren(...METRICS.map(([k, title, sub]) => {
+    const box = el("div", { className: "chart" }, [el("h3", { textContent: title }), el("p", { textContent: sub })]);
+    box.appendChild(barChart(d.map(r => ({ label: day(r.day), value: r[k] || 0 })), title));
+    return box;
+  }));
+  // the same numbers as a table
+  const head = el("tr", {}, [el("th", { textContent: "Day" }), ...METRICS.map(([, t]) => el("th", { className: "num", textContent: t })), el("th", { className: "num", textContent: "Spins" }), el("th", { className: "num", textContent: "Calls" })]);
+  $("#dayTable").replaceChildren(head, ...d.slice().reverse().map(r => el("tr", {}, [el("td", { textContent: day(r.day) }), ...METRICS.map(([k]) => el("td", { className: "num", textContent: r[k] || 0 })), el("td", { className: "num", textContent: r.spins }), el("td", { className: "num", textContent: r.calls })])));
+}
+$("#tableToggle").addEventListener("click", () => { showTable = !showTable; $("#dayTableWrap").hidden = !showTable; $("#charts").hidden = showTable; $("#tableToggle").textContent = showTable ? "Show as charts" : "Show as table"; });
+function barChart(points, title) {
+  const W = 300, H = 120, padL = 28, padB = 18, n = points.length, max = Math.max(1, ...points.map(p => p.value));
+  const nice = (() => { const m = Math.pow(10, Math.floor(Math.log10(max))); for (const f of [1, 2, 5, 10]) if (f * m >= max) return f * m; return max; })();
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", title + ", last 14 days");
+  const mk = (tag, attrs) => { const e = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); svg.appendChild(e); return e; };
+  const plotH = H - padB - 4, slot = (W - padL) / n, bw = Math.max(4, slot - 2);
+  for (const f of [0, 1]) {
+    const y = 4 + plotH * (1 - f);
+    mk("line", { x1: padL, x2: W, y1: y, y2: y, stroke: "rgba(243,239,228,.08)", "stroke-width": 1 });
+    const t = mk("text", { x: padL - 4, y: y + 3, "text-anchor": "end", "font-size": 9, fill: "#9ba6b2" }); t.textContent = Math.round(nice * f);
+  }
+  points.forEach((p, i) => {
+    const h = p.value ? Math.max(2, plotH * p.value / nice) : 0, x = padL + i * slot + 1, y = 4 + plotH - h;
+    if (h) {
+      const r = Math.min(4, bw / 2, h);    // rounded at the data end, square at the baseline
+      mk("path", { d: `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + bw - r}Q${x + bw},${y} ${x + bw},${y + r}V${y + h}Z`, fill: "#ffb627" });
+    }
+    const hit = mk("rect", { x: padL + i * slot, y: 0, width: slot, height: H - padB, fill: "transparent" });
+    hit.addEventListener("pointerenter", e => tip(e, p.label, p.value + " " + title.toLowerCase()));
+    hit.addEventListener("pointermove", e => tip(e, p.label, p.value + " " + title.toLowerCase()));
+    hit.addEventListener("pointerleave", () => { $("#tip").hidden = true; });
+    if ((n - 1 - i) % 4 === 0) { const t = mk("text", { x: x + bw / 2, y: H - 4, "text-anchor": "middle", "font-size": 9, fill: "#9ba6b2" }); t.textContent = p.label; }
+  });
+  return svg;
+}
+function tip(e, a, b) { const t = $("#tip"); t.replaceChildren(el("b", { textContent: b }), el("span", { textContent: a, className: "muted" })); t.hidden = false; t.style.left = Math.min(innerWidth - 160, e.clientX + 12) + "px"; t.style.top = e.clientY - 44 + "px"; }
+
+function renderRanks() {
+  const max = Math.max(1, ...data.ranks.map(r => r.n));
+  $("#ranks").replaceChildren(...data.ranks.map(r => {
+    const R = RANKS.find(x => x[0] === r.name) || RANKS[0];
+    const fill = el("div", { className: "fill" }); fill.style.width = (r.n / max * 100) + "%"; fill.style.background = R[2];
+    return el("div", { className: "rankbar" }, [el("span", { textContent: r.name }), el("div", { className: "track" }, [fill]), el("b", { textContent: r.n, style: "text-align:right" })]);
+  }));
+}
+function renderSkins() {
+  $("#ultra").textContent = data.ultra + " own an Ultra";
+  $("#skins").replaceChildren(...(data.skins.length ? data.skins.map(([k, n]) => el("li", {}, [el("span", { textContent: k }), el("b", { textContent: n })])) : [el("li", { className: "muted", textContent: "No skins won yet" })]));
+}
+function renderBans() {
+  const head = el("tr", {}, ["Who", "Type", "Reason", "When", ""].map(h => el("th", { textContent: h })));
+  $("#bans").replaceChildren(head, ...data.bans.map(b => el("tr", {}, [el("td", { textContent: b.label || b.val }), el("td", { textContent: b.kind === "ip" ? "Device" : "Name" }), el("td", { textContent: b.reason || "" }), el("td", { textContent: ago(b.at) }),
+    el("td", {}, [btn("Unban", "small", async () => { try { await api("admin-unban", { kind: b.kind, val: b.val }); toast("Unbanned"); load(); } catch (e) { toast(e.message); } })])])));
+  if (!data.bans.length) $("#bans").append(el("tr", {}, [el("td", { className: "muted", textContent: "Nobody is banned", colSpan: 5 })]));
+}
+$("#banBtn").addEventListener("click", async () => {
+  const n = $("#banName").value.trim(); if (!n) return;
+  if (!confirm("Ban the name " + n + "?")) return;
+  try { await api("admin-ban", { name: n, reason: "Banned from the dashboard" }); $("#banName").value = ""; toast("Banned " + n); load(); } catch (e) { toast(e.message); }
+});
+$("#killBtn").addEventListener("click", async () => {
+  const on = !data.kill;
+  if (on && !confirm("Close the game for everyone? Everyone playing online is sent back to the menu and can't play online until you reopen it.")) return;
+  try { await api("admin-killswitch", { on, msg: $("#killMsg").value.trim() }); toast(on ? "The game is closed" : "The game is open again"); loadOverview(); } catch (e) { toast(e.message); }
+});
+
+// ---- users
+const COLS = [["display", "Name"], ["rank", "Rank", 1], ["best", "Best", 1], ["skins", "Skins", 1], ["tickets", "Spins", 1], ["created", "Joined"], ["seen", "Last seen"], ["perks", "Hacks"], ["", ""]];
+function renderUsers() {
+  const q = $("#search").value.trim().toLowerCase();
+  const list = users.filter(u => !q || u.name.includes(q)).sort((a, b) => {
+    const x = a[sortKey], y = b[sortKey];
+    return (typeof x === "string" ? x.localeCompare(y) : (Number(x) || 0) - (Number(y) || 0)) * sortDir;
+  });
+  $("#userCount").textContent = list.length + " of " + users.length;
+  const head = el("tr", {}, COLS.map(([k, h, num]) => { const th = el("th", { textContent: h + (k === sortKey ? (sortDir < 0 ? " ↓" : " ↑") : ""), className: (k && k !== "perks" ? "sort" : "") + (num ? " num" : "") });
+    if (k && k !== "perks") th.addEventListener("click", () => { sortDir = sortKey === k ? -sortDir : -1; sortKey = k; renderUsers(); }); return th; }));
+  const rows = [head];
+  for (const u of list.slice(0, 400)) {
+    const R = rankOf(u.rank), hacks = el("td", {}, u.perks.map(k => el("span", { className: "chip hack", textContent: (HACKS.find(h => h[0] === k) || [k, k])[1] })));
+    if (u.banned) hacks.prepend(el("span", { className: "chip ban", textContent: "Banned" }));
+    const acts = el("div", { className: "actions" }, [
+      btn("Hacks", "small", () => { openHack = openHack === u.name ? null : u.name; renderUsers(); }),
+      btn("+ Spins", "small", async () => { const n = prompt("How many spins to give " + u.display + "?", "5"); if (!n) return; try { await api("admin-gift", { name: u.name, tickets: Number(n) }); toast("Gave " + n + " spins"); loadUsers(); } catch (e) { toast(e.message); } }),
+      btn("Set RP", "small", async () => { const n = prompt("Set " + u.display + "'s rank points to:", u.rank); if (n === null) return; try { await api("admin-rank", { name: u.name, rank: Number(n) }); toast("Rank set"); loadUsers(); } catch (e) { toast(e.message); } }),
+      u.banned ? btn("Unban", "small", async () => { try { await api("admin-unban", { kind: "name", val: u.name }); toast("Unbanned"); load(); } catch (e) { toast(e.message); } })
+        : btn("Ban", "danger small", async () => { if (!confirm("Ban " + u.display + "?")) return; try { await api("admin-ban", { name: u.display, reason: "Banned from the dashboard" }); toast("Banned " + u.display); load(); } catch (e) { toast(e.message); } }),
+    ]);
+    rows.push(el("tr", {}, [el("td", { textContent: u.display }), el("td", { className: "num", innerHTML: `<span style="color:${R[2]}">${R[0]}</span> ${u.rank}` }), el("td", { className: "num", textContent: u.best }),
+      el("td", { className: "num", textContent: u.skins }), el("td", { className: "num", textContent: u.tickets }), el("td", { textContent: new Date(u.created).toLocaleDateString() }), el("td", { textContent: ago(u.seen) }), hacks, el("td", {}, [acts])]));
+    if (openHack === u.name) {
+      const box = el("div", { className: "hackedit" });
+      const checks = HACKS.map(([k, label]) => { const c = el("input", { type: "checkbox", checked: u.perks.includes(k) }); c.dataset.k = k; box.append(el("label", {}, [c, label])); return c; });
+      box.append(btn("Save hacks", "primary small", async () => {
+        try { await api("admin-perks", { name: u.name, perks: checks.filter(c => c.checked).map(c => c.dataset.k) }); toast("Saved. " + u.display + " gets them next time they open the game"); openHack = null; loadUsers(); } catch (e) { toast(e.message); }
+      }), el("span", { className: "muted", textContent: "They pick which ones to use before each round." }));
+      rows.push(el("tr", {}, [el("td", { colSpan: COLS.length }, [box])]));
+    }
+  }
+  if (list.length > 400) rows.push(el("tr", {}, [el("td", { colSpan: COLS.length, className: "muted", textContent: "Showing 400 · search to find others" })]));
+  $("#users").replaceChildren(...rows);
+}
+$("#search").addEventListener("input", renderUsers);
+
+if (token) start();
+})();
+</script>
+</body>
+</html>
