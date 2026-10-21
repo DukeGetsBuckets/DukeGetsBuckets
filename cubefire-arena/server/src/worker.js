@@ -25,7 +25,7 @@ const MAP_IDS = ["arena", "farm", "peaks", "desert", "castle", "snow", "jungle"]
 const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math.floor(Math.random() * l.length)]; };
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 34;
+const MIN_BUILD = 35;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -164,12 +164,21 @@ export class Lobby {
     return pool[0][0];
   }
   // At each countdown: everyone playing, sorted by rank, split into even groups of up to 6
-  regroup() {
+  // Everyone playing, sorted by their current rank and split into even groups of up to 6
+  plan() {
     const ps = this.players().sort((x, y) => this.rankOf(y.a.id) - this.rankOf(x.a.id));
     const k = Math.min(3, Math.max(1, Math.ceil(ps.length / GROUP_SIZE))), names = GROUP_NAMES[k - 1];
     const base = Math.floor(ps.length / k), extra = ps.length % k;
     let i = 0;
-    names.forEach((g, gi) => { for (let n = base + (gi < extra ? 1 : 0); n > 0; n--, i++) { ps[i].a = { ...ps[i].a, g }; ps[i].ws.serializeAttachment(ps[i].a); } });
+    names.forEach((g, gi) => { for (let n = base + (gi < extra ? 1 : 0); n > 0; n--, i++) ps[i].g = g; });
+    return ps;
+  }
+  // When a round ends, tell each player which lobby they'll be in next
+  announce() { for (const p of this.plan()) { try { p.ws.send(JSON.stringify({ t: "next", g: p.g })); } catch {} } }
+  // ...and move them as the next countdown starts (all lobbies share one round clock)
+  regroup() {
+    const ps = this.plan();
+    for (const p of ps) { p.a = { ...p.a, g: p.g }; p.ws.serializeAttachment(p.a); }
     for (const p of ps) this.sendGroup(p.ws, p.a);
   }
   // How many are playing (and in which group), for the menu
@@ -211,6 +220,7 @@ export class Lobby {
     this.round = next;
     const out = JSON.stringify({ t: "round", ph: next.ph, ends: next.ends, n: next.n, map: next.map, now });
     for (const ws of this.ctx.getWebSockets()) { if (ws !== except) { try { ws.send(out); } catch {} } }
+    if (next.ph === "end" && this.ranked()) this.announce();
     if (next.ends) this.ctx.storage.setAlarm(next.ends).catch(() => {});
   }
   async alarm() { this.tickRound(); }

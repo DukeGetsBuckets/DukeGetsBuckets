@@ -2602,7 +2602,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 34;
+const BUILD = 35;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2623,7 +2623,8 @@ const MAP_VERSION = "v4"; // bump when map layouts change so mismatched versions
 const lobbyKey = code => (code ? "party" : "ranked") + MAP_VERSION + "-" + (code || "open");
 // Ranked: the server sorts players by rank into lobbies of about 6
 const GROUP_LABEL = { elite: "Elite lobby", normal: "Normal lobby", trash: "Trash lobby" };
-let myGroup = null, pop = null, serverMap = null;
+let myGroup = null, nextGroup = null, pop = null, serverMap = null;
+const GROUP_ORDER = ["trash", "normal", "elite"];
 
 function serverUrl(name) {
   const local = location.host === SERVER_HOST || /^(localhost|127\.0\.0\.1):87\d\d$/.test(location.host);
@@ -2663,7 +2664,12 @@ function connectServer(name) {
       onPeer({ peer: String(m.id), presence: m.d && typeof m.d === "object" ? m.d : {}, kind: "viewer", sameTab: false });
       renderStatus();
     } else if (m.t === "leave" && m.id) removeRemote(String(m.id));
-    else if (m.t === "group") onGroup(m);
+    else if (m.t === "group") { nextGroup = null; onGroup(m); }
+    else if (m.t === "next" && GROUP_LABEL[m.g] && state === "play" && mode === "online") {    // the lobby you'll be in next round
+      nextGroup = m.g;
+      const up = GROUP_ORDER.indexOf(m.g) - GROUP_ORDER.indexOf(myGroup);
+      setTimeout(() => banner(!myGroup || !up ? "Next round: staying in the " + GROUP_LABEL[m.g] : (up > 0 ? "Next round: moving up to the " : "Next round: moving down to the ") + GROUP_LABEL[m.g]), 2600);
+    }
     else if (m.t === "pop") { pop = { n: num(m.n) || 0, groups: m.groups && typeof m.groups === "object" ? m.groups : {} }; renderStatus(); }
     else if (m.t === "lastwin") onLastWin(m);
     else if (m.t === "full" && state === "play" && mode === "online") { leaveMatch(); banner(`Ranked is full (${num(m.max) || 18} players). Try again in a minute`); }
@@ -4334,8 +4340,8 @@ function renderRoundHud() {
   if (round.ph === "wait") { title = "Warm-up"; time = "waiting for players · " + (1 + playersOnline()) + "/2"; }
   else if (round.ph === "count") title = "Round " + (round.n + 1) + " starts in";
   else if (round.ph === "live") title = "Round " + round.n;
-  else title = "Round " + round.n + " over · next in";
-  if (myGroup && lobbyCode() === "open") title = GROUP_LABEL[myGroup] + " · " + title;   // tell people their lobby
+  else title = "Round " + round.n + " over · next" + (nextGroup ? ": " + GROUP_LABEL[nextGroup] : "") + " in";
+  if (myGroup && lobbyCode() === "open" && round.ph !== "end") title = GROUP_LABEL[myGroup] + " · " + title;   // tell people their lobby
   else if (lobbyCode() !== "open") title = "Party " + lobbyCode().toUpperCase() + " · " + title;
   $("#roundTitle").textContent = title; $("#roundTime").textContent = time;
   rh.className = round.ph === "live" ? (left < 30 ? "live hurry" : "live") : "";
@@ -5013,7 +5019,7 @@ function leaveMatch() {
   $("#setBody").prepend($("#settings"));
   $("#hud").hidden = true; $("#touch").hidden = true; $("#menu").hidden = false;
   stopBots();
-  myGroup = null;
+  myGroup = null; nextGroup = null;
   publish(true);
   if (lobbyCode() !== "open") joinLobby("");                             // back to watching ranked
   renderStatus(); flushProgress();
