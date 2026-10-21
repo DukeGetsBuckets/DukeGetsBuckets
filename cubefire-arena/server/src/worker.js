@@ -32,7 +32,7 @@ const MAP_IDS = ["arena", "farm", "peaks", "desert", "castle", "snow", "jungle"]
 const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math.floor(Math.random() * l.length)]; };
 // Oldest game copy allowed online. Older copies (including any that still have the
 // removed cheats) are told to refresh and can't join until they do.
-const MIN_BUILD = 36;
+const MIN_BUILD = 37;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -174,23 +174,28 @@ export class Lobby {
     const peers = this.players(ws).filter(p => p.a.g === a.g && this.last.has(p.a.id)).map(p => ({ id: p.a.id, d: this.last.get(p.a.id) }));
     try { ws.send(JSON.stringify({ t: "group", g: a.g, peers })); } catch {}
   }
-  // Someone joining mid-round goes to the group nearest their rank that has room
+  // Someone joining mid-round goes to the fullest lobby that still has room (closest rank breaks a
+  // tie); if every lobby is full they join the closest-ranked one until the round ends
   place(id) {
     const groups = new Map();
     for (const p of this.players()) if (p.a.g) { const l = groups.get(p.a.g) || []; l.push(this.rankOf(p.a.id)); groups.set(p.a.g, l); }
     if (!groups.size) return "normal";
-    const rk = this.rankOf(id), open = [...groups].filter(([, l]) => l.length < GROUP_SIZE), pool = open.length ? open : [...groups];
-    pool.sort((x, y) => Math.abs(x[1].reduce((s, v) => s + v, 0) / x[1].length - rk) - Math.abs(y[1].reduce((s, v) => s + v, 0) / y[1].length - rk));
-    return pool[0][0];
+    const rk = this.rankOf(id), gap = l => Math.abs(l.reduce((s, v) => s + v, 0) / l.length - rk);
+    const open = [...groups].filter(([, l]) => l.length < GROUP_SIZE);
+    if (open.length) return open.sort((x, y) => y[1].length - x[1].length || gap(x[1]) - gap(y[1]))[0][0];
+    return [...groups].sort((x, y) => gap(x[1]) - gap(y[1]))[0][0];
   }
   // At each countdown: everyone playing, sorted by rank, split into even groups of up to 6
-  // Everyone playing, sorted by their current rank and split into even groups of up to 6
+  // Everyone playing, sorted by their current rank. Full lobbies come first: each one gets 6
+  // before another opens (the last one never has just 1: 7 players are 5 + 2)
   plan() {
     const ps = this.players().sort((x, y) => this.rankOf(y.a.id) - this.rankOf(x.a.id));
     const k = Math.min(MAX_GROUPS, Math.max(1, Math.ceil(ps.length / GROUP_SIZE))), names = groupNames(k);
-    const base = Math.floor(ps.length / k), extra = ps.length % k;
+    const sizes = names.map(() => GROUP_SIZE); sizes[k - 1] = ps.length - GROUP_SIZE * (k - 1);
+    if (k > 1 && sizes[k - 1] === 1) { sizes[k - 2]--; sizes[k - 1]++; }
     let i = 0;
-    names.forEach((g, gi) => { for (let n = base + (gi < extra ? 1 : 0); n > 0; n--, i++) ps[i].g = g; });
+    names.forEach((g, gi) => { for (let n = sizes[gi]; n > 0 && i < ps.length; n--, i++) ps[i].g = g; });
+    for (; i < ps.length; i++) ps[i].g = names[k - 1];          // (only past the 60-player limit)
     return ps;
   }
   // When a round ends, tell each player which lobby they'll be in next
@@ -261,7 +266,7 @@ export class Lobby {
     const socks = this.ctx.getWebSockets().map(ws => ({ ws, a: this.att(ws) })).filter(x => x.a);
     if (path === "/state") return Response.json({ round: { ph: this.round.ph, n: this.round.n, map: this.round.map }, players: socks.map(({ a }) => {
       const d = this.last.get(a.id) || {};
-      return { id: a.id, name: String(d.n || "?").slice(0, 24), pl: !!a.pl, g: a.g || null, rk: Number(d.rk) || 0, k: Number(d.k) || 0, d: Number(d.d) || 0, afk: !!d.afk, perks: a.perks || [] };
+      return { id: a.id, name: String(d.n || "?").slice(0, 24), pl: !!a.pl, g: a.g || null, rk: Number(d.rk) || 0, k: Number(d.k) || 0, d: Number(d.d) || 0, afk: !!d.afk, perks: a.perks || [], ping: Number(d.pg) || null };
     }) });
     if (path === "/act") {
       if (b.act === "closeall") { for (const { ws } of socks) { try { ws.send(JSON.stringify({ t: "blocked", why: String(b.msg || "") })); ws.close(4003, "Closed"); } catch {} } return Response.json({ ok: true }); }
@@ -303,6 +308,7 @@ export class Lobby {
     let d;
     try { d = JSON.parse(message); } catch { return; }
     if (!d || typeof d !== "object" || Array.isArray(d)) return;
+    if (d.t === "ping") { try { ws.send(JSON.stringify({ t: "pong", c: d.c })); } catch {} return; }   // the ping display
     if (d.t === "acct") {                                        // hacks the admin gave this account
       accounts(this.env).fetch("https://internal/internal/perks", { method: "POST", body: JSON.stringify({ token: String(d.token || "") }) })
         .then(r => r.json()).then(r => { const cur = this.att(ws); if (cur) this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [] }); }).catch(() => {});

@@ -166,6 +166,9 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 .mini{position:absolute;left:16px;top:calc(12px + env(safe-area-inset-top,0px));background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 10px;min-width:170px;font-size:13px;display:grid;gap:3px}
 .mini h2{margin:0 0 3px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
 .mini h2 i{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.netstat{margin-top:4px;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--muted);font-variant-numeric:tabular-nums;display:flex;gap:8px}
+.netstat b{font-weight:700}
+.netstat .good{color:var(--ok)}.netstat .ok{color:var(--accent)}.netstat .bad{color:var(--hot)}
 .mini.live h2 i{background:var(--ok)}
 .row{display:flex;justify-content:space-between;gap:12px;font-variant-numeric:tabular-nums}
 .row.me{color:var(--accent);font-weight:700}
@@ -445,7 +448,7 @@ body.pig #pigTint{display:block}
 <div id="view"></div>
 
 <div id="hud" hidden>
-  <div class="mini" id="mini"><h2><i></i><span id="miniTitle">Arena</span></h2><div id="miniRows"></div></div>
+  <div class="mini" id="mini"><h2><i></i><span id="miniTitle">Arena</span></h2><div id="miniRows"></div><div class="netstat" id="netStat"></div></div>
   <div id="feed"></div>
   <div id="hurt"></div>
   <div id="nukeFlash"></div>
@@ -2602,7 +2605,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 36;
+const BUILD = 37;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2627,6 +2630,9 @@ const TIER_NAME = { elite: "Elite", normal: "Normal", trash: "Trash" };
 const groupLabel = g => { const [t, n] = String(g || "").split("-"); return TIER_NAME[t] ? TIER_NAME[t] + " lobby" + (n ? " " + n : "") : null; };
 const groupRank = g => { const [t, n] = String(g || "").split("-"); return ["trash", "normal", "elite"].indexOf(t) * 100 - (Number(n) || 0); };
 let myGroup = null, nextGroup = null, pop = null, serverMap = null;
+// Ping: the round trip to the game server, measured every 2 seconds
+let pingMs = null;
+setInterval(() => { if (netKind === "ws" && sock && sock.readyState === 1) { try { sock.send(JSON.stringify({ t: "ping", c: performance.now() })); } catch (e) {} } }, 2000);
 
 function serverUrl(name) {
   const local = location.host === SERVER_HOST || /^(localhost|127\.0\.0\.1):87\d\d$/.test(location.host);
@@ -2666,6 +2672,7 @@ function connectServer(name) {
       onPeer({ peer: String(m.id), presence: m.d && typeof m.d === "object" ? m.d : {}, kind: "viewer", sameTab: false });
       renderStatus();
     } else if (m.t === "leave" && m.id) removeRemote(String(m.id));
+    else if (m.t === "pong" && num(m.c) !== null) { const rtt = performance.now() - m.c; pingMs = Math.round(pingMs == null ? rtt : pingMs * 0.6 + rtt * 0.4); }
     else if (m.t === "group") { nextGroup = null; onGroup(m); }
     else if (m.t === "next" && groupLabel(m.g) && state === "play" && mode === "online") {    // the lobby you'll be in next round
       nextGroup = m.g;
@@ -2895,7 +2902,7 @@ function publish(force, target) {
     n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0, afk: playing && iAmAfk() ? 1 : 0, hb: Math.floor(now()),
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
-    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : mySkin(), k: playing ? kills : 0, d: playing ? deaths : 0, rk: rankPts, pm: playing && partyCode ? $("#partyMap").value : null, sp: playing && spectating ? 1 : 0,
+    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : mySkin(), k: playing ? kills : 0, d: playing ? deaths : 0, rk: rankPts, pg: pingMs, pm: playing && partyCode ? $("#partyMap").value : null, sp: playing && spectating ? 1 : 0,
     sh: playing ? lastShot : null, gr: playing ? lastNade : null, nk: playing ? lastNuke : null, md: playing ? lastMud : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
   if (netKind === "ws") { if (sock && sock.readyState === 1) { try { sock.send(JSON.stringify(P)); } catch (e) {} } }
@@ -4255,7 +4262,7 @@ function renderStatus() {
   if (netState === "offline") $("#onlineSub").textContent = "Unavailable on this page";
   if ($("#playSub")) renderPlaySub();
 }
-let hudT = 0;
+let hudT = 0, netT = 0;
 const RING = 138.2;
 function renderReticle(t) {
   const w = WEAPONS[cur];
@@ -4309,6 +4316,14 @@ function renderHud(t) {
     waiting.hidden = false;
     waiting.textContent = netState === "live" ? `Waiting for players in ${lobbyLabel()} · send friends this page's link` : "Connecting to other players…";
   } else waiting.hidden = true;
+  if (t > netT) {                                   // ping and frame rate, twice a second
+    netT = t + 0.5;
+    const fps = Math.round(1 / frameAvg), cls = (v, a, b) => v <= a ? "good" : v <= b ? "ok" : "bad";
+    const parts = [];
+    if (mode === "online" && netKind === "ws") parts.push(pingMs == null ? "<b>Ping …</b>" : `<b class="${cls(pingMs, 80, 160)}">Ping ${pingMs} ms</b>`);
+    parts.push(`<b class="${cls(-fps, -50, -30)}">${fps} fps</b>`);
+    $("#netStat").innerHTML = parts.join("");
+  }
   const callable = mode === "online" && state === "play" && (roundsOn() ? round.ph === "wait" : playersOnline() === 0);
   if ($("#callHud").hidden === callable) $("#callHud").hidden = !callable;
   if ($("#callPlayers").hidden === (mode === "online")) $("#callPlayers").hidden = mode !== "online";

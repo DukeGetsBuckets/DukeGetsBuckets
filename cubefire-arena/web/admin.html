@@ -202,7 +202,7 @@ function renderOverview() {
 function renderOnline() {
   const rows = data.online.slice().sort((a, b) => b.pl - a.pl || b.rk - a.rk);
   $("#onlineNote").textContent = rows.length ? "" : "Nobody is online right now";
-  const head = el("tr", {}, ["Name", "Where", "Status", "RP", "K / D", ""].map((h, i) => el("th", { textContent: h, className: i === 3 ? "num" : "" })));
+  const head = el("tr", {}, ["Name", "Where", "Status", "RP", "K / D", "Ping", ""].map((h, i) => el("th", { textContent: h, className: i === 3 || i === 5 ? "num" : "" })));
   $("#online").replaceChildren(head, ...rows.map(p => {
     const where = p.room.startsWith("ranked") ? (p.g ? GROUP[p.g] + " lobby" : "Ranked menu") : "Party " + p.room.split("-").slice(1).join("-").toUpperCase();
     const status = !p.pl ? "In the menu" : p.afk ? "Away" : "Playing" + (p.map ? " · " + p.map : "");
@@ -212,7 +212,8 @@ function renderOnline() {
       btn("Ban", "danger small", () => { if (confirm("Ban " + p.name + "? They and their device can't play until you unban them.")) act("admin-ban", { ...p, reason: "Banned from the dashboard" }, "Banned " + p.name); }));
     const R = rankOf(p.rk);
     return el("tr", {}, [el("td", { textContent: p.name }), el("td", { textContent: where }), el("td", { textContent: status }),
-      el("td", { className: "num", innerHTML: `<span style="color:${R[2]}">${R[0]}</span> ${p.rk}` }), el("td", { textContent: p.pl ? p.k + " / " + p.d : "—" }), el("td", {}, [acts])]);
+      el("td", { className: "num", innerHTML: `<span style="color:${R[2]}">${R[0]}</span> ${p.rk}` }), el("td", { textContent: p.pl ? p.k + " / " + p.d : "—" }),
+      el("td", { className: "num", textContent: p.ping ? p.ping + " ms" : "—", style: p.ping > 160 ? "color:#ff4f5e" : p.ping > 80 ? "color:#ffb627" : "" }), el("td", {}, [acts])]);
   }));
 }
 function btn(text, cls, fn) { const b = el("button", { type: "button", className: cls, textContent: text }); b.addEventListener("click", fn); return b; }
