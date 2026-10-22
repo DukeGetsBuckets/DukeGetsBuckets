@@ -51,7 +51,10 @@ function lobbyName(raw) {
   return name || "arena-open";
 }
 
+import { Royale } from "./royale.js";
+export { Royale };
 const accounts = env => env.ACCOUNTS.get(env.ACCOUNTS.idFromName("all"));
+const royale = env => env.ROYALE.get(env.ROYALE.idFromName("royale"));
 // Accept a socket only to send one message and close it (out-of-date copy, kill switch, ban)
 function closingSocket(msg, code, why) {
   const pair = new WebSocketPair();
@@ -74,6 +77,7 @@ export default {
       try { gate = await (await accounts(env).fetch("https://internal/internal/gate", { method: "POST", body: JSON.stringify({ ip: request.headers.get("CF-Connecting-IP") || "local", room }) })).json(); } catch {}
       if (gate.block) return closingSocket({ t: "blocked", why: gate.block }, 4003, "Blocked");
       const fwd = new URL(request.url); fwd.searchParams.set("ipk", gate.ipKey || "");
+      if (room === "royale") return royale(env).fetch(new Request(fwd, request));   // the battle royale hub
       return env.LOBBY.get(env.LOBBY.idFromName(room)).fetch(new Request(fwd, request));
     }
     if (url.pathname.startsWith("/api/")) {
@@ -273,17 +277,39 @@ export class Lobby {
   }
 
   // Move the round on if it's time (or if players came or went), and tell everyone
+  // Ranked stops from 2 minutes before each battle royale until 1 minute after it starts, so
+  // everyone can queue (the battle royale object knows the times)
+  brPause(now) { return this.br && Array.isArray(this.br.windows) ? this.br.windows.find(x => now >= x.stop && now < x.resume) || null : null; }
+  refreshBr() {
+    const now = Date.now(); if (this.brBusy || now < (this.brAt || 0)) return;
+    this.brBusy = true;
+    royale(this.env).fetch("https://internal/sched").then(r => r.json()).then(j => { this.br = j; })
+      .catch(() => {}).finally(() => { this.brBusy = false; this.brAt = Date.now() + 15000; this.tickRound(); });
+  }
+  wake(at) {                                                    // the round clock's alarm, or sooner for a pause
+    const now = Date.now(), stops = this.br && Array.isArray(this.br.windows) ? this.br.windows.map(x => x.stop).filter(x => x > now) : [];
+    const t = Math.min(at || Infinity, ...stops, this.ranked() && this.inMatch() ? now + 20000 : Infinity);
+    if (t < Infinity) this.ctx.storage.setAlarm(t).catch(() => {});
+  }
   tickRound(except) {
     const now = Date.now(), r = this.round, T = this.times(), n = this.inMatch(except);
+    if (this.ranked()) this.refreshBr();
+    const pause = this.ranked() ? this.brPause(now) : null;
     let next = null;
-    if (n < MIN_ROUND_PLAYERS) { if (r.ph !== "wait") next = { ph: "wait", ends: 0, n: r.n }; }
+    if (pause) {
+      if (r.ph === "live") next = { ph: "end", ends: now + T.end, n: r.n };                 // finish the round that was on
+      else if (r.ph === "end" && now < r.ends - 30) next = null;
+      else if (r.ph !== "pause" || r.ends !== pause.resume) next = { ph: "pause", ends: pause.resume, n: r.n };
+    }
+    else if (r.ph === "pause") next = n >= MIN_ROUND_PLAYERS ? { ph: "count", ends: now + T.count, n: r.n } : { ph: "wait", ends: 0, n: r.n };
+    else if (n < MIN_ROUND_PLAYERS) { if (r.ph !== "wait") next = { ph: "wait", ends: 0, n: r.n }; }
     else if (r.ph === "wait") next = { ph: "count", ends: now + T.count, n: r.n };
     else if (now >= r.ends - 30) {
       if (r.ph === "count") next = { ph: "live", ends: now + T.live, n: r.n + 1 };
       else if (r.ph === "live") next = { ph: "end", ends: now + T.end, n: r.n };
       else next = { ph: "count", ends: now + T.count, n: r.n };
     }
-    if (!next) { if (r.ends > now) this.ctx.storage.setAlarm(r.ends).catch(() => {}); return; }
+    if (!next) { this.wake(r.ends > now ? r.ends : 0); return; }
     next.map = next.ph === "count" ? this.partyMap || nextMap(r.map) : r.map;   // parties keep their picked map
     next.sizes = r.sizes; next.won = r.won;
     if (next.ph === "count" && this.ranked()) this.regroup();
@@ -295,8 +321,8 @@ export class Lobby {
     this.round = next;
     const out = JSON.stringify({ t: "round", ph: next.ph, ends: next.ends, n: next.n, map: next.map, now });
     for (const ws of this.ctx.getWebSockets()) { if (ws !== except) { try { ws.send(out); } catch {} } }
-    if (next.ph === "end" && this.ranked()) this.announce();
-    if (next.ends) this.ctx.storage.setAlarm(next.ends).catch(() => {});
+    if (next.ph === "end" && this.ranked() && !pause) this.announce();
+    this.wake(next.ends);
   }
   async alarm() { this.tickRound(); }
 
@@ -484,6 +510,7 @@ const SKINS = {
 const ALL_SKINS = [...SKINS.common, ...SKINS.rare, ...SKINS.super, ...SKINS.ultra];   // the wheel's skins
 // Rank rewards: owned automatically once the account's rank points reach the number
 const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200], ["diamondwarden", 1800], ["masterphantom", 2500], ["champion", 3500], ["mythic", 8000], ["legend", 15000]];
+const BR_SKIN = "royalechamp";   // only for battle royale winners
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["ultra", 0.01], ["super", 0.04], ["rare", 0.25], ["common", 0.7]];
 // Rare spins (won by winning a round with more than 8 players): 5% ultra, 60% super rare, 35% common
@@ -609,7 +636,7 @@ export class Accounts {
       let salt = this.setting("ipsalt"); if (!salt) { salt = hex(crypto.getRandomValues(new Uint8Array(16))); this.setSetting("ipsalt", salt); }
       const ipKey = hex(await crypto.subtle.digest("SHA-256", enc.encode(salt + String(b.ip || "")))).slice(0, 32);   // addresses are kept only as a salted hash
       const killed = this.setting("kill") === "1";
-      if (!killed && b.room !== "probe") this.bump("visits");
+      if (!killed && b.room !== "probe" && b.room !== "royale") this.bump("visits");
       return { ipKey, block: killed ? this.setting("killmsg") || "The game is closed right now. Check back soon." : this.banned("ip", ipKey) ? "You're banned from Cubefire Arena." : null };
     }
     if (op === "stat") {
@@ -622,6 +649,15 @@ export class Accounts {
     if (op === "check") {
       const n = String(b.name || "").trim().toLowerCase();
       return { banned: this.banned("name", n) || this.banned("ip", b.ipKey) ? "You're banned from Cubefire Arena." : null };
+    }
+    if (op === "who") {                                       // the battle royale hub checks who a game is signed in as
+      const t = String(b.token || ""), s = t && this.sql.exec("SELECT name FROM sessions WHERE token = ?", t).toArray()[0], u = s && this.user(s.name);
+      return u ? { acc: u.name, display: u.display } : {};
+    }
+    if (op === "brwin") {                                     // battle royale winners: the Royale Champion skin and the crown
+      for (const n of (Array.isArray(b.accts) ? b.accts : []).slice(0, 2)) { const u = this.user(String(n)); if (u) { const d = this.data(u); d.brWins = (d.brWins || 0) + 1; this.saveData(u.name, d); } }
+      this.setSetting("crown", JSON.stringify({ accts: (b.accts || []).slice(0, 2), names: (b.names || []).slice(0, 2).map(x => String(x).slice(0, 24)), at: Date.now() }));
+      return { ok: true };
     }
     if (op === "perks") {
       const t = String(b.token || ""), s = t && this.sql.exec("SELECT name FROM sessions WHERE token = ?", t).toArray()[0];
@@ -671,6 +707,7 @@ export class Accounts {
         totals: { accounts: all.length, premium: count("SELECT COUNT(*) AS n FROM push"), bans: count("SELECT COUNT(*) AS n FROM bans"), hacked: count("SELECT COUNT(*) AS n FROM perks") },
         ranks: tiers, skins: Object.entries(skinCount).sort((x, y) => y[1] - x[1]).slice(0, 10), ultra: all.filter(u => (u.d.owned || []).some(k => SKINS.ultra.includes(k))).length,
         online: await this.online(), kill: this.setting("kill") === "1", killmsg: this.setting("killmsg") || "",
+        br: await royale(this.env).fetch("https://internal/status").then(r => r.json()).catch(() => null),
         bans: this.sql.exec("SELECT kind, val, label, reason, at FROM bans ORDER BY at DESC").toArray(),
       };
     }
@@ -708,6 +745,7 @@ export class Accounts {
       this.saveData(u.name, d); return { ok: true };
     }
     if (op === "admin-kick" || op === "admin-kill") return this.lobbyCall(String(b.room || ""), "/act", { act: op === "admin-kick" ? "kick" : "kill", id: b.id, msg: "An admin removed you from the match." });
+    if (op === "admin-br-now") { const r = await (await royale(this.env).fetch("https://internal/admin-now")).json(); if (r.error) throw new UserError(r.error); return r; }
     if (op === "admin-killswitch") {
       const on = !!b.on, msg = String(b.msg || "").slice(0, 160);
       this.setSetting("kill", on ? "1" : "0"); this.setSetting("killmsg", msg);
@@ -722,8 +760,8 @@ export class Accounts {
   data(u) { try { return JSON.parse(u.data) || {}; } catch { return {}; } }
   saveData(name, d) { this.sql.exec("UPDATE users SET data = ? WHERE name = ?", JSON.stringify(d), name); }
   view(u, d) {
-    if (OWNER_ACCOUNTS[u.name]) return { name: u.display, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k)], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false, rareSpins: 999, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
-    return { name: u.display, tickets: d.tickets || 0, owned: [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0))], equipped: d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), rareSpins: d.rareSpins || 0, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
+    if (OWNER_ACCOUNTS[u.name]) return { name: u.display, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k), BR_SKIN], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false, rareSpins: 999, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
+    return { name: u.display, tickets: d.tickets || 0, owned: [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0)), ...(d.brWins ? [BR_SKIN] : [])], equipped: d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), rareSpins: d.rareSpins || 0, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
   }
   async session(name) {
     const token = hex(crypto.getRandomValues(new Uint8Array(24)));
@@ -874,6 +912,7 @@ export class Accounts {
       this.fails.delete(name);
       return { token: await this.session(name), account: this.view(u, this.data(u)) };
     }
+    if (op === "crown") { let c = null; try { c = JSON.parse(this.setting("crown") || "null"); } catch {} return { crown: c }; }   // the last battle royale winners
     if (op === "top") {                                    // leaderboard: the 20 highest-ranked accounts
       const top = this.sql.exec("SELECT display, CAST(json_extract(data, '$.rank') AS INTEGER) AS rank FROM users WHERE CAST(json_extract(data, '$.rank') AS INTEGER) > 0 ORDER BY rank DESC, created ASC LIMIT 20").toArray();
       return { top: top.map(r => ({ name: r.display, rank: r.rank })) };

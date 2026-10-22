@@ -106,6 +106,11 @@ tr:hover td{background:rgba(243,239,228,.03)}
   <div class="tiles" id="tiles"></div>
 
   <section class="card">
+    <div class="card-head"><h2>Battle royale</h2><span class="muted" id="brNote"></span><button type="button" class="primary small" id="brNow">Start battle royale now</button></div>
+    <div id="brBox" class="muted"></div>
+  </section>
+
+  <section class="card">
     <div class="card-head"><h2>Online now</h2><span class="muted" id="onlineNote"></span></div>
     <div class="tablewrap"><table id="online"></table></div>
   </section>
@@ -198,7 +203,7 @@ function renderOverview() {
   $("#killBtn").textContent = data.kill ? "Reopen the game" : "Kill switch";
   $("#killBtn").className = data.kill ? "primary" : "danger";
   if (document.activeElement !== $("#killMsg")) $("#killMsg").value = data.killmsg;
-  renderOnline(); renderCharts(); renderRanks(); renderSkins(); renderBans();
+  renderOnline(); renderCharts(); renderRanks(); renderSkins(); renderBans(); renderBr();
 }
 function renderOnline() {
   const rows = data.online.slice().sort((a, b) => b.pl - a.pl || b.rk - a.rk);
@@ -217,6 +222,21 @@ function renderOnline() {
       el("td", { className: "num", textContent: p.ping ? p.ping + " ms" : "—", style: p.ping > 160 ? "color:#ff4f5e" : p.ping > 80 ? "color:#ffb627" : "" }), el("td", {}, [acts])]);
   }));
 }
+// Battle royale: when the next one is, who's queued, and the match if one is running
+function renderBr() {
+  const b = data.br; if (!b) { $("#brBox").textContent = "Battle royale server not reachable"; return; }
+  const skew = Date.now() - b.now, at = t => new Date(t + skew).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const left = s => { const v = Math.max(0, Math.round((s + skew - Date.now()) / 1000)); return Math.floor(v / 60) + ":" + String(v % 60).padStart(2, "0"); };
+  $("#brNote").textContent = b.test ? "TEST MODE (every 4 min, 1 team is enough)" : "every 30 min · needs " + b.minTeams + " teams";
+  $("#brBox").textContent = b.match ? `Running now: ${b.match.alive} of ${b.match.teams} teams still in` :
+    b.ph === "queue" ? `Queue open: ${b.teams} teams (${b.players} players) queued · starts at ${at(b.start)} (in ${left(b.start)}) · ranked stops at ${at(b.stop)}` :
+    `Next one at ${at(b.start)} (in ${left(b.start)}) · queue opens at ${at(b.open)} · ${b.hubs} games connected`;
+  $("#brNow").disabled = !!b.match;
+}
+$("#brNow").addEventListener("click", async () => {
+  if (!confirm("Open the queue now and start a battle royale in about 2 minutes? Ranked stops until a minute after it starts.")) return;
+  try { await api("admin-br-now"); toast("Battle royale queue is open"); loadOverview(); } catch (e) { toast(e.message); }
+});
 function btn(text, cls, fn) { const b = el("button", { type: "button", className: cls, textContent: text }); b.addEventListener("click", fn); return b; }
 async function act(op, p, done) { try { await api(op, { room: p.room, id: p.id, reason: p.reason }); toast(done); loadOverview(); } catch (e) { toast(e.message); } }
 

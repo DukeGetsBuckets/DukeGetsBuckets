@@ -86,7 +86,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
 .lb-foot{grid-area:foot;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .lb-foot .status{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 14px;max-width:min(520px,100%)}
 .playbox{display:grid;gap:8px;width:min(340px,100%);margin-left:auto}
-.modeswitch{display:grid;grid-template-columns:repeat(3,1fr);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px;gap:3px}
+.modeswitch{display:grid;grid-template-columns:repeat(4,1fr);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px;gap:3px}
 .modeswitch button{border:0;background:transparent;border-radius:4px;padding:8px 6px;font:400 14px var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .modeswitch button[aria-pressed="true"]{background:rgba(255,182,39,.2);color:var(--accent)}
 .partyrow{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 6px 6px 12px}
@@ -143,7 +143,7 @@ input[type=range]{width:100%;accent-color:var(--accent);touch-action:pan-x}
   .playbox{width:100%}
   .lb-foot .status{align-self:center}
   .lb-hero{height:42vh}
-  #hero{height:100%;max-height:none}
+  #hero{height:42vh;max-height:none}
 }
 
 /* ---------- HUD ---------- */
@@ -358,7 +358,7 @@ body.pig #pigTint{display:block}
 .wheelwrap canvas{width:240px;height:240px;display:block}
 .wheelwrap::after{content:"";position:absolute;left:50%;top:-6px;transform:translateX(-50%);border:12px solid transparent;border-top:20px solid var(--ink);filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))}
 .odds{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;font-weight:700}
-.r0{color:#b7c3cf}.r1{color:#4fb0ff}.r2{color:#d17bff}.r3{color:#ffc93c}.r4{color:#ff4f8b;text-shadow:0 0 8px rgba(255,79,139,.6)}
+.r0{color:#b7c3cf}.r1{color:#4fb0ff}.r2{color:#d17bff}.r3{color:#ffc93c}.r4{color:#ff4f8b;text-shadow:0 0 8px rgba(255,79,139,.6)}.r5{color:#ffd23a;text-shadow:0 0 10px rgba(255,210,58,.7)}
 .prize{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;align-items:center;border:1px solid var(--accent);border-radius:6px;padding:8px 10px;background:rgba(255,182,39,.08)}
 .prize img{width:72px;height:90px;object-fit:contain}
 .prize b{font:400 18px var(--display);display:block}
@@ -427,6 +427,65 @@ body.pig #pigTint{display:block}
   .ammo b{font-size:26px}
   .set-row{grid-template-columns:minmax(0,1fr)}
 }
+/* battle royale: lobby */
+.modeswitch button.br{color:#c9a2ff}
+.modeswitch button.br[aria-pressed="true"]{background:rgba(157,92,255,.28);color:#e2ccff}
+#brCount{display:grid;justify-items:center;gap:3px;text-align:center;pointer-events:auto;cursor:pointer;background:linear-gradient(180deg,rgba(96,44,180,.9),rgba(40,18,84,.9));border:2px solid #b98bff;border-radius:10px;padding:8px 24px 10px;box-shadow:0 0 30px rgba(157,92,255,.45),0 12px 30px rgba(0,0,0,.45);white-space:nowrap;z-index:2}
+#brCount small{font:700 12px var(--ui);letter-spacing:.2em;text-transform:uppercase;color:#e2ccff}
+#brCount b{font:400 clamp(40px,5.4vw,60px)/1 var(--display);letter-spacing:.04em;color:#fff;text-shadow:0 4px 0 rgba(0,0,0,.45);font-variant-numeric:tabular-nums}
+#brCount span{font:700 12px var(--ui);letter-spacing:.08em;text-transform:uppercase;color:#ffd23a}
+#brCount.mini{padding:5px 16px 7px}
+#brCount.mini b{font-size:clamp(22px,3vw,30px)}
+#brCount.hot{animation:brPulse 1s infinite}
+@keyframes brPulse{50%{box-shadow:0 0 56px rgba(255,210,58,.75),0 12px 30px rgba(0,0,0,.45);border-color:#ffd23a}}
+.brparty{display:grid;gap:6px;background:var(--panel);border:1px solid rgba(185,139,255,.6);border-radius:6px;padding:8px}
+.brparty .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brparty .top button{border:0;background:transparent;color:var(--muted);font:700 11px var(--ui);letter-spacing:.08em;text-transform:uppercase;padding:2px 4px}
+.brslots{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.brslot{border:1px solid var(--line);border-radius:6px;padding:7px 8px;background:rgba(255,255,255,.04);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;min-width:0}
+.brslot small{display:block;font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.brslot.ready small{color:var(--ok)}
+.brslot.add{border-style:dashed;border-color:#b98bff;color:#e2ccff}
+.bigplay.brq{background:linear-gradient(180deg,#c69bff,#9d5cff 55%,#7a3be0);color:#fff;box-shadow:0 6px 0 #4f1fa0,0 14px 30px rgba(0,0,0,.45)}
+.bigplay.brq.on{background:linear-gradient(180deg,#ff8a95,#ff4f5e 55%,#d83040);box-shadow:0 6px 0 #8a1824,0 14px 30px rgba(0,0,0,.45)}
+.bigplay.brq.off{filter:grayscale(.55) brightness(.85)}
+#brInvite{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:23;display:flex;align-items:center;gap:14px;background:linear-gradient(180deg,rgba(96,44,180,.97),rgba(40,18,84,.97));border:2px solid #b98bff;border-radius:8px;padding:12px 14px 12px 18px;box-shadow:0 14px 40px rgba(0,0,0,.5);max-width:calc(100% - 32px);pointer-events:auto}
+#brInvite div:first-child{display:grid;gap:2px;min-width:0}
+#brInvite b{font:400 18px var(--display);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#brInvite span{font-size:13px;font-weight:600;color:#e2ccff}
+#brToast{position:fixed;left:50%;top:calc(18% + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:22;width:min(520px,calc(100% - 32px));box-sizing:border-box;display:grid;gap:6px;text-align:center;background:var(--panel);border:2px solid #b98bff;border-radius:8px;padding:16px 18px;box-shadow:0 14px 40px rgba(0,0,0,.5);pointer-events:none}
+#brToast b{font:400 24px var(--display);color:#e2ccff}
+#brToast span{font-weight:600}
+#brPick{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.78);padding:16px;z-index:7;overflow-y:auto}
+#brPick .card{max-width:440px;gap:10px}
+#brPick h2{font:400 26px var(--display);margin:0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+#brPickBody{display:grid;gap:8px}
+#brPickBody p{margin:0}
+/* battle royale: in the match */
+#brMap{position:absolute;right:16px;top:calc(12px + env(safe-area-inset-top,0px));width:158px;height:158px;border:2px solid rgba(243,239,228,.4);border-radius:6px;background:#1d3a52;pointer-events:auto;box-shadow:0 8px 20px rgba(0,0,0,.35)}
+#brMap.big{width:min(72vh,86vw);height:min(72vh,86vw);right:50%;top:50%;transform:translate(50%,-50%);z-index:5}
+.brmode #feed{top:calc(184px + env(safe-area-inset-top,0px))}
+.brmode #tPause{right:186px;top:calc(12px + env(safe-area-inset-top,0px))}
+.vitals .bar.sh{height:7px}
+.vitals .bar.sh i{background:#43b7ff}
+#brUse{position:absolute;left:50%;top:calc(50% + 70px);transform:translateX(-50%);display:grid;justify-items:center;gap:6px;font-weight:700;font-size:15px;text-shadow:0 2px 0 rgba(0,0,0,.6);white-space:nowrap}
+#brUse kbd{display:inline-block;font:700 12px var(--ui);border:1px solid var(--ink);border-radius:3px;padding:1px 6px;margin-right:6px}
+#brUse .bar{width:180px;height:7px}
+#brUse .bar i{background:var(--ok)}
+.touch #brUse kbd{display:none}
+#brKnock{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 45%,rgba(160,0,20,.55));display:grid;justify-items:center;align-content:start;padding-top:calc(26vh)}
+#brKnock b{font:400 clamp(26px,5vw,40px) var(--display);color:var(--hot);text-shadow:0 3px 0 rgba(0,0,0,.6)}
+#brKnock span{font-weight:700;text-shadow:0 2px 0 rgba(0,0,0,.6)}
+#brSoon{position:absolute;left:50%;top:calc(50px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:rgba(96,44,180,.88);border:1px solid #b98bff;border-radius:4px;padding:5px 12px;font:700 12px var(--ui);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
+.touch #brSoon{top:calc(96px + env(safe-area-inset-top,0px))}
+#stormTint{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(120,50,220,.18),rgba(110,40,210,.55));opacity:0;transition:opacity .4s}
+#brOver{position:fixed;inset:0;display:grid;place-items:center;background:rgba(10,6,24,.62);text-align:center;pointer-events:auto;z-index:6}
+#brOver .card{justify-items:center;gap:8px;max-width:460px}
+#brOver h3{margin:0;font:400 clamp(54px,12vw,96px)/1 var(--display);color:#fff;text-shadow:0 5px 0 rgba(0,0,0,.5)}
+#brOver h4{margin:0;font:400 clamp(22px,4.4vw,34px) var(--display);color:#e2ccff;letter-spacing:.04em}
+#brOver.win h3,#brOver.win h4{color:#ffd23a}
+#brOver p{margin:0;font-weight:600}
+#tUse{right:150px;bottom:calc(296px + env(safe-area-inset-bottom,0px));width:84px;height:84px;background:rgba(95,209,122,.45);font-size:11px;line-height:1.15;text-align:center;padding:6px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -436,6 +495,7 @@ body.pig #pigTint{display:block}
   <div class="mini" id="mini"><h2><i></i><span id="miniTitle">Arena</span></h2><div id="miniRows"></div><div class="netstat" id="netStat"></div></div>
   <div id="feed"></div>
   <div id="hurt"></div>
+  <div id="stormTint"></div>
   <div id="nukeFlash"></div>
   <div id="pigTint"></div>
   <div id="mudSplat"></div>
@@ -443,8 +503,12 @@ body.pig #pigTint{display:block}
   <div id="waiting" hidden></div>
   <button type="button" id="callHud" hidden>Call friends to join</button>
   <div id="roundHud" hidden><b id="roundTitle"></b><span id="roundTime"></span></div>
+  <div id="brSoon" hidden></div>
   <div id="spec" hidden><b id="specWho"></b><span id="specSub"></span></div>
   <div id="rpPop"></div>
+  <canvas id="brMap" width="320" height="320" hidden aria-label="Map"></canvas>
+  <div id="brKnock" hidden><b>Knocked down</b><span id="brKnockSub"></span></div>
+  <div id="brUse" hidden><span><kbd>F</kbd><span id="brUseText"></span></span><div class="bar" id="brUseBar" hidden><i id="brUseFill"></i></div></div>
   <div id="paintSplat"></div>
   <div id="reticle">
     <svg id="ring" viewBox="0 0 52 52" aria-hidden="true"><circle class="bg" cx="26" cy="26" r="22"/><circle class="fg" id="ringFg" cx="26" cy="26" r="22" stroke-dasharray="138.2" stroke-dashoffset="0"/></svg>
@@ -469,6 +533,7 @@ body.pig #pigTint{display:block}
     <div class="rankchip" id="rankHud"><b id="rankName">Bronze III</b><small id="rankPts">0 RP</small></div>
     <div class="lbl"><b id="hpNum">100</b><span>Health</span></div>
     <div class="bar"><i id="hpBar"></i></div>
+    <div class="bar sh" id="shWrap" hidden><i id="shBar"></i></div>
     <div class="dash" id="dashHud"><span>Dash</span><div class="bar"><i id="dashBar"></i></div><span id="dashKey">Q</span></div>
   </div>
   <div class="weap">
@@ -481,6 +546,7 @@ body.pig #pigTint{display:block}
   </div>
   <div id="dnums"></div>
   <div id="death" hidden><div><h3 id="deathTitle">Eliminated</h3><p id="deathSub">Respawning in 3</p></div></div>
+  <div id="brOver" hidden><div class="card"><h4 id="brOverTop"></h4><h3 id="brOverBig"></h3><p id="brOverText"></p><p class="fine" id="brOverSub"></p><div class="btns"><button class="btn primary" type="button" id="brOverLobby">Back to lobby</button><button class="btn" type="button" id="brOverWatch">Keep watching</button></div></div></div>
   <div id="board" hidden><h3>Scoreboard <small id="boardSub"></small></h3><div id="boardRows"></div></div>
 </div>
 
@@ -494,6 +560,7 @@ body.pig #pigTint{display:block}
   <button class="tb" id="tNade" type="button" aria-label="Throw grenade">Nade<b id="tNadeN">2</b></button>
   <button class="tb" id="tReload" type="button" aria-label="Reload">R</button>
   <button class="tb" id="tPause" type="button" aria-label="Pause">II</button>
+  <button class="tb" id="tUse" type="button" hidden>Use</button>
 </div>
 
 <div id="menu">
@@ -556,8 +623,9 @@ body.pig #pigTint{display:block}
     <footer class="lb-foot">
       <div class="status" id="menuStatus"><i></i><span>Connecting to the arena…</span></div>
       <div class="playbox">
+        <div id="brCount" hidden role="button" tabindex="0" aria-label="Battle royale"><small id="brCountTop">Battle royale</small><b id="brCountTime">--:--</b><span id="brCountSub"></span></div>
         <div class="modeswitch" role="group" aria-label="Mode">
-          <button type="button" id="modeRanked" aria-pressed="true">Ranked</button><button type="button" id="modeParty" aria-pressed="false">Party</button><button type="button" id="modeBots" aria-pressed="false">Bots</button>
+          <button type="button" id="modeRanked" aria-pressed="true">Ranked</button><button type="button" id="modeParty" aria-pressed="false">Party</button><button type="button" id="modeBots" aria-pressed="false">Bots</button><button type="button" id="modeRoyale" class="br" aria-pressed="false">Royale</button>
         </div>
         <div class="partyrow">
           <label for="code">Party code <em id="codeLock">friends use the same code</em></label>
@@ -566,6 +634,10 @@ body.pig #pigTint{display:block}
         <div class="partyrow" id="partyMapRow" hidden>
           <label for="partyMap">Party map <em>half rank points, no rare spins</em></label>
           <select id="partyMap"></select>
+        </div>
+        <div class="brparty" id="brParty" hidden>
+          <div class="top"><span class="lbl-sm">Your duo</span><button type="button" id="brLeave" hidden>Leave party</button></div>
+          <div class="brslots" id="brSlots"></div>
         </div>
         <button type="button" class="bigplay" id="bigPlay"><b>Play</b><span id="playSub">Ranked · matched by rank</span></button>
         <div hidden>
@@ -587,6 +659,15 @@ body.pig #pigTint{display:block}
     <div class="btns"><button class="btn primary" type="button" id="siLogin">Sign in</button><button class="btn" type="button" id="siCreate">Create account</button></div>
   </form>
 </div>
+
+<div id="brPick" hidden>
+  <div class="card" role="dialog" aria-labelledby="brPickTitle">
+    <h2 id="brPickTitle">Invite to your duo <button class="btn" type="button" id="brPickClose">Close</button></h2>
+    <div id="brPickBody"></div>
+  </div>
+</div>
+<div id="brInvite" hidden><div><b id="brInvWho"></b><span>invited you to a battle royale duo</span></div><div class="btns"><button class="btn primary" type="button" id="brInvYes">Join duo</button><button class="btn" type="button" id="brInvNo">No</button></div></div>
+<div id="brToast" hidden><b id="brToastTitle"></b><span id="brToastText"></span></div>
 
 <div id="friendsSheet" hidden>
   <div class="card" role="dialog" aria-labelledby="frTitle">
@@ -1369,6 +1450,121 @@ function buildJungle() {
   for (const [x, z] of pads) padAt(x, z);
 }
 
+// ---------------------------------------------------------------------
+// Royale (320x320): the battle royale island. Named places built like the other maps:
+// Crown Castle in the middle, Tilted Town, Hay Hollow, Dusty Dunes, Frostbase, Lost Temple
+// and Lazy Lake, with forests, cover and crates between them, and reboot vans.
+// ---------------------------------------------------------------------
+const BR_POIS = [
+  { name: "Crown Castle", x: 160, z: 160 }, { name: "Tilted Town", x: 78, z: 80 }, { name: "Hay Hollow", x: 246, z: 72 },
+  { name: "Dusty Dunes", x: 76, z: 246 }, { name: "Frostbase", x: 246, z: 248 }, { name: "Lost Temple", x: 268, z: 160 }, { name: "Lazy Lake", x: 52, z: 160 },
+];
+const brVans = [];                                       // reboot vans: [x, z] of each
+function rebootVan(x, z) {
+  fillBox(x, 1, z, x + 3, 2, z + 1, T.METAL); fillBox(x, 3, z, x + 3, 3, z + 1, T.TRIM);
+  fillBox(x + 1, 1, z - 1, x + 2, 1, z - 1, T.PAD);       // the glowing spot to stand on
+  brVans.push([x + 1.5, z - 0.5]);
+}
+function buildRoyale() {
+  fillBox(0, 0, 0, W - 1, 0, D - 1, T.GROUND);
+  outerWall(6, T.STONE, T.TRIM);
+  brVans.length = 0;
+  const r = rng32(31337), plan = makePlanner(2), pads = [];
+  const area = (cx, cz, h) => [clamp(cx - h, 2, W - 3), clamp(cz - h, 2, D - 3), clamp(cx + h, 2, W - 3), clamp(cz + h, 2, D - 3)];
+  // Crown Castle
+  castle(160, 160); plan.take(137, 137, 183, 183);
+  for (const [x, z] of [[134, 154], [186, 166], [166, 134], [154, 186]]) padAt(x, z);
+  // Tilted Town: houses, warehouses, containers and towers around a central tower
+  centerTower(78, 80); plan.take(69, 71, 87, 89);
+  const town = area(78, 80, 42);
+  for (let i = 0; i < 16; i++) { const p = plan.place(r, ri(r, 7, 10) + 3, ri(r, 6, 9), town); if (p) brickHouse(p, r); }
+  for (let i = 0; i < 4; i++) { const w = r() < 0.5 ? 13 : 9, p = plan.place(r, w, w === 13 ? 9 : 13, town); if (p) warehouse(p, r); }
+  for (let i = 0; i < 8; i++) { const p = r() < 0.5 ? plan.place(r, 6, 2, town) : plan.place(r, 2, 6, town); if (p) containers(p, r); }
+  for (let i = 0; i < 4; i++) { const p = plan.place(r, 9, 3, town); if (p) { sniperTower(p); pads.push([p.x0 - 2, p.z0 + 1]); } }
+  for (let i = 0; i < 5; i++) { const p = plan.place(r, 5, 5, town); if (p) bunker(p); }
+  // Hay Hollow: barns, silos, fields and a windmill
+  const farm = area(246, 72, 46);
+  { const p = plan.place(r, 18, 12, farm); if (p) placeBarn(p.x0, p.z0, p.x1, p.z1, 5, "z1", { loft: true }); }
+  for (let i = 0; i < 6; i++) { const w = ri(r, 8, 12), d = ri(r, 6, 8), p = plan.place(r, w, d, farm); if (p) placeBarn(p.x0, p.z0, p.x1, p.z1, ri(r, 3, 4), ["x0", "x1", "z0", "z1"][ri(r, 0, 3)], { loft: r() < 0.5 }); }
+  for (let i = 0; i < 3; i++) { const p = plan.place(r, 8, 6, farm); if (p) placeBarn(p.x0, p.z0, p.x1, p.z1, 3, "z1", { wall: T.HOUSE }); }
+  for (let i = 0; i < 3; i++) { const n = ri(r, 1, 3), p = plan.place(r, 6 * n - 1, 5, farm); if (p) for (let k = 0; k < n; k++) silo(p.x0 + 2 + k * 6, p.z0 + 2, ri(r, 6, 8)); }
+  { const p = plan.place(r, 9, 6, farm); if (p) windmill(p); }
+  { const p = plan.place(r, 5, 5, farm); if (p) waterTower(p); }
+  for (let i = 0; i < 6; i++) { const p = plan.place(r, ri(r, 11, 18), ri(r, 9, 14), farm); if (p) cornField(p, r); }
+  for (let i = 0; i < 3; i++) { const p = plan.place(r, ri(r, 7, 10), ri(r, 7, 10), farm); if (p) pen(p, r); }
+  // Dusty Dunes: an adobe town with mesas, an oasis and cacti
+  const ox = 76, oz = 246, dunes = area(76, 246, 46);
+  for (let x = ox - 5; x <= ox + 5; x++) for (let z = oz - 5; z <= oz + 5; z++) if (Math.hypot(x - ox, z - oz) <= 5.2) setB(x, 1, z, T.WATER);
+  for (let a = 0; a < 7; a++) palm(Math.round(ox + Math.cos(a) * 7.5), Math.round(oz + Math.sin(a) * 7.5), r);
+  plan.take(ox - 9, oz - 9, ox + 9, oz + 9);
+  for (let i = 0; i < 4; i++) { const rad = ri(r, 4, 6), h = ri(r, 6, 9), p = plan.place(r, 2 * rad + h + 2, 2 * rad + 1, dunes); if (p) mesa(p.x0 + rad, p.z0 + rad, rad, h); }
+  for (let i = 0; i < 12; i++) { const p = plan.place(r, ri(r, 6, 9) + 3, ri(r, 6, 9), dunes); if (p) brickHouse(p, r, T.ADOBE, T.ADOBE); }
+  for (let i = 0; i < 5; i++) { const p = plan.place(r, ri(r, 5, 8), ri(r, 5, 8), dunes); if (p) ruin(p, r); }
+  for (let i = 0; i < 30; i++) { const p = plan.place(r, 3, 3, dunes); if (p) cactus(p.x0 + 1, p.z0 + 1, r); }
+  // Frostbase: a radar tower, warehouses, igloos and snowy pines
+  radar(246, 248); plan.take(237, 239, 255, 257);
+  const frost = area(246, 248, 46);
+  for (let i = 0; i < 3; i++) { const w = r() < 0.5 ? 13 : 9, p = plan.place(r, w, w === 13 ? 9 : 13, frost); if (p) warehouse(p, r); }
+  for (let i = 0; i < 6; i++) { const p = plan.place(r, 5, 5, frost); if (p) bunker(p); }
+  for (let i = 0; i < 6; i++) { const p = plan.place(r, 7, 7, frost); if (p) igloo(p.x0 + 3, p.z0 + 3); }
+  for (let i = 0; i < 10; i++) { const p = r() < 0.5 ? plan.place(r, 6, 2, frost) : plan.place(r, 2, 6, frost); if (p) containers(p, r); }
+  for (let i = 0; i < 30; i++) { const p = plan.place(r, 3, 3, frost); if (p) tree(p.x0 + 1, p.z0 + 1, 0, ri(r, 3, 4), 2, T.LEAF); }
+  // Lost Temple, deep in the jungle
+  temple(268, 160); plan.take(255, 147, 281, 173);
+  const jungle = area(262, 160, 40);
+  for (let i = 0; i < 10; i++) {
+    const p = plan.place(r, 5, 5, jungle); if (!p) continue;
+    const x = p.x0 + 2, z = p.z0 + 2, h = ri(r, 6, 9);
+    fillBox(x, 1, z, x + 1, h, z + 1, T.WOOD); tree(x, z, h - 1, 1, 4, T.LEAF);
+  }
+  for (let i = 0; i < 6; i++) { const p = plan.place(r, ri(r, 5, 8), ri(r, 5, 8), jungle); if (p) ruin(p, r); }
+  // Lazy Lake: a big lake with a dock and cabins on the shore
+  const lx = 52, lz = 160;
+  for (let x = lx - 20; x <= lx + 20; x++) for (let z = lz - 13; z <= lz + 13; z++) if (((x - lx) / 20) ** 2 + ((z - lz) / 13) ** 2 <= 1) setB(x, 1, z, T.WATER);
+  for (let x = lx; x <= lx + 22; x++) setB(x, 1, lz, T.PLANK);
+  plan.take(lx - 21, lz - 14, lx + 21, lz + 14);
+  const lake = area(52, 160, 34);
+  for (let i = 0; i < 5; i++) { const p = plan.place(r, 8, 6, lake); if (p) placeBarn(p.x0, p.z0, p.x1, p.z1, 3, "z1", { wall: T.PLANK }); }
+  // reboot vans between the named places
+  for (const [x, z] of [[120, 118], [200, 118], [120, 202], [200, 202], [160, 60], [160, 262], [104, 160], [222, 160]]) { rebootVan(x, z); plan.take(x - 2, z - 3, x + 6, z + 4); }
+  // everywhere else: forests, rocks, cover and crates
+  for (let f = 0; f < 22; f++) {
+    const fx = ri(r, 14, W - 15), fz = ri(r, 14, D - 15);
+    for (let i = 0; i < 10; i++) { const p = plan.place(r, 3, 3, area(fx, fz, 12)); if (p) tree(p.x0 + 1, p.z0 + 1, 0, ri(r, 3, 5), ri(r, 2, 3), r() < 0.7 ? T.LEAF : T.MOSS); }
+  }
+  for (let i = 0; i < 40; i++) { const p = plan.place(r, 3, 3); if (p) fillBox(p.x0, 1, p.z0, p.x0 + ri(r, 0, 2), ri(r, 1, 3), p.z0 + ri(r, 0, 2), T.STONE); }   // boulders
+  for (let i = 0; i < 18; i++) { const p = plan.place(r, ri(r, 6, 9) + 3, ri(r, 6, 8)); if (p) brickHouse(p, r, r() < 0.5 ? T.HOUSE : T.BRICK, T.ROOF); }   // lone houses
+  for (let i = 0; i < 70; i++) { const len = ri(r, 3, 6), p = r() < 0.5 ? plan.place(r, len, 1) : plan.place(r, 1, len); if (p) coverWall(p, r); }
+  for (let i = 0; i < 90; i++) { const p = plan.place(r, 2, 2); if (p) cratePile(p, r); }
+  for (let i = 0; i < 80; i++) { const p = plan.place(r, 1, 1); if (p) fillBox(p.x0, 1, p.z0, p.x0, ri(r, 1, 2), p.z0, T.HAY); }
+  for (const [x, z] of pads) padAt(x, z);
+}
+// Team spawn slots (32, as many as the server hands out): spread as far apart as possible
+const brSlots = [];
+function computeBrSlots() {
+  brSlots.length = 0;
+  const pool = spawns.filter(s => s.x > 12 && s.z > 12 && s.x < W - 12 && s.z < D - 12);
+  if (!pool.length) return;
+  brSlots.push(pool[Math.floor(pool.length / 2)]);
+  const dmin = pool.map(s => s.distanceTo(brSlots[0]));
+  while (brSlots.length < 32) {
+    let best = 0; for (let i = 1; i < pool.length; i++) if (dmin[i] > dmin[best]) best = i;
+    brSlots.push(pool[best]);
+    for (let i = 0; i < pool.length; i++) dmin[i] = Math.min(dmin[i], pool[i].distanceTo(pool[best]));
+  }
+}
+// Where loot can lie: open floor (indoors too), never inside a wall or on water
+const brLootSpots = [];
+function computeBrLootSpots() {
+  brLootSpots.length = 0;
+  const r = rng32(4040), ok = (x, z) => x > 2 && z > 2 && x < W - 3 && z < D - 3 && grid[idx(x, 0, z)] && !grid[idx(x, 1, z)] && !grid[idx(x, 2, z)];
+  for (const P of BR_POIS) for (let n = 0, t = 0; n < 34 && t < 600; t++) {
+    const x = Math.floor(P.x + (r() - .5) * 80), z = Math.floor(P.z + (r() - .5) * 80);
+    if (ok(x, z)) { brLootSpots.push(new V3(x + .5, 1, z + .5)); n++; }
+  }
+  for (let n = 0, t = 0; n < 130 && t < 2000; t++) { const x = ri(r, 4, W - 5), z = ri(r, 4, D - 5); if (ok(x, z)) { brLootSpots.push(new V3(x + .5, 1, z + .5)); n++; } }
+}
+
 const MAPS = {
   arena: { name: "Arena", size: 96, build: buildArena, sky: 0x8fc6f2, ground: 0x7aa457, outer: 0x5f8546, fog: [70, 190] },
   farm: { name: "Farm", size: 128, build: buildFarm, sky: 0x9fd0f0, ground: 0x86ad55, outer: 0x6f9a4c, fog: [80, 230] },
@@ -1377,6 +1573,7 @@ const MAPS = {
   castle: { name: "Castle", size: 120, build: buildCastle, sky: 0x9fc8ee, ground: 0x6f9f4a, outer: 0x5f8a40, fog: [80, 230] },
   snow: { name: "Snowbase", size: 104, build: buildSnow, sky: 0xcfe2f0, ground: 0xe8eef3, outer: 0xdfe8ef, fog: [60, 190] },
   jungle: { name: "Jungle", size: 120, build: buildJungle, sky: 0x9fd6c0, ground: 0x4f8a3a, outer: 0x3f7a2f, fog: [60, 180] },
+  royale: { name: "Royale Island", size: 320, build: buildRoyale, sky: 0x8fcdf5, ground: 0x6fa24c, outer: 0x3a7fc0, fog: [70, 175], royale: true },   // battle royale only
 };
 let mapId = "arena";
 const spawns = [];
@@ -1502,7 +1699,7 @@ const outer = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), outerMat);
 outer.rotation.x = -Math.PI / 2; outer.position.set(W / 2, 0.98, D / 2); scene.add(outer);
 let mapMeshes = [];
 function buildMeshes() {
-  for (const m of mapMeshes) { scene.remove(m); m.material.dispose(); m.dispose && m.dispose(); }
+  for (const m of mapMeshes) { scene.remove(m); m.material.dispose(); if (m.geometry !== boxGeo) m.geometry.dispose(); m.dispose && m.dispose(); }
   mapMeshes = [];
   const lists = {};
   const r = rng32(7);
@@ -1510,14 +1707,19 @@ function buildMeshes() {
     const t = grid[idx(x, y, z)]; if (!t) continue;
     const exposed = !solid(x + 1, y, z) || !solid(x - 1, y, z) || !solid(x, y + 1, z) || !solid(x, y, z + 1) || !solid(x, y, z - 1) || (y > 1 && !solid(x, y - 1, z)) || x === 0 || z === 0 || x === W - 1 || z === D - 1;
     if (!exposed) continue;
-    const k = BLOCK_STYLE[t].tex; (lists[k] = lists[k] || []).push([x, y, z, t]);
+    const k = BLOCK_STYLE[t].tex + (W > 140 ? "@" + (x >> 6) + "," + (z >> 6) : ""); (lists[k] = lists[k] || []).push([x, y, z, t]);
   }
   const m4 = new THREE.Matrix4(), col = new THREE.Color();
-  for (const k of Object.keys(lists)) {
-    const L = lists[k];
+  for (const key of Object.keys(lists)) {
+    const L = lists[key], k = key.split("@")[0];
     const mat = new THREE.MeshLambertMaterial({ map: TEX[k] });
     if (k === "pad") mat.emissive = new THREE.Color(0x1d8077); // jump pads glow
-    const mesh = new THREE.InstancedMesh(boxGeo, mat, L.length);
+    let geo = boxGeo;
+    if (key.includes("@")) {                                // a section: cull it as a whole when it's out of view
+      const [cx, cz] = key.split("@")[1].split(",").map(Number);
+      geo = boxGeo.clone(); geo.boundingSphere = new THREE.Sphere(new V3(cx * 64 + 32, H / 2, cz * 64 + 32), 48);
+    }
+    const mesh = new THREE.InstancedMesh(geo, mat, L.length);
     L.forEach(([x, y, z, t], i) => {
       m4.makeTranslation(x + .5, y + .5, z + .5); mesh.setMatrixAt(i, m4);
       col.setHex(BLOCK_STYLE[t].color).multiplyScalar(0.9 + r() * 0.14); mesh.setColorAt(i, col);
@@ -1545,6 +1747,7 @@ function loadMap(id) {
   M.build();
   buildMeshes();
   computeSpawns();
+  if (M.royale) { computeBrSlots(); computeBrLootSpots(); }
   scene.background.setHex(M.sky); if (pigMode) scene.background.lerp(new THREE.Color(PIG_PINK), 0.32);
   scene.fog.color.copy(scene.background); applyViewDistance();
   groundMat.color.setHex(M.ground); outerMat.color.setHex(M.outer);
@@ -1691,7 +1894,7 @@ const PAL = ["#ff5d5d", "#ffb627", "#5fd17a", "#43b7ff", "#b57bff", "#ff7ac8", "
 // target's movement is followed), snap (share of the gap closed when you start aiming),
 // magnet (extra hitbox width in blocks).
 // Online matches are capped at Normal so everyone plays on the same footing.
-const assistNow = () => ASSIST[mode === "online" ? 1 : assistLevel];
+const assistNow = () => ASSIST[mode !== "bots" ? 1 : assistLevel];
 const ASSIST = [
   null,
   { cone: 0.15, slow: 0.5, pull: 8, track: 0.85, snap: 0.75, magnet: 0.3 },
@@ -1765,7 +1968,7 @@ const skinFor = (name, color) => color === 6 ? "default" : SKINS[String(name || 
 // Skins from the skin wheel. rarity: 0 common, 1 rare, 2 super rare, 4 ultra (1%). Colors for each
 // part of the body; glow: emissive color (super rares glow); gun: tint for your own gun;
 // extra(add, head, body) adds details; anim(av, t) animates the skin for everyone.
-const RARITY = [{ name: "Common", color: "#b7c3cf" }, { name: "Rare", color: "#4fb0ff" }, { name: "Super rare", color: "#d17bff" }, { name: "Rank reward", color: "#ffc93c" }, { name: "Ultra 1%", color: "#ff4f8b" }];
+const RARITY = [{ name: "Common", color: "#b7c3cf" }, { name: "Rare", color: "#4fb0ff" }, { name: "Super rare", color: "#d17bff" }, { name: "Rank reward", color: "#ffc93c" }, { name: "Ultra 1%", color: "#ff4f8b" }, { name: "Royale Champion", color: "#ffd23a" }];
 const SKIN_DEFS = {
   camo: { name: "Jungle Camo", rarity: 0, legs: 0x3b4526, body: 0x56683a, helmet: 0x4a5a30,
     extra(add) { for (const [x, y, w, h, c] of [[-0.16, 1.18, 0.16, 0.12, 0x2f3b20], [0.12, 0.96, 0.2, 0.1, 0x6f7f45], [0.15, 1.24, 0.12, 0.1, 0x2f3b20], [-0.1, 0.9, 0.14, 0.08, 0x6f7f45]]) add(w, h, 0.02, c, x, y, -0.18); } },
@@ -2040,16 +2243,18 @@ const MORE_SKINS = [
   ["infernodemon", "Inferno Demon", 4, 0x3a0606, 0x140202, 0x5a0a0a, "horns+wings+dots", 0xff3a1a, 0xff9a3a, { head: 0x5a0a0a, visor: 0xffd23a, glow: 0x300000, aura: 0xff3a1a }],
   ["hologram", "Hologram", 4, 0x5ff0ff, 0x2aa8c8, 0x8ff6ff, "vstripes+visor2+antenna", 0xffffff, 0x2bf3ff, { glow: 0x0a5a6a, aura: 0x5ff0ff,
     anim(av, t) { av.bodyMat.color.setHSL(0.52, 0.9, 0.62 + 0.12 * Math.sin(t * 9)); } }],
+  // only for battle royale winners
+  ["royalechamp", "Royale Champion", 5, 0xffd23a, 0x3a1a6a, 0xffd23a, "crown+cape+stars", 0xffd23a, 0x9b4bff, { head: 0x5a2aa0, visor: 0x9b4bff, glow: 0x3a2400, aura: 0xffd23a }],
   ["thundergod", "Thunder God", 4, 0x1f2f6a, 0x101a3a, 0xc9d3dd, "bolt+cape+pads", 0xffe14a, 0x6fc3ff, { visor: 0x6fc3ff, glow: 0x0a1440, aura: 0x6fc3ff }],
 ];
 for (const [id, name, rarity, body, legs, helmet, parts, a, b, x = {}] of MORE_SKINS) {
-  const fancy = rarity === 2 || rarity === 4, o = fancy ? { glow: a, pulse: true } : undefined, own = x.anim;
+  const fancy = rarity === 2 || rarity >= 4, o = fancy ? { glow: a, pulse: true } : undefined, own = x.anim;
   SKIN_DEFS[id] = { name, rarity, body, legs, helmet, gun: rarity ? a : undefined, ...(fancy ? { visor: a, visorGlow: a } : {}), ...x,
     extra(add, head) { for (const p of parts.split("+")) PART[p](add, head, a, b != null ? b : a, o); },
     anim: fancy ? (av, t) => { const k = 0.55 + 0.45 * Math.sin(t * 3); for (const m of av.pulse) m.emissiveIntensity = k; if (own) own(av, t); } : own };
 }
 const RANK_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity === 3);
-const WHEEL_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity !== 3);
+const WHEEL_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity !== 3 && SKIN_DEFS[k].rarity !== 5);
 const SKIN_IDS = Object.keys(SKIN_DEFS);
 // Soft round glow used for the top rank skins' auras
 const auraTex = (() => {
@@ -2590,7 +2795,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 41;
+const BUILD = 42;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2606,6 +2811,7 @@ const AFK_IDLE = 45, STALE = 8;
 let lastInputT = now();
 const iAmAfk = () => document.hidden || now() - lastInputT > AFK_IDLE;
 const activePeer = r => r.pl && !r.afk && now() - r.seen < STALE;
+const netMode = () => mode === "online" || mode === "royale";            // playing with other people (ranked, a party or the battle royale)
 function setNet(s) { netState = s; renderStatus(); }
 const MAP_VERSION = "v4"; // bump when map layouts change so mismatched versions never share a lobby
 const lobbyKey = code => (code ? "party" : "ranked") + MAP_VERSION + "-" + (code || "open");
@@ -2626,7 +2832,7 @@ const PID = (() => {                                // this game's player id, ke
   return id;
 })();
 function serverUrl(name) {
-  const local = location.host === SERVER_HOST || /^(localhost|127\.0\.0\.1):87\d\d$/.test(location.host);
+  const local = location.host === SERVER_HOST || /:87\d\d$/.test(location.host);
   const host = local ? location.host : SERVER_HOST;
   const proto = local && location.protocol === "http:" ? "ws:" : "wss:";
   return proto + "//" + host + "/ws?room=" + encodeURIComponent(name) + "&v=" + BUILD + "&pid=" + PID;
@@ -2714,7 +2920,7 @@ async function initNet() {
     await joinLobby("");
     return;
   }
-  if (await probeServer()) { netKind = "ws"; await joinLobby(""); return; }
+  if (await probeServer()) { netKind = "ws"; await joinLobby(""); brConnect(); return; }
   try { p2p = await loadP2P(); } catch (e) { p2p = null; }
   if (p2p && p2p.joinRoom) {
     netKind = "p2p"; myPeer = p2p.selfId;
@@ -2803,6 +3009,8 @@ function onPeer(p) {
   r.rk = clamp(Math.floor(num(s.rk) || 0), 0, 99999);
   r.w = clamp(Math.floor(num(s.w) || 0), 0, WEAPONS.length - 1);
   r.sp = s.sp === 1;
+  r.ac = typeof s.ac === "string" ? cleanName(s.ac) : null;               // their account (for the crown)
+  if (mode === "royale" && BR.m) brPeer(r, s);
   const pos = vec(s.p);
   if (pos) {
     if (!r.hasPos || pos.distanceTo(r.target) > 4) r.pos.copy(pos);
@@ -2824,12 +3032,13 @@ function onPeer(p) {
     r.lastNade = gr ? gr.s : 0;
     r.lastNuke = nk ? nk.s : 0;
     r.lastMud = md ? md.s : 0;
+    r.lastRb = s.rb && num(s.rb.s) || 0;
     return;
   }
-  const online = state === "play" && mode === "online";
+  const online = state === "play" && netMode();
   for (const h of hits) {
     if (h.s <= r.lastHit) continue;
-    if (h.t === myPeer && online && alive) {
+    if (h.t === myPeer && online && alive && !brMate(r)) {                // no friendly fire in the battle royale
       const wi = clamp(Math.floor(num(h.w) || 0), 0, NADE_W);
       const dm = clamp(num(h.dm) || 0, 0, MAXDMG[wi]);
       takeDamage(dm, { name: r.name, peer: r.peer, pos: r.pos }, !!h.hs, h.nk === 1);
@@ -2888,14 +3097,15 @@ const r2 = v => Math.round(v * 100) / 100, r3 = v => Math.round(v * 1000) / 1000
 function publish(force, target) {
   if (netKind === "none") return;
   const t = now(); if (!force && t - lastPub < (netKind === "ws" ? 0.066 : 0.05)) return; if (!target) lastPub = t;
-  const playing = state === "play" && mode === "online";
+  const playing = state === "play" && netMode(), royale = playing && mode === "royale" && BR.m;
   const P = {
-    n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0, afk: playing && iAmAfk() ? 1 : 0, hb: Math.floor(now()),
+    n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0, afk: playing && !royale && iAmAfk() ? 1 : 0, ac: acct ? acct.name : null, hb: Math.floor(now()),
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
     al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : mySkin(), k: playing ? kills : 0, d: playing ? deaths : 0, rk: rankPts, pg: pingMs, pm: playing && partyCode ? $("#partyMap").value : null, sp: playing && spectating ? 1 : 0,
     sh: playing ? lastShot : null, gr: playing ? lastNade : null, nk: playing ? lastNuke : null, md: playing ? lastMud : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
+  if (royale) { Object.assign(P, brState()); brSend(P); return; }          // the battle royale runs on its own server
   if (netKind === "ws") { if (sock && sock.readyState === 1) { try { sock.send(JSON.stringify(P)); } catch (e) {} } }
   else if (netKind === "room" && roomTarget) roomTarget.presence(P).catch(() => {});
   else if (netKind === "p2p" && p2pAct) { try { const pr = p2pAct.send(P, target ? { target } : undefined); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {} }
@@ -2978,7 +3188,8 @@ function updateBot(b, dt, t) {
 // ======================================================================
 function enemies() {
   const list = [];
-  if (mode === "online") { for (const r of remotes.values()) if (activePeer(r) && r.alive && r.hasPos) list.push({ kind: "peer", r, pos: r.pos }); }
+  if (mode === "royale") { for (const r of remotes.values()) if (activePeer(r) && r.alive && r.hasPos && r.bs !== "out" && !brMate(r)) list.push({ kind: "peer", r, pos: r.pos }); }   // knocked players can be finished
+  else if (mode === "online") { for (const r of remotes.values()) if (activePeer(r) && r.alive && r.hasPos) list.push({ kind: "peer", r, pos: r.pos }); }
   else for (const b of bots) if (b.alive) list.push({ kind: "bot", r: b, pos: b.pos });
   return list;
 }
@@ -2995,6 +3206,7 @@ function farSpawn() {
   return best.clone();
 }
 function respawn() {
+  if (mode === "royale") { brSpawn(); return; }
   me.pos.copy(farSpawn()); me.vel.set(0, 0, 0);
   const c = new V3(W / 2, 1, D / 2).sub(me.pos);
   yaw = Math.atan2(-c.x, -c.z); pitch = 0;
@@ -3054,11 +3266,11 @@ function onLastWin(m) {
   banner("Everyone else left · you win round " + round.wonN + "!");
 }
 function setRound(m) {
-  const ph = ["wait", "count", "live", "end"].includes(m.ph) ? m.ph : "wait";
+  const ph = ["wait", "count", "live", "end", "pause"].includes(m.ph) ? m.ph : "wait";
   // every round is on a new map, picked by the server (not during a bot match)
   if (netKind === "ws" && MAPS[m.map]) {
     serverMap = m.map;
-    if (m.map !== mapId && !(state === "play" && mode === "bots")) { loadMap(m.map); if (state === "play" && mode === "online") respawn(); }
+    if (m.map !== mapId && !(state === "play" && mode !== "online")) { loadMap(m.map); if (state === "play" && mode === "online") respawn(); }
   }
   const skew = num(m.now) !== null ? m.now - Date.now() : 0;
   const prev = round.ph, same = round.lobby === lobbyName;
@@ -3096,6 +3308,9 @@ function onRoundPhase(prev, ph) {
   } else if (ph === "wait") {
     if (spectating) { spectating = false; respawn(); }
     if (prev !== "wait") banner("Not enough players · warm-up");
+  } else if (ph === "pause") {                    // everyone into the battle royale: ranked waits until a minute after it starts
+    if (spectating) { spectating = false; respawn(); }
+    brToast("Battle royale time!", "Ranked is paused until a minute after the battle royale starts. Queue for it from the lobby", 7);
   }
 }
 function startSpectate() {
@@ -3103,7 +3318,11 @@ function startSpectate() {
   $("#death").hidden = true; publish(true);
 }
 // Players you can watch while spectating
-function specTargets() { return [...remotes.values()].filter(r => activePeer(r) && r.alive && r.hasPos && !r.iv && !r.sp); }
+function specTargets() {
+  const all = [...remotes.values()].filter(r => activePeer(r) && r.alive && r.hasPos && !r.iv && !r.sp);
+  const mates = mode === "royale" ? all.filter(r => brMate(r)) : [];      // out of the battle royale: watch your duo first
+  return mates.length ? mates : all;
+}
 function addRank(delta) {
   if (state === "play" && mode === "online" && !rankedLobby()) delta = Math.round(delta / 2);   // party codes: everything is half
   const before = rankOf(rankPts).label, old = rankPts;
@@ -3444,6 +3663,7 @@ function aimbot() {
   return best;
 }
 function takeDamage(dm, src, head, unblockable) {
+  if (mode === "royale") { brHurt(dm, src, head, unblockable); return; }
   if (!alive || state !== "play" || dm <= 0 || roundFrozen()) return;
   if (!unblockable && now() < spawnProt) return;
   if (!unblockable && duke.on && duke.god) { showDmgDir(src.pos); return; }
@@ -3453,6 +3673,7 @@ function takeDamage(dm, src, head, unblockable) {
   if (hp <= 0) die(src);
 }
 function die(src, free) {
+  if (mode === "royale") { brDown(src); return; }
   if (rankedNow() && !free) addRank(-rpLoss(RP.death));          // free: the admin's kill button costs no points
   hp = 0; alive = false; deaths++; streak = 0;
   respawnAt = now() + 3;
@@ -3517,7 +3738,7 @@ function aimSnap() {
 
 function fire() {
   const t = now(), w = WEAPONS[cur];
-  if (t < nextFire || reloading || !alive || roundFrozen()) return;
+  if (t < nextFire || reloading || !alive || roundFrozen() || brKnocked()) return;
   if (w.spin && spin < 1) return;                   // the minigun has to spin up first
   if (ammo[cur] <= 0) { dryFire(); startReload(); return; }
   ammo[cur]--; nextFire = t + w.rate; lastFireT = t;
@@ -3715,7 +3936,7 @@ function spawnNade(o, v, owner) {
 function clearTrail(n) { for (const o of [n.trail, n.mark]) if (o) { scene.remove(o); o.geometry !== markGeo && o.geometry.dispose(); o.material.dispose(); } n.trail = n.mark = null; }
 function throwGrenade() {
   const t = now();
-  if (!alive || paused || state !== "play" || nades <= 0 || t < nadeReady || roundFrozen()) return;
+  if (!alive || paused || state !== "play" || nades <= 0 || t < nadeReady || roundFrozen() || brKnocked()) return;
   nades--; nadeReady = t + NADE.cooldown;
   const d = aimDir(), o = eyePos().addScaledVector(d, 0.6);
   if (solid(Math.floor(o.x), Math.floor(o.y), Math.floor(o.z))) o.copy(eyePos());
@@ -3914,7 +4135,7 @@ function updateMud(dt) {
 }
 function dash() {
   const t = now();
-  if (!alive || paused || t < dashReady) return;
+  if (!alive || paused || t < dashReady || brKnocked()) return;
   let f = 0, s = 0;
   if (keys.has("KeyW") || keys.has("ArrowUp")) f += 1;
   if (keys.has("KeyS") || keys.has("ArrowDown")) f -= 1;
@@ -3991,7 +4212,7 @@ function requestLock() {
 document.addEventListener("pointerlockchange", () => {
   locked = document.pointerLockElement === canvas;
   if (locked) showPause(false);
-  else if (state === "play" && !noLock && !isTouch) showPause(true);
+  else if (state === "play" && !noLock && !isTouch && $("#brOver").hidden) showPause(true);
 });
 document.addEventListener("pointerlockerror", () => { noLock = true; showPause(false); });
 
@@ -4013,9 +4234,10 @@ window.addEventListener("keydown", e => {
   if (e.code === "KeyE") aimKey = true;
   if (e.code === "KeyC") crouch = true;
   if (e.code === "KeyR") startReload();
+  if (e.code === "KeyF") { if (!e.repeat) useTap = true; useHeld = true; }
   if (e.code === "Tab") boardOpen = true;
 });
-window.addEventListener("keyup", e => { keys.delete(e.code); if (e.code === "Tab") boardOpen = false; if (e.code === "KeyE") aimKey = false; if (e.code === "KeyC") crouch = false; });
+window.addEventListener("keyup", e => { keys.delete(e.code); if (e.code === "KeyF") useHeld = false; if (e.code === "Tab") boardOpen = false; if (e.code === "KeyE") aimKey = false; if (e.code === "KeyC") crouch = false; });
 for (const ev of ["keydown", "mousedown", "mousemove", "wheel", "touchstart", "touchmove"]) {
   window.addEventListener(ev, () => {
     const wasAfk = iAmAfk(); lastInputT = now();
@@ -4080,6 +4302,7 @@ if (isTouch) {
     tNade: { down() { throwGrenade(); } },
     tMud: { down() { shootMud(); } },
     tPause: { down() { showPause(true); } },
+    tUse: { down() { useHeld = true; useTap = true; }, up() { useHeld = false; } },
     dkAim: { down() { toggleDuke("aim"); } },
     dkGod: { down() { toggleDuke("god"); } },
     dkSnipe: { down() { toggleDuke("snipe"); } },
@@ -4104,7 +4327,7 @@ if (isTouch) {
     touchMove.x = dx / R; touchMove.y = dy / R;
     knob.style.transform = `translate(${dx}px,${dy}px)`;
   }
-  const inMenus = t => t && t.closest && (t.closest("#pause") || t.closest("#menu") || t.closest(".slots") || t.closest("#tpList"));
+  const inMenus = t => t && t.closest && (t.closest("#pause") || t.closest("#menu") || t.closest(".slots") || t.closest("#tpList") || t.closest("#brOver") || t.closest("#brMap") || t.closest("#brInvite"));
   document.addEventListener("touchstart", e => {
     if (state !== "play" || paused || inMenus(e.target)) return;
     e.preventDefault();
@@ -4215,7 +4438,7 @@ function showDmgDir(p) {
 function playersOnline() { let n = 0; for (const r of remotes.values()) if (activePeer(r)) n++; return n; }
 function standings() {
   const list = [{ name: myName, k: kills, d: deaths, me: true, rk: rankPts, sp: spectating }];
-  if (mode === "online") { for (const r of remotes.values()) if (activePeer(r)) list.push({ name: r.name, k: r.k, d: r.d, rk: r.rk, sp: r.sp }); }
+  if (netMode()) { for (const r of remotes.values()) if (activePeer(r)) list.push({ name: r.name, k: r.k, d: r.d, rk: r.rk, sp: r.sp }); }
   else for (const b of bots) list.push({ name: b.name, k: b.k, d: b.d, rk: b.rk });
   list.sort((a, b) => b.k - a.k || a.d - b.d);
   return list;
@@ -4280,7 +4503,7 @@ function renderHud(t) {
   $("#tDash").style.setProperty("--cd", dp.toFixed(3));
   if (t - hudT < 0.1) return; hudT = t;
   const mini = $("#mini"); mini.classList.toggle("live", mode === "online" && netState === "live");
-  $("#miniTitle").textContent = mode === "bots" ? "Bot match · " + MAPS[mapId].name : `Online · ${playersOnline() + 1} · ${MAPS[mapId].name}${lobbyCode() === "open" ? "" : " · " + lobbyCode().toUpperCase()}`;
+  $("#miniTitle").textContent = mode === "royale" ? "Battle royale · " + MAPS[mapId].name : mode === "bots" ? "Bot match · " + MAPS[mapId].name : `Online · ${playersOnline() + 1} · ${MAPS[mapId].name}${lobbyCode() === "open" ? "" : " · " + lobbyCode().toUpperCase()}`;
   const st = standings(), rows = $("#miniRows"); rows.replaceChildren();
   st.slice(0, 5).forEach(p => rows.appendChild(rowEl([p.name, String(p.k)], p.me ? "me" : "")));
   const hpEl = $("#hpBar"); hpEl.style.width = clamp(hp, 0, 100) + "%";
@@ -4294,6 +4517,7 @@ function renderHud(t) {
   [...pipsEl.children].forEach((p, i) => p.classList.toggle("off", i >= shown));
   [...slotsEl.children].forEach((d, i) => d.classList.toggle("on", loadout[i] === cur));
   renderRoundHud();
+  brHud(t);
   const waiting = $("#waiting");
   if (mode === "online" && iAmAfk()) {
     waiting.hidden = false;
@@ -4306,7 +4530,7 @@ function renderHud(t) {
     netT = t + 0.5;
     const fps = Math.round(1 / frameAvg), cls = (v, a, b) => v <= a ? "good" : v <= b ? "ok" : "bad";
     const parts = [];
-    if (mode === "online" && netKind === "ws") parts.push(pingMs == null ? "<b>Ping …</b>" : `<b class="${cls(pingMs, 80, 160)}">Ping ${pingMs} ms</b>`);
+    if (netMode() && netKind === "ws") parts.push(pingMs == null ? "<b>Ping …</b>" : `<b class="${cls(pingMs, 80, 160)}">Ping ${pingMs} ms</b>`);
     parts.push(`<b class="${cls(-fps, -50, -30)}">${fps} fps</b>`);
     $("#netStat").innerHTML = parts.join("");
   }
@@ -4343,6 +4567,7 @@ function renderRoundHud() {
   const left = roundLeft();
   let title, time = mmss(Math.ceil(left));
   if (round.ph === "wait") { title = "Warm-up"; time = "waiting for players · " + (1 + playersOnline()) + "/2"; }
+  else if (round.ph === "pause") title = "Ranked paused for the battle royale · back in";
   else if (round.ph === "count") title = "Round " + (round.n + 1) + " starts in";
   else if (round.ph === "live") title = "Round " + round.n;
   else title = "Round " + round.n + " over · next" + (nextGroup ? ": " + groupLabel(nextGroup) : "") + " in";
@@ -4392,7 +4617,7 @@ PAL.forEach((c, i) => {
 const sens = $("#sens"); sens.value = String(sensVal); $("#sensOut").textContent = String(sensVal);
 sens.addEventListener("input", () => { sensVal = clamp(parseFloat(sens.value) || 6, 1, 12); $("#sensOut").textContent = String(sensVal); save("cfa.sens", sensVal); });
 const mapPick = $("#mapPick");
-for (const [id, m] of Object.entries(MAPS)) { const b = document.createElement("button"); b.type = "button"; b.dataset.v = id; b.textContent = m.name; mapPick.appendChild(b); }
+for (const [id, m] of Object.entries(MAPS)) { if (m.royale) continue; const b = document.createElement("button"); b.type = "button"; b.dataset.v = id; b.textContent = m.name; mapPick.appendChild(b); }
 function renderMapPick() { [...mapPick.children].forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === mapId))); }
 mapPick.addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b || state !== "menu") return;
@@ -4448,10 +4673,12 @@ function startGame(m) {
   if (!$("#notice").hidden) { $("#notice").hidden = true; save("cfa.notice", NOTICE.id); } // seen it; clear the screen for play
   state = "play";
   $("#menu").hidden = true; $("#hud").hidden = false; $("#touch").hidden = !isTouch;
-  if (m === "bots") { const ids = Object.keys(MAPS).filter(k => k !== mapId); loadMap(ids[Math.floor(Math.random() * ids.length)]); }
+  if (m === "royale") {}                                                  // the map and the match come from the battle royale server
+  else if (m === "bots") { const ids = Object.keys(MAPS).filter(k => k !== mapId && !MAPS[k].royale); loadMap(ids[Math.floor(Math.random() * ids.length)]); }
   else if (netKind === "ws") { if (serverMap && serverMap !== mapId && !partyCode) loadMap(serverMap); }
   else if (mapId !== "arena") loadMap("arena");                           // no game server: everyone on one map
-  if (m === "bots") startBots(); else { stopBots(); joinLobby(partyCode); }
+  if (m === "bots") startBots(); else { stopBots(); if (m !== "royale") joinLobby(partyCode); }
+  document.body.classList.toggle("brmode", m === "royale");
   if (m === "online" && partyCode) banner("Party " + partyCode.toUpperCase() + " · " + MAPS[$("#partyMap").value].name + " · half rank points");
   for (const r of remotes.values()) if (r.av) r.av.g.visible = false;
   respawn();
@@ -4465,7 +4692,7 @@ $("#playOnline").addEventListener("click", () => {
   const who = passwordProfile();
   if (who && authedAs !== who) {
     $("#pwWho").textContent = (who === "doug" ? "Doug (also Duke and Bill)" : who[0].toUpperCase() + who.slice(1)) + " needs the password to play online.";
-    $("#pwErr").hidden = true; $("#pwIn").value = ""; $("#pw").hidden = false; $("#pwIn").focus(); return;
+    pwThen = ""; $("#pwErr").hidden = true; $("#pwIn").value = ""; $("#pw").hidden = false; $("#pwIn").focus(); return;
   }
   startGame("online");
 });
@@ -4491,7 +4718,7 @@ $("#refreshBtn").addEventListener("click", () => location.reload());
 // device. Spin the wheel for skins; earn tickets by playing.
 // ======================================================================
 const API = (() => {
-  const local = location.host === SERVER_HOST || /^(localhost|127\.0\.0\.1):87\d\d$/.test(location.host);
+  const local = location.host === SERVER_HOST || /:87\d\d$/.test(location.host);
   return local ? "" : "https://" + SERVER_HOST;
 })();
 let acctToken = load("cfa.tok") || "", acct = null;
@@ -4522,7 +4749,7 @@ function signOutLocal() { acct = null; acctToken = ""; save("cfa.tok", ""); save
 // Points toward tickets (online eliminations 2, bot ones 1) and round wins, sent every so often
 let pendPts = 0, pendWins = 0, pendRare = 0, rankDirty = false, lastKills = 0, flushing = false;
 function trackProgress() {
-  if (kills > lastKills) pendPts += (kills - lastKills) * (mode === "online" ? 2 : 1);
+  if (kills > lastKills) pendPts += (kills - lastKills) * (netMode() ? 2 : 1);
   lastKills = kills;
 }
 async function flushProgress() {
@@ -4661,11 +4888,11 @@ function renderLocker() {
   const grid = $("#skinGrid"); grid.replaceChildren();
   const none = el("button", { type: "button", className: "skin none" + (!id ? " on" : ""), textContent: "No skin" });
   none.addEventListener("click", () => equipSkin(null)); grid.appendChild(none);
-  for (const rar of [4, 3, 2, 1, 0]) for (const sid of SKIN_IDS.filter(k => SKIN_DEFS[k].rarity === rar)) {
+  for (const rar of [5, 4, 3, 2, 1, 0]) for (const sid of SKIN_IDS.filter(k => SKIN_DEFS[k].rarity === rar)) {
     const owned = !!acct && acct.owned.includes(sid), D = SKIN_DEFS[sid];
-    const tagTxt = D.rarity === 3 ? (owned ? "Rank reward" : "Reach " + rankOf(D.rank).label.split(" ")[0]) : RARITY[D.rarity].name;
+    const tagTxt = D.rarity === 3 ? (owned ? "Rank reward" : "Reach " + rankOf(D.rank).label.split(" ")[0]) : D.rarity === 5 ? (owned ? "Battle royale winner" : "Win a battle royale") : RARITY[D.rarity].name;
     const b = el("button", { type: "button", className: "skin" + (owned ? "" : " locked") + (sid === id ? " on" : "") }, [thumbImg(sid), el("span", { textContent: D.name }), el("small", { className: "r" + D.rarity, textContent: tagTxt })]);
-    b.dataset.skin = sid; b.title = owned ? "Wear " + D.name : D.rarity === 3 ? "Reach " + rankOf(D.rank).label.split(" ")[0] + " to unlock" : "Win it on the wheel";
+    b.dataset.skin = sid; b.title = owned ? "Wear " + D.name : D.rarity === 5 ? "Win a battle royale to unlock" : D.rarity === 3 ? "Reach " + rankOf(D.rank).label.split(" ")[0] + " to unlock" : "Win it on the wheel";
     b.addEventListener("click", () => { if (owned) equipSkin(sid); });
     grid.appendChild(b);
   }
@@ -4742,7 +4969,7 @@ $("#pwForm").addEventListener("submit", async e => {
     $("#pwErr").hidden = false; $("#pwIn").select(); return;
   }
   authedAs = who; $("#pwIn").blur(); $("#pw").hidden = true;                // blur closes the iPad keyboard
-  startGame("online");
+  if (pwThen === "royale") { pwThen = ""; brQueueToggle(); } else startGame("online");
 });
 // ======================================================================
 // Premium: free for anyone who turns on notifications. Premium players can play online
@@ -4755,7 +4982,9 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platfor
 const isStandalone = () => navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 const canPush = () => onOwnSite && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 let premium = onOwnSite && load("cfa.premium") === "1", pushEndpoint = load("cfa.pushEp") || "", premiumBusy = false, premiumWhy = "";
-const needsPremium = () => onOwnSite && !premium && !passwordProfile();
+// A test server on the local network (http, port 87xx) has no notifications, so no Premium gate there
+const devHost = location.protocol === "http:" && /:87\d\d$/.test(location.host);
+const needsPremium = () => onOwnSite && !devHost && !premium && !passwordProfile();
 function setPremium(on, ep) {
   premium = !!on; pushEndpoint = on ? ep || pushEndpoint : "";
   save("cfa.premium", premium ? "1" : ""); save("cfa.pushEp", pushEndpoint); renderPremium();
@@ -4865,6 +5094,647 @@ function applyInvite(q) {
 }
 renderPremium();
 // ======================================================================
+// Battle royale. Every game keeps a "hub" socket to the battle royale server: duo parties,
+// the schedule (one every 30 minutes) and the queue go over it, and so does the match.
+// In the match you land with a pistol and find guns, med kits, shields and grenades while
+// the storm closes in. At 0 health you're knocked down: you crawl and bleed out in 30
+// seconds unless your duo holds F (or Use) on you for 5 seconds. Eliminated while your duo
+// is still in, you drop a reboot card they can carry to a reboot van to bring you back.
+// The last duo standing wins 500 RP, the Royale Champion skin and the crown, which shows
+// over their heads everywhere until the next battle royale is won.
+// ======================================================================
+const BR = { sock: null, id: "", retry: 0, info: null, skew: 0, party: null, queued: false, inv: null, helloKey: "", crown: null, crownAsked: false, m: null, bs: "up", guns: [], partyKey: "" };
+const BR_RP = 500, BLEED = 30, REVIVE_T = 5, REBOOT_T = 4, CARD_T = 90, MAX_GUNS = 3;
+const brNow = () => Date.now() + BR.skew;
+let shield = 0, useHeld = false, useTap = false, pwThen = "";
+const brKnocked = () => mode === "royale" && state === "play" && BR.bs === "down";
+const brMate = r => mode === "royale" && !!BR.m && !!r && r.team === BR.m.team;      // a remote player on your duo
+const brPartner = () => BR.party ? BR.party.members.find(x => x.id !== BR.id) || null : null;   // your duo in the lobby
+const plural = (n, w) => n + " " + w + (n === 1 ? "" : "s");
+
+// ---- the hub
+function brConnect() {
+  if (netKind !== "ws" || BR.sock || mustRefresh) return;
+  let s; try { s = new WebSocket(serverUrl("royale")); } catch (e) { return; }
+  BR.sock = s;
+  s.onopen = () => {
+    BR.retry = 0; BR.helloKey = ""; brHello();
+    if (!BR.crownAsked) { BR.crownAsked = true; api("crown").then(j => brSetCrown(j.crown)).catch(() => {}); }
+  };
+  s.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (err) { return; } if (m && typeof m === "object") brMsg(m); };
+  s.onclose = () => {
+    if (BR.sock !== s) return;
+    BR.sock = null; BR.info = null; renderBrLobby();
+    setTimeout(brConnect, Math.min(8000, 500 * 2 ** BR.retry++));
+  };
+}
+function brSend(m) { const s = BR.sock; if (s && s.readyState === 1) { try { s.send(JSON.stringify(m)); } catch (e) {} } }
+// who you are and how you look (your duo sees your skin on their lobby stage)
+function brHello() {
+  const h = { t: "hello", name: cleanName(nick.value) || myName, token: acctToken || "", skin: pigMode ? "pig" : mySkin(), color: myColor, rk: rankPts };
+  const k = JSON.stringify(h); if (k === BR.helloKey) return;
+  BR.helloKey = k; brSend(h);
+}
+setInterval(() => { if (BR.sock && BR.sock.readyState === 1) { brSend({ t: "ping", c: performance.now() }); brHello(); } }, 2000);
+setInterval(() => { renderBrLobby(); renderBrSoon(); }, 500);
+function brMsg(m) {
+  if (m.t === "welcome") BR.id = String(m.id || "");
+  else if (m.t === "pong") { if (mode === "royale" && state === "play" && num(m.c) !== null) { const rtt = performance.now() - m.c; pingMs = Math.round(pingMs == null ? rtt : pingMs * 0.6 + rtt * 0.4); } }
+  else if (m.t === "brinfo") {
+    BR.info = { ...m }; if (num(m.now) !== null) BR.skew = m.now - Date.now();
+    if (BR.m && m.match && num(m.match.alive) !== null && !BR.m.done) BR.m.alive = m.match.alive;
+    renderBrLobby();
+  } else if (m.t === "party") {
+    const had = brPartner();
+    const list = Array.isArray(m.members) ? m.members.filter(x => x && x.id).slice(0, 2) : [];
+    BR.party = m.id && list.length ? { id: String(m.id), members: list.map(x => ({ id: String(x.id), name: cleanName(x.name) || "Player", skin: x.skin === "pig" || SKIN_DEFS[x.skin] ? x.skin : null, color: clamp(Math.floor(num(x.color) || 0), 0, PAL.length - 1), rk: clamp(Math.floor(num(x.rk) || 0), 0, 99999), queued: !!x.queued })) } : null;
+    const mine = BR.party && BR.party.members.find(x => x.id === BR.id);
+    BR.queued = !!(mine && mine.queued) || (!BR.party && BR.queued);
+    const now_ = brPartner();
+    if (now_ && !had) { $("#brPick").hidden = true; banner(now_.name + " joined your duo!"); if (state === "menu" && playMode !== "royale") { playMode = "royale"; save("cfa.mode", "royale"); renderPlayMode(); } }
+    else if (had && !now_) banner(had.name + " left your duo");
+    renderBrLobby();
+  } else if (m.t === "invite") brShowInvite(m);
+  else if (m.t === "invited") banner(String(m.msg || ""));
+  else if (m.t === "declined") banner((cleanName(m.by) || "Your friend") + " can't join right now");
+  else if (m.t === "queue") {
+    BR.queued = !!m.on; if (m.msg) brToast(m.on ? "Queued" : "Battle royale", String(m.msg), 5);
+    else if (m.on) banner("Queued for the battle royale!");
+    renderBrLobby();
+  } else if (m.t === "br" && m.ph === "cancelled") { BR.queued = false; brToast("Battle royale cancelled", String(m.msg || "Not enough teams queued"), 9); renderBrLobby(); }
+  else if (m.t === "brstart") brStart(m);
+  else if (m.t === "st" && m.id) { if (mode === "royale" && state === "play" && BR.m) onPeer({ peer: String(m.id), presence: m.d && typeof m.d === "object" ? m.d : {}, kind: "viewer", sameTab: false }); }
+  else if (m.t === "taken") brTaken(m);
+  else if (m.t === "teamout") brTeamOut(m);
+  else if (m.t === "brend") brEnd(m);
+  else if (m.t === "crown") { brSetCrown(m); if (!BR.m) brToast("👑 New Royale Champions", (BR.crown ? BR.crown.names.join(" & ") : "") + " won the battle royale!", 6); }
+}
+function brSetCrown(c) {
+  BR.crown = c && Array.isArray(c.names) && c.names.length ? { names: c.names.map(n => String(n).slice(0, 24)).slice(0, 2), at: num(c.at) || 0 } : null;
+  BR.crownKey = (BR.crownKey || 0) + 1;
+  if (typeof renderPlate === "function") renderPlate();
+}
+// The crown: the winners of the last battle royale (by account name, or callsign if not signed in)
+function brIsChamp(name) { if (!BR.crown || !name) return false; const n = String(name).toLowerCase(); return BR.crown.names.some(x => x.toLowerCase() === n); }
+const myChampName = () => acct ? acct.name : cleanName(nick.value) || myName;
+function brToast(title, text, sec) {
+  $("#brToastTitle").textContent = title; $("#brToastText").textContent = text; $("#brToast").hidden = false;
+  clearTimeout(brToast.t); brToast.t = setTimeout(() => { $("#brToast").hidden = true; }, (sec || 6) * 1000);
+}
+
+// ---- duo invites
+function brShowInvite(m) {
+  BR.inv = { from: String(m.from || ""), name: cleanName(m.name) || "A friend" };
+  $("#brInvWho").textContent = BR.inv.name; $("#brInvite").hidden = false;
+  blip(880, 0.1, 0.1); blip(1320, 0.14, 0.1, "square", 0.1);
+  clearTimeout(brShowInvite.t); brShowInvite.t = setTimeout(() => { $("#brInvite").hidden = true; BR.inv = null; }, 30000);
+}
+$("#brInvYes").addEventListener("click", () => {
+  if (BR.inv) { brSend({ t: "accept", from: BR.inv.from }); if (state === "menu") { playMode = "royale"; save("cfa.mode", "royale"); renderPlayMode(); } }
+  BR.inv = null; $("#brInvite").hidden = true;
+});
+$("#brInvNo").addEventListener("click", () => { if (BR.inv) brSend({ t: "decline", from: BR.inv.from }); BR.inv = null; $("#brInvite").hidden = true; });
+$("#brLeave").addEventListener("click", () => brSend({ t: "leaveparty" }));
+async function openBrPick() {
+  const box = $("#brPickBody"); $("#brPick").hidden = false;
+  const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); for (const k of kids || []) e.append(k); return e; };
+  if (!acct) {
+    const b = el("button", { type: "button", className: "btn primary", textContent: "Sign in / Create account" }); b.addEventListener("click", () => { $("#brPick").hidden = true; openSignIn(); });
+    box.replaceChildren(el("p", { textContent: "Sign in to invite a friend to your duo. Or just queue solo and you'll get a random partner." }), el("div", { className: "btns" }, [b]));
+    return;
+  }
+  box.replaceChildren(el("p", { className: "fine", textContent: "Loading your friends…" }));
+  let fr; try { fr = await api("friends-list"); } catch (e) { box.replaceChildren(el("p", { className: "pm-why", textContent: e.message })); return; }
+  const list = fr.friends || [];
+  const parts = [el("p", { className: "fine", textContent: "Your friend needs the game open to get the invite. No partner? Queue solo and you'll get a random one." })];
+  if (!list.length) {
+    const b = el("button", { type: "button", className: "btn", textContent: "Add friends" }); b.addEventListener("click", () => { $("#brPick").hidden = true; renderFriends(true); });
+    parts.push(el("p", { textContent: "No friends yet." }), el("div", { className: "btns" }, [b]));
+  }
+  for (const f of list) {
+    const R = rankOf(f.rank), rk = el("b", { textContent: R.label }); rk.style.color = R.color;
+    const b = el("button", { type: "button", className: "btn primary", textContent: "Invite" });
+    b.addEventListener("click", () => { brSend({ t: "invite", to: f.name.toLowerCase() }); b.textContent = "Sent"; b.disabled = true; });
+    parts.push(el("div", { className: "frow" }, [el("span", { textContent: f.name }), rk, el("div", { className: "btns" }, [b])]));
+  }
+  box.replaceChildren(...parts);
+}
+$("#brPickClose").addEventListener("click", () => { $("#brPick").hidden = true; });
+$("#brPick").addEventListener("click", e => { if (e.target.id === "brPick") $("#brPick").hidden = true; });
+
+// ---- the lobby: countdown, your duo and the queue button
+function brPhase() {
+  const I = BR.info; if (!I || num(I.start) === null) return null;
+  const t = brNow();
+  let ph = I.ph; if (ph === "idle" && t >= I.open) ph = "queue";
+  return { ph, toStart: Math.max(0, (I.start - t) / 1000), toOpen: Math.max(0, (I.open - t) / 1000), I };
+}
+function renderBrLobby() {
+  if (state !== "menu") { $("#brCount").hidden = true; return; }
+  const P = brPhase(), royale = playMode === "royale", cnt = $("#brCount");
+  cnt.hidden = !P;
+  if (P) {
+    let top, time, sub, hot = false;
+    if (P.ph === "match") { top = "Battle royale live"; time = P.I.match ? plural(P.I.match.alive, "team") + " left" : "Live"; sub = "Next one in " + mmss(Math.ceil(P.toStart)); }
+    else if (P.ph === "queue") { top = "Queue open · starts in"; time = mmss(Math.ceil(P.toStart)); sub = `${plural(P.I.teams, "team")} queued · ${P.I.minTeams} needed`; hot = true; }
+    else { top = "Next battle royale in"; time = mmss(Math.ceil(P.toStart)); sub = "Queue opens in " + mmss(Math.ceil(P.toOpen)); }
+    if (BR.queued) sub = "You're queued · " + sub;
+    else if (!royale && P.ph !== "match") sub += " · tap to queue";
+    $("#brCountTop").textContent = top; $("#brCountTime").textContent = time; $("#brCountSub").textContent = sub;
+    cnt.classList.toggle("mini", !royale); cnt.classList.toggle("hot", hot);
+  }
+  renderBrParty(); renderBrPlay();
+}
+$("#brCount").addEventListener("click", () => { if (playMode !== "royale") { playMode = "royale"; save("cfa.mode", "royale"); renderPlayMode(); } });
+function renderBrParty() {
+  const royale = playMode === "royale";
+  $("#brParty").hidden = !royale;
+  if (!royale) return;
+  const mate = brPartner(), mine = cleanName(nick.value) || myName;
+  const key = JSON.stringify([mine, BR.queued, mate && [mate.name, mate.queued], !!BR.party]);
+  if (key === BR.partyKey) return; BR.partyKey = key;
+  const slot = (cls, top, name) => { const d = document.createElement("div"); d.className = "brslot " + cls; const sm = document.createElement("small"); sm.textContent = top; d.append(sm, name); return d; };
+  const kids = [slot(BR.queued ? "ready" : "", BR.queued ? "Queued" : "You", mine)];
+  if (mate) kids.push(slot(mate.queued ? "ready" : "", mate.queued ? "Queued" : "Duo", mate.name));
+  else { const b = document.createElement("button"); b.type = "button"; b.className = "brslot add"; const sm = document.createElement("small"); sm.textContent = "Empty"; b.append(sm, "+ Invite friend"); b.addEventListener("click", openBrPick); kids.push(b); }
+  $("#brSlots").replaceChildren(...kids);
+  $("#brLeave").hidden = !BR.party;
+}
+function renderBrPlay() {
+  const bp = $("#bigPlay"), royale = playMode === "royale";
+  bp.classList.toggle("brq", royale);
+  if (!royale) { bp.classList.remove("on", "off"); bp.firstChild.textContent = "Play"; return; }
+  const P = brPhase(), mate = brPartner();
+  let b = "Queue", sub, off = false;
+  if (!P) { sub = netKind === "ws" ? "Connecting to the battle royale…" : "The battle royale needs the game server"; off = true; }
+  else if (BR.queued) { b = "Cancel"; sub = "Queued · starts in " + mmss(Math.ceil(P.toStart)); }
+  else if (P.ph === "match") { sub = "Running now · next queue opens in " + mmss(Math.ceil(P.toOpen)); off = true; }
+  else if (P.ph !== "queue") { sub = "Queue opens in " + mmss(Math.ceil(P.toOpen)); off = true; }
+  else sub = (mate ? "Duo with " + mate.name : "Solo · random partner") + " · starts in " + mmss(Math.ceil(P.toStart));
+  bp.classList.toggle("on", BR.queued); bp.classList.toggle("off", off);
+  bp.firstChild.textContent = b; $("#playSub").textContent = sub;
+}
+function brQueueToggle() {
+  if (BR.queued) { brSend({ t: "unqueue" }); return; }
+  const P = brPhase();
+  if (!P) { banner("Can't reach the battle royale right now"); return; }
+  if (P.ph === "match") { banner("A battle royale is running · queue for the next one when it opens"); return; }
+  if (P.ph !== "queue") { banner("The queue opens " + Math.ceil(P.toOpen / 60) + " min before the battle royale"); return; }
+  if (needsPremium()) { openPremium("Online play is for Premium members. It's free: turn on notifications and you're in."); return; }
+  const who = passwordProfile();
+  if (who && authedAs !== who) {
+    pwThen = "royale";
+    $("#pwWho").textContent = (who === "doug" ? "Doug (also Duke and Bill)" : who[0].toUpperCase() + who.slice(1)) + " needs the password to play online.";
+    $("#pwErr").hidden = true; $("#pwIn").value = ""; $("#pw").hidden = false; $("#pwIn").focus(); return;
+  }
+  initAudio();
+  myName = cleanName(nick.value) || myName; save("cfa.name", myName); save("cfa.color", myColor);
+  brHello(); brSend({ t: "queue" });
+}
+// In a ranked or bot match: when the battle royale is coming up, and the last seconds out loud if you're queued
+let brSoonBeep = 0;
+function renderBrSoon() {
+  const el = $("#brSoon"), P = brPhase();
+  const show = state === "play" && mode !== "royale" && P && P.ph === "queue";
+  el.hidden = !show; if (!show) return;
+  el.textContent = BR.queued ? "Queued · battle royale in " + mmss(Math.ceil(P.toStart)) + " · you'll be pulled in" : "Battle royale in " + mmss(Math.ceil(P.toStart)) + " · queue in the lobby";
+  const sec = Math.ceil(P.toStart);
+  if (BR.queued && sec <= 10 && sec > 0 && sec !== brSoonBeep) { brSoonBeep = sec; banner("Battle royale in " + sec); blip(660, 0.1, 0.1); }
+}
+
+// ---- starting the match
+function brStart(m) {
+  const at = num(m.at) || 0;
+  if (num(m.now) !== null) BR.skew = m.now - Date.now();
+  BR.queued = false; $("#brInvite").hidden = true; $("#brPick").hidden = true;
+  if (BR.m && BR.m.at === at && state === "play" && mode === "royale") { for (const i of Array.isArray(m.taken) ? m.taken : []) brTaken({ i }); return; }   // back after a reconnect
+  if (state === "play") leaveMatch();
+  const players = new Map();
+  for (const p of Array.isArray(m.players) ? m.players : []) if (p && p.id) players.set(String(p.id), { name: cleanName(p.name) || "Player", team: String(p.team || "") });
+  const teams = Math.max(1, Math.floor(num(m.teams) || 1));
+  BR.m = { at, seed: Math.floor(num(m.seed) || 1), storm: (Array.isArray(m.storm) ? m.storm : []).filter(p => p && num(p.t0) !== null && num(p.t1) !== null).slice(0, 12),
+    team: String(m.team || ""), slot: Math.floor(num(m.slot) || 0), mates: (Array.isArray(m.mates) ? m.mates : []).map(String).slice(0, 1), players, teams, alive: teams,
+    loot: [], done: false, ended: false, place: 0, card: null, carry: new Set(), rb: null, rbSeq: 0, useT: 0, useC: null, revT: 0, revSeen: 0, revBy: "", dhp: 100, knocker: null, kb: null, stormT: 0, swapL: null, lootT: 0, mapT: 0 };
+  // the match runs on the hub, so leave the ranked lobby until it's over
+  if (sock) { sock.onclose = null; try { sock.close(); } catch (e) {} sock = null; }
+  lobbyName = "royale"; clearRemotes(); myGroup = myGroupName = nextGroup = null;
+  myPeer = BR.id;
+  loadMap("royale");
+  brMakeLoot(); for (const i of Array.isArray(m.taken) ? m.taken : []) brTaken({ i });
+  brMapBase = null;
+  startGame("royale");
+  $("#brMap").hidden = false; $("#shWrap").hidden = false;
+  const mate = BR.m.mates.length ? (players.get(BR.m.mates[0]) || {}).name : null;
+  brToast("Battle royale!", `${plural(teams, "team")}${mate ? " · your duo: " + mate : " · you're on your own"} · last team standing wins ${BR_RP} RP and the crown`, 6);
+  blip(523, 0.15, 0.12); blip(659, 0.15, 0.12, "square", 0.12); blip(784, 0.3, 0.12, "square", 0.24);
+}
+// Your duo's spawn slot (the server gives each team a different one, spread across the map);
+// the two of you land side by side, never on the same spot
+function brSpawn() {
+  const M = BR.m; if (!M) return;
+  const base = brSlots.length ? brSlots[((M.slot % brSlots.length) + brSlots.length) % brSlots.length] : spawns[0];
+  const order = [BR.id, ...M.mates].sort(), k = Math.max(0, order.indexOf(BR.id));
+  const near = spawns.slice().sort((a, b) => a.distanceTo(base) - b.distanceTo(base));
+  me.pos.copy(near[Math.min(k, near.length - 1)] || base); me.vel.set(0, 0, 0);
+  const c = new V3(W / 2, 1, D / 2).sub(me.pos); yaw = Math.atan2(-c.x, -c.z); pitch = 0;
+  brRevive(100); BR.guns = [PISTOL]; nades = 0; shield = 0;
+  ammo = WEAPONS.map(w => w.mag); recoilP = 0; spin = 0; spawnProt = now() + 3;
+  brSetGuns(PISTOL);
+  $("#death").hidden = true; publish(true);
+}
+function brRevive(health) {
+  BR.bs = "up"; hp = health; alive = true; spectating = false; crouch = false; dashReady = 0;
+  if (BR.m) { BR.m.revT = 0; BR.m.dhp = 100; BR.m.kb = null; }
+}
+function brSetGuns(hold) {
+  loadout = BR.guns.slice();
+  if (hold != null && loadout.includes(hold)) { cur = hold; reloading = false; triggerHeld = holdFire = false; shotQueue = 0; }
+  else if (!loadout.includes(cur)) cur = loadout[0];
+  renderSlots(); buildPips();
+}
+
+// ---- loot: the same on every screen (from the match seed); the server says who got each piece
+const BR_GUNS = [["rifle", 24], ["smg", 22], ["shotgun", 22], ["dmr", 12], ["sniper", 9], ["minigun", 6], ["paint", 5]];
+const GUN_GLOW = { smg: 0x5fd17a, paint: 0x5fd17a, rifle: 0x43b7ff, shotgun: 0x43b7ff, dmr: 0xb57bff, sniper: 0xb57bff, minigun: 0xffb627 };
+const LOOT = { med: { name: "Med kit", color: 0xff4f5e }, shield: { name: "Shield potion", color: 0x43b7ff }, nade: { name: "Grenades", color: 0x6fae45 } };
+let lootGeo = null;
+const lootMats = new Map();
+function lootMat(c, beam) {
+  const k = c + (beam ? "b" : "");
+  if (!lootMats.has(k)) lootMats.set(k, beam ? new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.32, depthWrite: false }) : new THREE.MeshLambertMaterial({ color: c, emissive: new THREE.Color(c).multiplyScalar(0.45) }));
+  return lootMats.get(k);
+}
+function brMakeLoot() {
+  brClearLoot();
+  const M = BR.m, r = rng32(M.seed ^ 0x5bd1e995);
+  if (!lootGeo) {
+    const beam = new THREE.CylinderGeometry(0.06, 0.06, 4, 6, 1, true); beam.translate(0, 2, 0);
+    lootGeo = { gun: new THREE.BoxGeometry(0.85, 0.22, 0.22), item: new THREE.BoxGeometry(0.42, 0.42, 0.42), beam };
+  }
+  const total = BR_GUNS.reduce((a, g) => a + g[1], 0);
+  brLootSpots.forEach((p, i) => {
+    const x = r(); let kind = "gun", gun = -1;
+    if (x < 0.5) { let w = r() * total; for (const [id, n] of BR_GUNS) { if ((w -= n) < 0) { gun = W_ID[id]; break; } } if (gun < 0) gun = W_ID.rifle; }
+    else kind = x < 0.68 ? "med" : x < 0.86 ? "shield" : "nade";
+    const col = kind === "gun" ? GUN_GLOW[WEAPONS[gun].id] : LOOT[kind].color;
+    const g = new THREE.Group(); g.position.set(p.x, p.y + 0.55, p.z);
+    const item = new THREE.Mesh(kind === "gun" ? lootGeo.gun : lootGeo.item, lootMat(col)); g.add(item);
+    const beam = new THREE.Mesh(lootGeo.beam, lootMat(col, true)); beam.position.y = -0.5; g.add(beam);
+    g.visible = false; scene.add(g);
+    M.loot.push({ i, kind, gun, pos: p, g, item, taken: false, pend: 0, ph: r() * 6 });
+  });
+}
+function brClearLoot() { const M = BR.m; if (M) for (const L of M.loot) scene.remove(L.g); }
+const lootName = L => L.kind === "gun" ? WEAPONS[L.gun].name : LOOT[L.kind].name;
+function brTaken(m) {
+  const M = BR.m; if (!M) return;
+  const L = M.loot[Math.floor(num(m.i) ?? -1)]; if (!L || L.taken) return;
+  L.taken = true; L.g.visible = false;
+  if (m.by && String(m.by) === BR.id && L.pend) brUseLoot(L);
+}
+function brTake(L) { L.pend = now(); L.g.visible = false; brSend({ t: "take", i: L.i }); }
+function brUseLoot(L) {
+  if (L.kind === "gun") {
+    if (BR.guns.includes(L.gun)) return;
+    if (BR.guns.length < MAX_GUNS) BR.guns.push(L.gun);
+    else { const at = BR.guns.indexOf(cur); BR.guns[at > 0 ? at : 1] = L.gun; }        // swap the gun you're holding (never the pistol)
+    ammo[L.gun] = WEAPONS[L.gun].mag; brSetGuns(L.gun);
+    banner("Picked up " + WEAPONS[L.gun].name); mech(1800, 0.1); mech(2400, 0.08, 0.08);
+  } else if (L.kind === "med") { hp = Math.min(100, hp + 50); banner("Med kit · +50 health"); blip(700, 0.15, 0.1); blip(1050, 0.2, 0.1, "sine", 0.1); }
+  else if (L.kind === "shield") { shield = Math.min(100, shield + 50); banner("Shield potion · +50 shield"); blip(900, 0.15, 0.1); blip(1350, 0.2, 0.1, "sine", 0.1); }
+  else { nades = Math.min(6, nades + 2); banner("Grenades · +2"); mech(1500, 0.1); }
+  publish(true);
+}
+function brLootTick(dt, t) {
+  const M = BR.m, up = BR.bs === "up" && alive;
+  const checkVis = t > M.lootT; if (checkVis) M.lootT = t + 0.3;
+  M.swapL = null;
+  let best = null, bestD = 9;
+  for (const L of M.loot) {
+    if (L.taken) continue;
+    if (L.pend && t - L.pend > 3) L.pend = 0;                                       // no answer from the server: let it be picked up again
+    const dx = L.pos.x - me.pos.x, dz = L.pos.z - me.pos.z, d2 = dx * dx + dz * dz;
+    if (checkVis) L.g.visible = !L.pend && d2 < 48 * 48;
+    if (L.g.visible && d2 < 30 * 30) { L.item.rotation.y += dt * 1.6; L.item.position.y = Math.sin(t * 2.2 + L.ph) * 0.08; }
+    if (!up || L.pend || d2 > 1.9 * 1.9 || Math.abs(L.pos.y - me.pos.y) > 2.2) continue;
+    if (d2 < bestD) { bestD = d2; best = L; }
+  }
+  if (!best) return;
+  // walk over loot to pick it up when it helps; a gun when your slots are full is a swap (F or Use)
+  if (best.kind === "gun") {
+    if (BR.guns.includes(best.gun)) return;
+    if (BR.guns.length < MAX_GUNS) brTake(best); else M.swapL = best;
+  } else if ((best.kind === "med" && hp < 100) || (best.kind === "shield" && shield < 100) || (best.kind === "nade" && nades < 6)) brTake(best);
+}
+
+// ---- the storm: each phase waits, then shrinks the circle toward a smaller one inside it
+function brStorm() {
+  const M = BR.m, S = M.storm, t = (brNow() - M.at) / 1000;
+  let x = W / 2, z = D / 2, r = 999, dps = 0, next = null, label = "Final storm", left = 0;
+  if (S.length) { x = S[0].x0; z = S[0].z0; r = S[0].r0; }
+  for (let i = 0; i < S.length; i++) {
+    const p = S[i];
+    if (t < p.t0) { next = p; label = i ? "Storm shrinks in" : "Storm forms in"; left = p.t0 - t; break; }
+    if (t < p.t1) { const k = (t - p.t0) / Math.max(1, p.t1 - p.t0); x = p.x0 + (p.x1 - p.x0) * k; z = p.z0 + (p.z1 - p.z0) * k; r = p.r0 + (p.r1 - p.r0) * k; dps = p.dps; next = p; label = "Storm closing"; left = p.t1 - t; break; }
+    x = p.x1; z = p.z1; r = p.r1; dps = p.dps;
+  }
+  return { x, z, r, dps, next, label, left };
+}
+let stormMesh = null;
+function brStormMesh() {
+  if (stormMesh) return stormMesh;
+  const geo = new THREE.CylinderGeometry(1, 1, 70, 120, 1, true); geo.translate(0, 25, 0);
+  stormMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x9b4dff, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+  stormMesh.renderOrder = 3; scene.add(stormMesh);
+  return stormMesh;
+}
+
+// ---- knocked down, revived, eliminated, rebooted
+function brHurt(dm, src, head, unblockable) {
+  const M = BR.m; if (!M || state !== "play" || BR.bs === "out" || dm <= 0) return;
+  if (!unblockable && now() < spawnProt) return;
+  if (!unblockable && duke.on && duke.god) { if (src.pos) showDmgDir(src.pos); return; }
+  lastHurt = now();
+  if (src.pos) showDmgDir(src.pos);
+  blip(head ? 180 : 140, 0.12, 0.12, "sawtooth");
+  if (BR.bs === "down") { M.dhp -= dm; hp = Math.max(0, M.dhp); if (M.dhp <= 0) brOut(src.peer ? src : M.knocker || src); return; }
+  if (!src.storm) { const s = Math.min(shield, dm); shield -= s; dm -= s; }        // the shield takes hits first (not the storm)
+  hp -= dm;
+  if (hp <= 0) brDown(src);
+}
+function brDown(src) {
+  const M = BR.m; if (!M || BR.bs !== "up") return;
+  const mateUp = M.mates.some(id => { const r = remotes.get(id); return r && activePeer(r) && r.alive && r.bs === "up"; });
+  if (!mateUp) { brOut(src); return; }                  // nobody left to revive you
+  BR.bs = "down"; M.dhp = 100; hp = 100; shield = 0; M.revT = 0; crouch = true; reloading = false; resetAim();
+  M.knocker = src && src.peer ? { name: src.name, peer: src.peer } : null; M.kb = M.knocker ? M.knocker.peer : null;
+  addFeed(src && src.name || "The storm", myName + " (knocked)", false);
+  publish(true);
+}
+function brOut(src) {
+  const M = BR.m; if (!M || BR.bs === "out") return;
+  BR.bs = "out"; alive = false; hp = 0; shield = 0; deaths++; streak = 0; crouch = false; reloading = false; resetAim();
+  dthOut = { s: ++deathSeq, by: src && src.peer || null };
+  addFeed(src && src.name || "The storm", myName, false);
+  M.carry.clear(); M.useC = null; M.useT = 0;
+  const mateIn = M.mates.some(id => { const r = remotes.get(id); return r && activePeer(r) && r.alive && r.bs !== "out"; });
+  M.card = mateIn ? { pos: me.pos.clone(), at: now(), taken: false } : null;
+  if (mateIn) brToast("Eliminated", "Your duo can grab your reboot card and take it to a reboot van to bring you back", 6);
+  spectating = true; specIdx = 0;
+  publish(true);
+}
+function brRebooted(v) {
+  const M = BR.m, van = brVans[v] || brVans[0];
+  if (van) me.pos.set(van[0], 3, van[1]); me.vel.set(0, 6, 0);
+  brRevive(100); BR.guns = [PISTOL]; nades = 0; shield = 0; spawnProt = now() + 3;
+  ammo = WEAPONS.map(w => w.mag); brSetGuns(PISTOL);
+  M.card = null;
+  brToast("Rebooted!", "You're back · find a gun fast", 4); blip(660, 0.12, 0.12); blip(990, 0.2, 0.12, "square", 0.1);
+  publish(true);
+}
+// What you'd do with F (or Use): revive your duo, reboot them at a van, or swap guns
+function brUseNow() {
+  const M = BR.m; if (!M || BR.bs !== "up" || !alive) return null;
+  for (const id of M.mates) {
+    const r = remotes.get(id);
+    if (r && activePeer(r) && r.bs === "down" && r.hasPos && r.pos.distanceTo(me.pos) < 2.6) return { kind: "revive", id, text: "Revive " + r.name, hold: REVIVE_T };
+  }
+  if (M.carry.size) for (let v = 0; v < brVans.length; v++) {
+    const [vx, vz] = brVans[v];
+    if (Math.hypot(vx - me.pos.x, vz - me.pos.z) < 3.5) return { kind: "reboot", v, text: "Reboot " + [...M.carry].map(id => (remotes.get(id) || {}).name || "your duo").join(" & "), hold: REBOOT_T };
+  }
+  if (M.swapL) return { kind: "swap", L: M.swapL, text: "Swap for " + lootName(M.swapL), hold: 0 };
+  return null;
+}
+// Other players' battle royale state (their client decides it; a knock or a reboot happens on their screen)
+function brPeer(r, s) {
+  const M = BR.m, P = M.players.get(r.peer);
+  r.team = P ? P.team : "?";
+  const bs = ["up", "down", "out"].includes(s.bs) ? s.bs : "up", was = r.bs || "up";
+  r.bs = bs; r.sd = clamp(num(s.sd) || 0, 0, 100); r.hpN = clamp(num(s.hp) || 0, 0, 100);
+  r.rc = vec(s.rc); r.cc = Array.isArray(s.cc) ? s.cc.map(String).slice(0, 2) : null;
+  const mate = brMate(r);
+  if (r.init && bs !== was) {
+    if (bs === "down") {
+      const by = typeof s.kb === "string" ? s.kb : null, kn = by === myPeer ? myName : by && remotes.has(by) ? remotes.get(by).name : "The storm";
+      addFeed(kn, r.name + " (knocked)", by === myPeer);
+      if (by === myPeer) { banner("Knocked " + r.name + "!"); flashHit(true); blip(1000, 0.1, 0.1); }
+      if (mate) banner(r.name + " is knocked! Get to them and hold " + (isTouch ? "Use" : "F") + " to revive");
+    } else if (bs === "out" && mate && BR.bs === "up") brToast(r.name + " is out", "Grab their reboot card and take it to a reboot van (purple on the map)", 6);
+    else if (bs === "up" && was === "out" && mate) banner(r.name + " is back!");
+  }
+  if (!mate) return;
+  if (s.rv === myPeer && BR.bs === "down") { M.revSeen = now(); M.revBy = r.name; }
+  if (BR.bs === "out" && M.card && !M.card.taken && r.cc && r.cc.includes(myPeer)) { M.card.taken = true; brToast(r.name + " has your card", "They're taking it to a reboot van", 5); }
+  if (s.rb && typeof s.rb === "object" && num(s.rb.s) !== null) {
+    if (r.init && s.rb.s > (r.lastRb || 0) && BR.bs === "out" && Array.isArray(s.rb.t) && s.rb.t.includes(myPeer)) brRebooted(Math.floor(num(s.rb.v) || 0));
+    if (r.init) r.lastRb = Math.max(r.lastRb || 0, s.rb.s);
+  }
+}
+function brState() {
+  const M = BR.m;
+  return { bs: BR.bs, kb: BR.bs === "down" ? M.kb : null, sd: Math.round(shield),
+    rv: useHeld && M.useC && M.useC.kind === "revive" ? M.useC.id : null,
+    rc: BR.bs === "out" && M.card && !M.card.taken ? [r2(M.card.pos.x), r2(M.card.pos.y), r2(M.card.pos.z)] : null,
+    cc: M.carry.size ? [...M.carry] : null, rb: M.rb };
+}
+
+// ---- every frame in the match
+function brTick(dt, t) {
+  const M = BR.m; if (!M) return;
+  brLootTick(dt, t);
+  dt = clamp(t - (M.lastT || t), 0, 2); M.lastT = t;            // bleeding, reviving and rebooting go by the clock, even when frames are slow
+  // the storm
+  const S = brStorm(), out = Math.hypot(me.pos.x - S.x, me.pos.z - S.z) > S.r;
+  const sm = brStormMesh(); sm.visible = true; sm.position.set(S.x, 0, S.z); sm.scale.set(Math.max(0.01, S.r), 1, Math.max(0.01, S.r));
+  $("#stormTint").style.opacity = out && BR.bs !== "out" ? 1 : 0;
+  if (out && BR.bs !== "out" && t > M.stormT) { M.stormT = t + 1; brHurt(Math.max(1, S.dps), { name: "The storm", storm: true }, false, true); }
+  if (BR.bs === "down") {                                        // bleeding out, unless your duo is reviving you
+    crouch = true;
+    if (now() - M.revSeen < 1.5) { M.revT += dt; if (M.revT >= REVIVE_T) { brRevive(30); banner("Revived by " + M.revBy + "!"); publish(true); } }
+    else { M.revT = 0; M.dhp -= dt * 100 / BLEED; hp = Math.max(0, M.dhp); if (M.dhp <= 0) brOut(M.knocker || { name: "Bleeding out" }); }
+  }
+  if (BR.bs === "out" && M.card && !M.card.taken && now() - M.card.at > CARD_T) { M.card = null; brToast("Reboot card expired", "You can keep watching your duo", 5); publish(true); }
+  if (BR.bs === "up" && alive) {
+    // pick up your duo's reboot card by walking over it
+    for (const id of M.mates) {
+      const r = remotes.get(id);
+      if (r && r.bs === "out" && r.rc && !M.carry.has(id) && Math.hypot(r.rc.x - me.pos.x, r.rc.z - me.pos.z) < 2 && Math.abs(r.rc.y - me.pos.y) < 2.5) {
+        M.carry.add(id); brToast("Got " + r.name + "'s reboot card", "Take it to a reboot van (purple squares on the map) and hold " + (isTouch ? "Use" : "F"), 6); publish(true);
+      }
+      if (M.carry.has(id) && (!r || r.bs !== "out")) M.carry.delete(id);
+    }
+    // F or Use: hold to revive or reboot, tap to swap
+    const C = brUseNow();
+    if (C && C.hold && useHeld) {
+      if (!M.useC || M.useC.kind !== C.kind) M.useT = 0;
+      M.useC = C; M.useT += dt;
+      if (C.kind === "reboot" && M.useT >= C.hold) {
+        M.rb = { s: ++M.rbSeq, t: [...M.carry], v: C.v }; M.carry.clear(); M.useT = 0; M.useC = null;
+        banner("Rebooting your duo!"); blip(500, 0.2, 0.1); blip(750, 0.3, 0.1, "square", 0.15); publish(true);
+      }
+      if (C.kind === "revive" && M.useT > C.hold + 1) M.useT = C.hold + 1;
+    } else { M.useC = null; M.useT = 0; }
+    if (C && C.kind === "swap" && useTap) brTake(C.L);
+    M.use = C;
+  } else { M.useC = null; M.useT = 0; M.use = null; }
+  useTap = false;
+}
+
+// ---- HUD: storm timer, shield, your duo, the map
+let brMapBase = null;
+function brHud(t) {
+  const M = BR.m, on = mode === "royale" && !!M && state === "play";
+  for (const id of ["#brMap", "#shWrap"]) if ($(id).hidden === on) $(id).hidden = !on;
+  if (!on) { $("#brKnock").hidden = true; $("#brUse").hidden = true; $("#tUse").hidden = true; return; }
+  const S = brStorm();
+  const rh = $("#roundHud"); rh.hidden = false; rh.className = S.dps >= 4 || (S.label === "Storm closing" && S.left < 15) ? "live hurry" : "live";
+  $("#roundTitle").textContent = `${plural(M.alive, "team")} left · ${S.label}`; $("#roundTime").textContent = S.left > 0 ? mmss(Math.ceil(S.left)) : "";
+  $("#shBar").style.width = clamp(shield, 0, 100) + "%";
+  if (BR.bs === "down") $("#hpBar").style.background = "var(--hot)";
+  // you and your duo, top left
+  const rows = $("#miniRows"), st = (bs, h, s) => bs === "out" ? "Out" : bs === "down" ? "Knocked" : Math.ceil(h) + (s > 0 ? " +" + Math.round(s) : "");
+  rows.replaceChildren(rowEl([myName + " (you)", st(BR.bs, BR.bs === "down" ? M.dhp : hp, shield)], "me"));
+  for (const id of M.mates) { const r = remotes.get(id), P = M.players.get(id); rows.appendChild(rowEl([(r ? r.name : P ? P.name : "Duo"), r && activePeer(r) ? st(r.bs, r.hpN || 0, r.sd || 0) : "…"], "")); }
+  rows.appendChild(rowEl(["Eliminations", String(kills)], ""));
+  const kn = $("#brKnock"); kn.hidden = BR.bs !== "down";
+  if (BR.bs === "down") $("#brKnockSub").textContent = now() - M.revSeen < 1.5 ? `${M.revBy} is reviving you… ${Math.ceil((REVIVE_T - M.revT) * 10) / 10}s` : `Bleeding out · ${Math.max(0, Math.ceil(M.dhp * BLEED / 100))}s · crawl to your duo`;
+  const C = M.use, bu = $("#brUse");
+  bu.hidden = !C;
+  if (C) {
+    $("#brUseText").textContent = (C.hold ? "Hold to " : "") + C.text.charAt(0).toLowerCase() + C.text.slice(1);
+    $("#brUseBar").hidden = !C.hold; $("#brUseFill").style.width = (C.hold ? clamp(M.useT / C.hold, 0, 1) * 100 : 0) + "%";
+  }
+  const tu = $("#tUse"); tu.hidden = !C || !isTouch; if (C) tu.textContent = C.kind === "revive" ? "Revive" : C.kind === "reboot" ? "Reboot" : "Swap";
+  if (spectating) {
+    $("#specWho").textContent = specCur ? "Spectating " + specCur.name : "Spectating";
+    $("#specSub").textContent = M.done ? "Match over" : M.card ? (M.card.taken ? "Your duo has your reboot card" : "Reboot card waiting · " + Math.max(0, Math.ceil(CARD_T - (now() - M.card.at))) + "s") : "You're out · tap to watch someone else";
+  }
+  if (t > M.mapT) { M.mapT = t + 0.18; brDrawMap(S); }
+}
+function brDrawMap(S) {
+  const cv = $("#brMap"), g = cv.getContext("2d"), M = BR.m, s = cv.width / W;
+  if (!brMapBase) {
+    const c = document.createElement("canvas"); c.width = W; c.height = D;
+    const cg = c.getContext("2d"), img = cg.createImageData(W, D), ground = new THREE.Color(MAPS[mapId].ground), col = new THREE.Color();
+    for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) {
+      const y = topY(x, z), b = grid[idx(x, y, z)];
+      if (b === T.WATER) col.setHex(0x3f8fd0); else if (b === T.GROUND || !BLOCK_STYLE[b]) col.copy(ground); else col.setHex(BLOCK_STYLE[b].color);
+      const f = 0.78 + Math.min(y, 10) * 0.035, o = (z * W + x) * 4;
+      img.data[o] = Math.min(255, col.r * 255 * f); img.data[o + 1] = Math.min(255, col.g * 255 * f); img.data[o + 2] = Math.min(255, col.b * 255 * f); img.data[o + 3] = 255;
+    }
+    cg.putImageData(img, 0, 0); brMapBase = c;
+  }
+  g.imageSmoothingEnabled = false;
+  g.drawImage(brMapBase, 0, 0, cv.width, cv.height);
+  const fs = Math.round(11 * cv.width / Math.max(60, cv.clientWidth)), px = cv.width / Math.max(60, cv.clientWidth);
+  // the storm outside the circle, the circle, and where it closes to next
+  g.fillStyle = "rgba(120,45,220,.5)"; g.beginPath(); g.rect(0, 0, cv.width, cv.height); g.arc(S.x * s, S.z * s, Math.max(0, S.r) * s, 0, Math.PI * 2, true); g.fill();
+  g.lineWidth = 2 * px; g.strokeStyle = "#fff"; g.beginPath(); g.arc(S.x * s, S.z * s, Math.max(0, S.r) * s, 0, Math.PI * 2); g.stroke();
+  if (S.next) { g.setLineDash([5 * px, 4 * px]); g.beginPath(); g.arc(S.next.x1 * s, S.next.z1 * s, Math.max(0.5, S.next.r1) * s, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); }
+  g.font = `700 ${fs}px system-ui,sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
+  const big = cv.classList.contains("big");
+  for (const P of BR_POIS) {
+    if (big) { g.fillStyle = "rgba(0,0,0,.55)"; g.fillText(P.name, P.x * s + px, P.z * s + px); g.fillStyle = "#fff"; g.fillText(P.name, P.x * s, P.z * s); }
+    else { g.fillStyle = "rgba(255,255,255,.8)"; g.beginPath(); g.arc(P.x * s, P.z * s, 2 * px, 0, Math.PI * 2); g.fill(); }
+  }
+  g.fillStyle = "#c06bff"; g.strokeStyle = "#fff"; g.lineWidth = px;
+  for (const [vx, vz] of brVans) { const a = (big ? 4 : 2.5) * px; g.fillRect(vx * s - a, vz * s - a, a * 2, a * 2); g.strokeRect(vx * s - a, vz * s - a, a * 2, a * 2); }
+  // your duo (and their reboot card), then you
+  for (const id of M.mates) {
+    const r = remotes.get(id); if (!r) continue;
+    if (r.bs === "out" && r.rc) { g.fillStyle = "#36d6c3"; g.fillRect(r.rc.x * s - 3 * px, r.rc.z * s - 4 * px, 6 * px, 8 * px); }
+    if (!r.hasPos || r.bs === "out" || !activePeer(r)) continue;
+    g.fillStyle = r.bs === "down" ? "#ff4f5e" : "#43b7ff"; g.beginPath(); g.arc(r.pos.x * s, r.pos.z * s, 4.5 * px, 0, Math.PI * 2); g.fill(); g.strokeStyle = "#fff"; g.stroke();
+  }
+  if (BR.bs === "out" && M.card && !M.card.taken) { g.fillStyle = "#36d6c3"; g.fillRect(M.card.pos.x * s - 3 * px, M.card.pos.z * s - 4 * px, 6 * px, 8 * px); }
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw), mx = me.pos.x * s, mz = me.pos.z * s, a = 7 * px;
+  g.fillStyle = "#ffd23a"; g.strokeStyle = "#1a1205"; g.beginPath();
+  g.moveTo(mx + fx * a, mz + fz * a); g.lineTo(mx - fx * a * 0.6 + fz * a * 0.6, mz - fz * a * 0.6 - fx * a * 0.6); g.lineTo(mx - fx * a * 0.6 - fz * a * 0.6, mz - fz * a * 0.6 + fx * a * 0.6); g.closePath(); g.fill(); g.stroke();
+}
+$("#brMap").addEventListener("click", () => { $("#brMap").classList.toggle("big"); if (BR.m) BR.m.mapT = 0; });
+
+// ---- over: your team out, or the winners
+function brTeamOut(m) {
+  const M = BR.m; if (!M) return;
+  M.alive = Math.max(1, Math.floor(num(m.alive) || 1));
+  if (String(m.team) === M.team) {
+    if (BR.bs !== "out") brOut(M.knocker || { name: "The other team" });       // both of you down: your duo is out
+    M.place = Math.floor(num(m.place) || 0); brOver(false);
+  } else if (!M.done) banner("A team was eliminated · " + plural(M.alive, "team") + " left");
+}
+function brEnd(m) {
+  const M = BR.m; if (!M) return;
+  const names = (Array.isArray(m.names) ? m.names : []).map(n => cleanName(n)).filter(Boolean);
+  M.ended = true;
+  if (m.team && String(m.team) === M.team) {
+    M.place = 1; addRank(BR_RP); pendWins++; flushProgress();
+    if (acct) setTimeout(() => api("me").catch(() => {}), 1500);       // picks up the Royale Champion skin
+    brOver(true);
+    for (let i = 0; i < 8; i++) blip(523 * Math.pow(1.19, i), 0.2, 0.12, "square", i * 0.1);
+  } else if (!M.done) brOver(false);
+  $("#brOverSub").textContent = names.length ? "Winners: " + names.join(" & ") : "No winner this time";
+  $("#brOverWatch").hidden = true;
+  clearTimeout(brEnd.t); brEnd.t = setTimeout(() => { if (state === "play" && mode === "royale") leaveMatch(); }, 30000);
+}
+function brOver(win) {
+  const M = BR.m; M.done = true;
+  const o = $("#brOver"); o.hidden = false; o.classList.toggle("win", win);
+  $("#brOverTop").textContent = win ? "Victory Royale" : "Eliminated";
+  $("#brOverBig").textContent = "#" + (win ? 1 : M.place || "?");
+  $("#brOverText").textContent = win ? `+${BR_RP} RP · Royale Champion skin · your crown shows over your head until the next battle royale is won` : `${plural(kills, "elimination")} · ${plural(M.teams, "team")} played`;
+  $("#brOverSub").textContent = win ? "" : M.ended ? "" : "The match is still going";
+  $("#brOverWatch").hidden = win || M.ended;
+  if (document.exitPointerLock && locked) document.exitPointerLock();
+}
+$("#brOverLobby").addEventListener("click", () => leaveMatch());
+$("#brOverWatch").addEventListener("click", () => { $("#brOver").hidden = true; if (!isTouch && !noLock) requestLock(); });
+// Leaving the match (or it's over): you're out on the server, and back to the ranked lobby
+function brLeave() {
+  const M = BR.m;
+  if (M && !M.done && BR.bs !== "out") { BR.bs = "out"; alive = false; publish(true); }
+  brClearLoot(); BR.m = null; BR.bs = "up"; BR.guns = []; shield = 0; useHeld = false;
+  if (stormMesh) stormMesh.visible = false;
+  for (const id of ["#brOver", "#brKnock", "#brUse", "#brMap", "#shWrap", "#tUse"]) $(id).hidden = true;
+  $("#brMap").classList.remove("big"); $("#stormTint").style.opacity = 0;
+  document.body.classList.remove("brmode");
+  clearRemotes(); mode = "online"; lobbyName = null; myPeer = "";
+  loadMap(serverMap && MAPS[serverMap] && !MAPS[serverMap].royale ? serverMap : "arena");
+  if (netKind === "ws") joinLobby("");
+}
+
+// Other players' extras: your duo's marker (seen through walls) and the champions' crown
+function crownMesh() {
+  const g = new THREE.Group(), gold = new THREE.MeshBasicMaterial({ color: 0xffd23a }), gem = new THREE.MeshBasicMaterial({ color: 0xff3a5a }), blue = new THREE.MeshBasicMaterial({ color: 0x43b7ff });
+  const add = (w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b; };
+  add(0.72, 0.16, 0.72, gold, 0, 0, 0);
+  for (const [x, z] of [[-0.3, -0.3], [0.3, -0.3], [-0.3, 0.3], [0.3, 0.3], [0, -0.33], [0, 0.33], [-0.33, 0], [0.33, 0]]) add(0.12, 0.26, 0.12, gold, x, 0.2, z);
+  for (const [x, z] of [[-0.3, -0.3], [0.3, -0.3], [-0.3, 0.3], [0.3, 0.3]]) add(0.09, 0.09, 0.09, gold, x, 0.38, z);
+  add(0.12, 0.1, 0.03, gem, 0, 0.02, -0.37); add(0.03, 0.1, 0.12, blue, -0.37, 0.02, 0); add(0.03, 0.1, 0.12, blue, 0.37, 0.02, 0); add(0.12, 0.1, 0.03, gem, 0, 0.02, 0.37);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: auraTex, color: 0xffd23a, transparent: true, opacity: 0.85, depthWrite: false }));
+  glow.scale.set(1.9, 1.5, 1); glow.position.y = 0.1; g.add(glow);
+  g.userData.glow = glow;
+  return g;
+}
+function setCrown(av, on, y) {
+  if (on && !av.crown) { av.crown = crownMesh(); av.g.add(av.crown); }
+  if (av.crown) { av.crown.visible = on; av.crown.position.y = y || TAG_Y + 0.55; }
+}
+function animCrown(av, t) { if (av.crown && av.crown.visible) { av.crown.rotation.y = t * 1.3; av.crown.userData.glow.material.opacity = 0.65 + 0.25 * Math.sin(t * 3); } }
+function brDecorate(r, t) {
+  const av = r.av;
+  if (av.crownKey !== BR.crownKey) { av.crownKey = BR.crownKey; setCrown(av, brIsChamp(r.ac || r.name)); }
+  animCrown(av, t);
+  const mate = brMate(r);
+  if (mate && !av.mark) {
+    const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d");
+    g.fillStyle = "#43b7ff"; g.strokeStyle = "#fff"; g.lineWidth = 5; g.beginPath(); g.moveTo(12, 14); g.lineTo(52, 14); g.lineTo(32, 50); g.closePath(); g.fill(); g.stroke();
+    av.mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+    av.mark.scale.set(0.55, 0.55, 1); av.mark.renderOrder = 9; av.g.add(av.mark);
+  }
+  if (av.mark) { av.mark.visible = mate; av.mark.position.y = TAG_Y + (av.crown && av.crown.visible ? 1.15 : 0.5); av.mark.material.color.set(r.bs === "down" ? 0xff4f5e : 0xffffff); }
+}
+// ======================================================================
 // Lobby: your character on a glowing stage, tabs on top, mode switch and a big Play button
 // ======================================================================
 let hk = null, heroYaw = 0.5, heroDrag = null;
@@ -4878,13 +5748,19 @@ function heroKit() {
   const rim = new THREE.DirectionalLight(0xffb627, 0.7); rim.position.set(2, 2, 3); sc.add(rim);
   const cam = new THREE.PerspectiveCamera(30, 3 / 4, 0.1, 30); cam.position.set(0, 1.4, -6.1); cam.lookAt(0, 0.95, 0);
   // the stage: a dark disc with a glowing rim and a soft glow on the floor
-  const stage = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.15, 0.22, 40), new THREE.MeshLambertMaterial({ color: 0x1a222c }));
-  stage.position.y = -0.11; sc.add(stage);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.06, 0.035, 8, 64), new THREE.MeshBasicMaterial({ color: 0xffb627 }));
-  ring.rotation.x = Math.PI / 2; ring.position.y = 0.005; sc.add(ring);
-  const glow = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.2), new THREE.MeshBasicMaterial({ map: auraTex, color: 0xffb627, transparent: true, opacity: 0.55, depthWrite: false }));
-  glow.rotation.x = -Math.PI / 2; glow.position.y = 0.01; sc.add(glow);
-  hk = { r, sc, cam, av: null, key: "", w: 0, h: 0, ring, glow };
+  // (a second one appears for your battle royale duo)
+  const pad = () => {
+    const p = new THREE.Group();
+    const stage = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.15, 0.22, 40), new THREE.MeshLambertMaterial({ color: 0x1a222c }));
+    stage.position.y = -0.11; p.add(stage);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.06, 0.035, 8, 64), new THREE.MeshBasicMaterial({ color: 0xffb627 }));
+    ring.rotation.x = Math.PI / 2; ring.position.y = 0.005; p.add(ring);
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.2), new THREE.MeshBasicMaterial({ map: auraTex, color: 0xffb627, transparent: true, opacity: 0.55, depthWrite: false }));
+    glow.rotation.x = -Math.PI / 2; glow.position.y = 0.01; p.add(glow);
+    sc.add(p); return { p, ring, glow };
+  };
+  const A = pad(), B = pad(); B.p.visible = false;
+  hk = { r, sc, cam, av: null, key: "", w: 0, h: 0, ring: A.ring, glow: A.glow, padA: A.p, padB: B, mate: null, mateKey: "", duo: null };
   const c = $("#hero");
   c.addEventListener("pointerdown", e => { heroDrag = { x: e.clientX, yaw: heroYaw }; c.setPointerCapture(e.pointerId); c.style.cursor = "grabbing"; });
   c.addEventListener("pointermove", e => { if (heroDrag) heroYaw = heroDrag.yaw + (e.clientX - heroDrag.x) * 0.012; });
@@ -4897,12 +5773,32 @@ function updateHero(dt, t) {
   const k = heroKit(), c = $("#hero"), w = c.clientWidth, h = c.clientHeight;
   if (!w || !h) return;
   if (w !== k.w || h !== k.h) { k.w = w; k.h = h; k.r.setSize(w, h, false); k.cam.aspect = w / h; k.cam.updateProjectionMatrix(); }
-  const skin = pigMode ? "pig" : mySkin() || "default", key = skin + "|" + myColor;
-  if (key !== k.key) { if (k.av) disposeAvatar(k.av); k.av = makeAvatar(PAL[myColor], null, skin, null, k.sc); k.key = key; }
-  if (!heroDrag) heroYaw += dt * 0.45;
-  k.av.g.rotation.y = heroYaw;
+  // your battle royale duo stands next to you, in their own skin
+  const mate = brPartner(), duo = !!mate, crowned = brIsChamp(myChampName()) || !!(mate && brIsChamp(mate.name)), frame = duo + "|" + crowned;
+  if (frame !== k.frame) {                       // step back for two players, and leave room above for a crown
+    k.frame = frame;
+    if (duo) { k.cam.position.set(0, 1.9, -9.6); k.cam.lookAt(0, 1.5, 0); }
+    else { k.cam.position.set(0, 1.4, -6.1); k.cam.lookAt(0, 0.95, 0); }
+  }
+  if (duo !== k.duo) {
+    k.duo = duo; k.key = "";
+    k.padA.position.x = duo ? 0.95 : 0; k.padB.p.position.x = -0.95; k.padB.p.visible = duo;
+    $(".lb-hero .plate").hidden = duo;
+  }
+  const skin = pigMode ? "pig" : mySkin() || "default", champ = brIsChamp(myChampName()), key = skin + "|" + myColor + "|" + (duo ? cleanName(nick.value) || myName : "") + "|" + rankPts;
+  if (key !== k.key) { if (k.av) disposeAvatar(k.av); k.av = makeAvatar(PAL[myColor], duo ? cleanName(nick.value) || myName : null, skin, duo ? rankPts : null, k.sc); k.key = key; k.av.crownKey = null; }
+  if (k.av.crownKey !== BR.crownKey + "|" + champ) { k.av.crownKey = BR.crownKey + "|" + champ; setCrown(k.av, champ, duo ? TAG_Y + 0.55 : 1.97); if (k.av.crown) k.av.crown.scale.setScalar(duo ? 1 : 0.8); }
+  const mk = mate ? [mate.skin, mate.color, mate.name, mate.rk].join("|") : "";
+  if (mk !== k.mateKey) {
+    if (k.mate) disposeAvatar(k.mate); k.mate = null; k.mateKey = mk;
+    if (mate) { k.mate = makeAvatar(PAL[mate.color], mate.name, mate.skin || "default", mate.rk, k.sc); k.mate.g.position.x = -0.95; setCrown(k.mate, brIsChamp(mate.name)); }
+  }
+  if (!heroDrag) heroYaw = duo ? heroYaw + (0.35 - heroYaw) * Math.min(1, dt * 3) : heroYaw + dt * 0.45;
+  k.av.g.rotation.y = heroYaw; k.av.g.position.x = duo ? 0.95 : 0;
   k.av.g.position.y = Math.sin(t * 1.6) * 0.02;
   if (k.av.anim) k.av.anim(k.av, t);
+  animCrown(k.av, t);
+  if (k.mate) { k.mate.g.rotation.y = -0.35; k.mate.g.position.y = Math.sin(t * 1.6 + 1) * 0.02; if (k.mate.anim) k.mate.anim(k.mate, t); animCrown(k.mate, t); const mc = new THREE.Color(PAL[mate.color]); k.padB.ring.material.color.copy(mc); k.padB.glow.material.color.copy(mc); k.padB.glow.material.opacity = 0.45 + 0.12 * Math.sin(t * 2 + 1); }
   const col = new THREE.Color(PAL[myColor]); k.ring.material.color.copy(col); k.glow.material.color.copy(col);
   k.glow.material.opacity = 0.45 + 0.12 * Math.sin(t * 2);
   k.r.render(k.sc, k.cam);
@@ -4910,29 +5806,32 @@ function updateHero(dt, t) {
 function renderPlate() {
   const R = rankOf(rankPts);
   $("#heroName").textContent = cleanName(nick.value) || "Player";
-  $("#heroRank").textContent = R.label; $("#heroRank").style.color = R.color;
+  $("#heroRank").textContent = (brIsChamp(myChampName()) ? "👑 Royale Champion · " : "") + R.label; $("#heroRank").style.color = R.color;
 }
 nick.addEventListener("input", renderPlate); renderPlate();
 // Ranked or a bot match; the big button plays whichever is picked
-var playMode = ["bots", "party"].includes(load("cfa.mode")) ? load("cfa.mode") : "ranked";   // var: the status line can ask before this runs
+var playMode = ["bots", "party", "royale"].includes(load("cfa.mode")) ? load("cfa.mode") : "ranked";   // var: the status line can ask before this runs
 function renderPlayMode() {
-  for (const [id, m] of [["modeRanked", "ranked"], ["modeParty", "party"], ["modeBots", "bots"]]) $("#" + id).setAttribute("aria-pressed", String(playMode === m));
+  for (const [id, m] of [["modeRanked", "ranked"], ["modeParty", "party"], ["modeBots", "bots"], ["modeRoyale", "royale"]]) $("#" + id).setAttribute("aria-pressed", String(playMode === m));
   $(".partyrow").hidden = playMode !== "party";
   renderPlaySub();
 }
 function renderPlaySub() {
+  try { renderBrPlay(); } catch (e) {}                                     // the battle royale's queue button
+  if (playMode === "royale") return;
   let party = ""; try { party = playMode === "party" ? cleanCode($("#code").value) : ""; } catch (e) {}   // may run before the page finishes loading
   const pm = MAPS[$("#partyMap").value];
   $("#partyMapRow").hidden = playMode !== "party";
   $("#playSub").textContent = playMode === "bots" ? "Bot match · 6–8 bots" : playMode === "party" ? (party ? "Party " + party.toUpperCase() + (pm ? " · " + pm.name : "") + " · half RP" : "Type a party code above") : $("#onlineSub").textContent || "Ranked · matched by rank";
 }
 // Party map: picked by whoever starts the party
-for (const [id, m] of Object.entries(MAPS)) { const o = document.createElement("option"); o.value = id; o.textContent = m.name; $("#partyMap").appendChild(o); }
+for (const [id, m] of Object.entries(MAPS)) { if (m.royale) continue; const o = document.createElement("option"); o.value = id; o.textContent = m.name; $("#partyMap").appendChild(o); }
 $("#partyMap").value = MAPS[load("cfa.pmap")] ? load("cfa.pmap") : "arena";
 $("#partyMap").addEventListener("change", () => { save("cfa.pmap", $("#partyMap").value); renderPlaySub(); });
 codeIn.addEventListener("input", renderPlaySub);
-for (const [id, m] of [["modeRanked", "ranked"], ["modeParty", "party"], ["modeBots", "bots"]]) $("#" + id).addEventListener("click", () => { playMode = m; save("cfa.mode", m); renderPlayMode(); if (m === "party" && !codeIn.value.trim()) codeIn.focus(); });
+for (const [id, m] of [["modeRanked", "ranked"], ["modeParty", "party"], ["modeBots", "bots"], ["modeRoyale", "royale"]]) $("#" + id).addEventListener("click", () => { playMode = m; save("cfa.mode", m); renderPlayMode(); if (m === "party" && !codeIn.value.trim()) codeIn.focus(); });
 $("#bigPlay").addEventListener("click", () => {
+  if (playMode === "royale") { brQueueToggle(); return; }
   if (playMode === "party" && !cleanCode(codeIn.value)) { banner("Type a party code first"); codeIn.focus(); return; }
   $(playMode === "bots" ? "#playBots" : "#playOnline").click();
 });
@@ -5010,7 +5909,7 @@ $("#friendsClose").addEventListener("click", () => { $("#friendsSheet").hidden =
 $("#friendsSheet").addEventListener("click", e => { if (e.target.id === "friendsSheet") $("#friendsSheet").hidden = true; });
 renderAcctUI();
 // ---- iPad and iPhone: play from the Home Screen app, not Safari
-if (onOwnSite && isIOS && !isStandalone()) $("#getApp").hidden = false;
+if (onOwnSite && !devHost && isIOS && !isStandalone()) $("#getApp").hidden = false;
 $("#getAppSignBtn").addEventListener("click", openSignIn);
 function renderGetApp() { $("#getAppSign").hidden = !!acct; $("#getAppSave").textContent = acct ? "You're signed in as " + acct.name + ". Sign in with the same account inside the app to keep your rank, skins and friends." : "The app starts fresh, so sign in here first to keep your rank, then sign in again inside the app."; }
 renderGetApp();
@@ -5019,6 +5918,7 @@ $("#playBots").addEventListener("click", () => startGame("bots"));
 $("#resume").addEventListener("click", () => { initAudio(); requestLock(); if (isTouch || noLock) showPause(false); });
 $("#leave").addEventListener("click", () => leaveMatch());
 function leaveMatch() {
+  if (mode === "royale") brLeave();
   state = "menu"; alive = false; resetAim(); spectating = false; joinPending = false; specCur = null;
   $(".lb-side").appendChild($("#classField"));
   $(".lb-side").appendChild($("#dougField")); renderHackPick();
@@ -5075,13 +5975,13 @@ function tick() {
       const len = Math.hypot(f, s); if (len > 1) { f /= len; s /= len; }
       const sprint = input && (keys.has("ShiftLeft") || keys.has("ShiftRight") || (isTouch && len > 0.85));
       crouchAmt += ((crouch ? 1 : 0) - crouchAmt) * (1 - Math.exp(-14 * dt));
-      const speed = (sprint && f > 0.2 && aim < 0.3 && !crouch ? SPRINT : WALK) * (1 - aim * 0.35) * (crouch ? 0.5 : 1) * classOf(classId).speed * (WEAPONS[cur].move || 1);
+      const speed = (sprint && f > 0.2 && aim < 0.3 && !crouch ? SPRINT : WALK) * (1 - aim * 0.35) * (crouch ? 0.5 : 1) * classOf(classId).speed * (WEAPONS[cur].move || 1) * (brKnocked() ? 0.32 : 1);
       const fwx = -Math.sin(yaw), fwz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
       const wx = (fwx * f + rx * s) * speed, wz = (fwz * f + rz * s) * speed;
       const k = t < dashUntil ? 0 : 1 - Math.exp(-(me.onGround ? 20 : (t - (me.padT || -9) < 1.2 ? 4 : 8)) * (t < dashUntil + 0.15 ? 0.35 : 1) * dt);
       me.vel.x += (wx - me.vel.x) * k; me.vel.z += (wz - me.vel.z) * k;
       me.vel.y -= GRAV * dt;
-      if (input && (keys.has("Space") || touchJump || jumpHeld) && me.onGround) me.vel.y = JUMP;
+      if (input && (keys.has("Space") || touchJump || jumpHeld) && me.onGround && !brKnocked()) me.vel.y = JUMP;
       touchJump = false;
       moveEnt(me, dt);
       if (onPad(me)) { launchPad(me); dashFov = Math.max(dashFov, 0.7); blip(300, 0.05, 0.1, "sine"); blip(600, 0.08, 0.08, "sine", 0.04); blip(1100, 0.1, 0.06, "sine", 0.09); }
@@ -5116,7 +6016,7 @@ function tick() {
       }
       if (input && (fireQueued || (holdFire && WEAPONS[cur].auto))) fire();
       fireQueued = false;
-      if (t - lastHurt > 4 && hp < 100) hp = Math.min(100, hp + 12 * dt);
+      if (t - lastHurt > 4 && hp < 100 && mode !== "royale") hp = Math.min(100, hp + 12 * dt);   // no healing by itself in the battle royale
       bob += Math.hypot(me.vel.x, me.vel.z) * dt * (me.onGround ? 1.4 : 0);
     } else {
       aim = 0; assistTg = null;
@@ -5149,6 +6049,7 @@ function tick() {
     }
 
     if (mode === "bots") for (const b of bots) updateBot(b, dt, t);
+    if (mode === "royale") brTick(dt, t);
     publish(false);
   } else {
     orbit += dt * 0.07;
@@ -5161,7 +6062,7 @@ function tick() {
   // remote players (only shown in online matches)
   const kk = 1 - Math.exp(-22 * dt);   // other players follow their latest position closely
   for (const r of remotes.values()) {
-    const show = mode === "online" && activePeer(r) && r.hasPos && r.alive && !r.iv && r !== specCur;
+    const show = netMode() && activePeer(r) && r.hasPos && r.alive && !r.iv && r !== specCur;
     const wantSkin = r.sk || skinFor(r.name, r.color);
     if (r.av && r.av.skin !== wantSkin) { disposeAvatar(r.av); r.av = null; }
     if (show && !r.av) r.av = makeAvatar(PAL[r.color], r.name, wantSkin, r.rk);
@@ -5173,7 +6074,8 @@ function tick() {
     r.pos.lerp(r.target, kk);
     r.av.g.position.copy(r.pos);
     if (r.av.legs) animatePig(r.av, r.pos, dt);
-    r.av.g.scale.y += ((r.cr ? 0.75 : 1) - r.av.g.scale.y) * kk;
+    r.av.g.scale.y += ((r.bs === "down" ? 0.42 : r.cr ? 0.75 : 1) - r.av.g.scale.y) * kk;
+    brDecorate(r, t);
     r.av.g.rotation.y += wrapA(r.yaw - r.av.g.rotation.y) * kk;
     r.av.head.rotation.x = r.pitch; r.av.arms.rotation.x = r.pitch;
     if (r.av.anim) r.av.anim(r.av, t);
