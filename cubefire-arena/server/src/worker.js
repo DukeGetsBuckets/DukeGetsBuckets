@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 46;
+const MIN_BUILD = 47;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -513,6 +513,7 @@ const ALL_SKINS = [...SKINS.common, ...SKINS.rare, ...SKINS.super, ...SKINS.ultr
 // Rank rewards: owned automatically once the account's rank points reach the number
 const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200], ["diamondwarden", 1800], ["masterphantom", 2500], ["champion", 3500], ["mythic", 8000], ["legend", 15000]];
 const BR_SKIN = "royalechamp";   // only for battle royale winners
+const PRO_SKIN = "proskin", LEGEND_RP = 15000;   // Pro: the top 3 Legends (their own skin while they stay in the top 3)
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["ultra", 0.01], ["super", 0.04], ["rare", 0.25], ["common", 0.7]];
 // Rare spins (won by winning a round with more than 8 players): 5% ultra, 60% super rare, 35% common
@@ -784,10 +785,21 @@ export class Accounts {
 
   user(name) { return this.sql.exec("SELECT * FROM users WHERE name = ?", name).toArray()[0] || null; }
   data(u) { try { return JSON.parse(u.data) || {}; } catch { return {}; } }
-  saveData(name, d) { this.sql.exec("UPDATE users SET data = ? WHERE name = ?", JSON.stringify(d), name); }
+  saveData(name, d) { this.sql.exec("UPDATE users SET data = ? WHERE name = ?", JSON.stringify(d), name); if ((d.rank || 0) >= LEGEND_RP || this.proPlace(name)) this.prosCache = null; }   // a Legend's rank changed: work out the top 3 again
+  // The top 3 Legends (not banned): Pro rank, the Pro skin and the glowing Pro icon
+  pros() {
+    if (this.prosCache && Date.now() - this.prosCache.at < 15000) return this.prosCache.list;
+    const rows = this.sql.exec("SELECT name, display, CAST(json_extract(data, '$.rank') AS INTEGER) AS rank FROM users WHERE CAST(json_extract(data, '$.rank') AS INTEGER) >= ? ORDER BY rank DESC, created ASC LIMIT 10", LEGEND_RP).toArray();
+    const list = rows.filter(r => !this.banned("name", r.name)).slice(0, 3).map((r, i) => ({ acc: r.name, name: r.display, rank: r.rank, place: i + 1 }));
+    this.prosCache = { at: Date.now(), list };
+    return list;
+  }
+  proPlace(name) { const p = this.pros().find(x => x.acc === name); return p ? p.place : 0; }
   view(u, d) {
-    if (OWNER_ACCOUNTS[u.name]) return { name: u.display, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k), BR_SKIN], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false, rareSpins: 999, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
-    return { name: u.display, tickets: d.tickets || 0, owned: [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0)), ...(d.brWins ? [BR_SKIN] : [])], equipped: d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), rareSpins: d.rareSpins || 0, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
+    const pro = this.proPlace(u.name);
+    if (OWNER_ACCOUNTS[u.name]) return { name: u.display, pro, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k), BR_SKIN, PRO_SKIN], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false, rareSpins: 999, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
+    const owned = [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0)), ...(d.brWins ? [BR_SKIN] : []), ...(pro ? [PRO_SKIN] : [])];
+    return { name: u.display, pro, tickets: d.tickets || 0, owned, equipped: d.equipped === PRO_SKIN && !pro ? null : d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), rareSpins: d.rareSpins || 0, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
   }
   async session(name) {
     const token = hex(crypto.getRandomValues(new Uint8Array(24)));
@@ -938,10 +950,11 @@ export class Accounts {
       this.fails.delete(name);
       return { token: await this.session(name), account: this.view(u, this.data(u)) };
     }
+    if (op === "pros") return { pros: this.pros().map(({ name, rank, place }) => ({ name, rank, place })) };   // the top 3 Legends
     if (op === "crown") { let c = null; try { c = JSON.parse(this.setting("crown") || "null"); } catch {} return { crown: c }; }   // the last battle royale winners
     if (op === "top") {                                    // leaderboard: the 20 highest-ranked accounts
       const top = this.sql.exec("SELECT display, CAST(json_extract(data, '$.rank') AS INTEGER) AS rank FROM users WHERE CAST(json_extract(data, '$.rank') AS INTEGER) > 0 ORDER BY rank DESC, created ASC LIMIT 20").toArray();
-      return { top: top.map(r => ({ name: r.display, rank: r.rank })) };
+      return { top: top.map(r => ({ name: r.display, rank: r.rank })), pros: this.pros().map(({ name, rank, place }) => ({ name, rank, place })) };
     }
     const u = this.who(body), d = this.data(u);
     if (Date.now() - (d.seen || 0) > 300000) { d.seen = Date.now(); this.saveData(u.name, d); }   // last seen, for the dashboard

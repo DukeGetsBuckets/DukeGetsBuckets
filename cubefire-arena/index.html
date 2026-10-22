@@ -373,7 +373,7 @@ body.pig #pigTint{display:block}
 .wheelwrap canvas{width:240px;height:240px;display:block}
 .wheelwrap::after{content:"";position:absolute;left:50%;top:-6px;transform:translateX(-50%);border:12px solid transparent;border-top:20px solid var(--ink);filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))}
 .odds{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;font-weight:700}
-.r0{color:#b7c3cf}.r1{color:#4fb0ff}.r2{color:#d17bff}.r3{color:#ffc93c}.r4{color:#ff4f8b;text-shadow:0 0 8px rgba(255,79,139,.6)}.r5{color:#ffd23a;text-shadow:0 0 10px rgba(255,210,58,.7)}
+.r0{color:#b7c3cf}.r1{color:#4fb0ff}.r2{color:#d17bff}.r3{color:#ffc93c}.r4{color:#ff4f8b;text-shadow:0 0 8px rgba(255,79,139,.6)}.r5{color:#ffd23a;text-shadow:0 0 10px rgba(255,210,58,.7)}.r6{color:#ff5cf0;text-shadow:0 0 10px rgba(255,92,240,.75)}
 .prize{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;align-items:center;border:1px solid var(--accent);border-radius:6px;padding:8px 10px;background:rgba(255,182,39,.08)}
 .prize img{width:72px;height:90px;object-fit:contain}
 .prize b{font:400 18px var(--display);display:block}
@@ -1945,6 +1945,12 @@ const DEATH_LOSS = [2, 5, 9, 12, 15, 18, 22, 25, 28];   // one per rank in RANKS
 const rankTier = () => { let i = 0; RANKS.forEach((R, k) => { if (rankPts >= R.min) i = k; }); return i; };
 const rpGain = n => n, rpLoss = () => DEATH_LOSS[rankTier()];
 // Each rank but the top one has three divisions: III, then II, then I
+// Pro: the top 3 Legends on the leaderboard (the server says who). They show as "Pro #1" to
+// "Pro #3" everywhere, wear the Pro skin, and have a glowing Pro icon over their heads.
+const PRO_COLOR = "#ff5cf0";
+let PROS = [], proKey = 0;
+const proPlace = name => { const n = String(name || "").toLowerCase(); const p = n && PROS.find(x => x.name.toLowerCase() === n); return p ? p.place : 0; };
+const rankFor = (pts, pro) => pro ? { label: "Pro #" + pro, color: PRO_COLOR } : rankOf(pts);
 function rankOf(pts) {
   pts = Math.max(0, pts || 0);
   let i = RANKS.length - 1; while (i > 0 && pts < RANKS[i].min) i--;
@@ -1961,18 +1967,20 @@ const lam = c => new THREE.MeshLambertMaterial({ color: c });
 function box(w, h, d, mat, x, y, z, parent) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); parent.add(m); return m; }
 // Name tag: the player's rank (when they have one) over their name
 const TAG_Y = 2.35;
-function nameSprite(text, pts) {
+function nameSprite(text, pts, pro) {
   const c = document.createElement("canvas"); c.width = 448; c.height = 112;
   const g = c.getContext("2d");
   g.textAlign = "center"; g.textBaseline = "middle";
   if (pts != null) {
-    const rk = rankOf(pts), label = rk.label.toUpperCase();
+    const rk = rankFor(pts, pro), label = (pro ? "★ " : "") + rk.label.toUpperCase();
     g.font = '700 28px "Chakra Petch", system-ui, sans-serif';
     const w = Math.min(440, g.measureText(label).width + 54), x0 = 224 - w / 2;
     g.fillStyle = "rgba(10,14,20,.72)"; g.fillRect(x0, 2, w, 42);
+    if (pro) { g.shadowColor = PRO_COLOR; g.shadowBlur = 14; }
     g.fillStyle = rk.color; g.fillRect(x0, 40, w, 4);                                  // rank-colored underline
     g.beginPath(); g.moveTo(x0 + 19, 9); g.lineTo(x0 + 30, 22); g.lineTo(x0 + 19, 35); g.lineTo(x0 + 8, 22); g.closePath(); g.fill();
     g.fillText(label, 224 + 12, 23, 400);
+    g.shadowBlur = 0;
   }
   g.font = '700 30px "Chakra Petch", system-ui, sans-serif';
   const w = Math.min(440, g.measureText(text).width + 24);
@@ -1982,14 +1990,14 @@ function nameSprite(text, pts) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: true, transparent: true }));
   s.scale.set(2.8, 0.7, 1); return s;
 }
-const tagKey = (name, pts) => name + "|" + (pts == null ? "" : rankOf(pts).label);
+const tagKey = (name, pts, pro) => name + "|" + (pts == null ? "" : rankFor(pts, pro).label);
 // Custom skins by player name (everyone sees them)
 const SKINS = { mason: "pig" };
 const skinFor = (name, color) => color === 6 ? "default" : SKINS[String(name || "").toLowerCase()] || "default"; // white armor = no pig
 // Skins from the skin wheel. rarity: 0 common, 1 rare, 2 super rare, 4 ultra (1%). Colors for each
 // part of the body; glow: emissive color (super rares glow); gun: tint for your own gun;
 // extra(add, head, body) adds details; anim(av, t) animates the skin for everyone.
-const RARITY = [{ name: "Common", color: "#b7c3cf" }, { name: "Rare", color: "#4fb0ff" }, { name: "Super rare", color: "#d17bff" }, { name: "Rank reward", color: "#ffc93c" }, { name: "Ultra 1%", color: "#ff4f8b" }, { name: "Royale Champion", color: "#ffd23a" }];
+const RARITY = [{ name: "Common", color: "#b7c3cf" }, { name: "Rare", color: "#4fb0ff" }, { name: "Super rare", color: "#d17bff" }, { name: "Rank reward", color: "#ffc93c" }, { name: "Ultra 1%", color: "#ff4f8b" }, { name: "Royale Champion", color: "#ffd23a" }, { name: "Pro", color: "#ff5cf0" }];
 const SKIN_DEFS = {
   camo: { name: "Jungle Camo", rarity: 0, legs: 0x3b4526, body: 0x56683a, helmet: 0x4a5a30,
     extra(add) { for (const [x, y, w, h, c] of [[-0.16, 1.18, 0.16, 0.12, 0x2f3b20], [0.12, 0.96, 0.2, 0.1, 0x6f7f45], [0.15, 1.24, 0.12, 0.1, 0x2f3b20], [-0.1, 0.9, 0.14, 0.08, 0x6f7f45]]) add(w, h, 0.02, c, x, y, -0.18); } },
@@ -2264,6 +2272,9 @@ const MORE_SKINS = [
   ["infernodemon", "Inferno Demon", 4, 0x3a0606, 0x140202, 0x5a0a0a, "horns+wings+dots", 0xff3a1a, 0xff9a3a, { head: 0x5a0a0a, visor: 0xffd23a, glow: 0x300000, aura: 0xff3a1a }],
   ["hologram", "Hologram", 4, 0x5ff0ff, 0x2aa8c8, 0x8ff6ff, "vstripes+visor2+antenna", 0xffffff, 0x2bf3ff, { glow: 0x0a5a6a, aura: 0x5ff0ff,
     anim(av, t) { av.bodyMat.color.setHSL(0.52, 0.9, 0.62 + 0.12 * Math.sin(t * 9)); } }],
+  // only for the top 3 Legends (Pro), while they stay in the top 3
+  ["proskin", "Pro", 6, 0x17121f, 0x0b0912, 0x231a33, "crest+pads+visor2+bands", 0xff5cf0, 0x5ff0ff, { head: 0x231a33, visor: 0x5ff0ff, glow: 0x2a0830, aura: 0xff5cf0,
+    anim(av, t) { av.helmetMat.color.setHSL(0.86 + 0.04 * Math.sin(t * 2.5), 0.9, 0.22 + 0.06 * Math.sin(t * 5)); } }],
   // only for battle royale winners
   ["royalechamp", "Royale Champion", 5, 0xffd23a, 0x3a1a6a, 0xffd23a, "crown+cape+stars", 0xffd23a, 0x9b4bff, { head: 0x5a2aa0, visor: 0x9b4bff, glow: 0x3a2400, aura: 0xffd23a }],
   ["thundergod", "Thunder God", 4, 0x1f2f6a, 0x101a3a, 0xc9d3dd, "bolt+cape+pads", 0xffe14a, 0x6fc3ff, { visor: 0x6fc3ff, glow: 0x0a1440, aura: 0x6fc3ff }],
@@ -2275,7 +2286,7 @@ for (const [id, name, rarity, body, legs, helmet, parts, a, b, x = {}] of MORE_S
     anim: fancy ? (av, t) => { const k = 0.55 + 0.45 * Math.sin(t * 3); for (const m of av.pulse) m.emissiveIntensity = k; if (own) own(av, t); } : own };
 }
 const RANK_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity === 3);
-const WHEEL_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity !== 3 && SKIN_DEFS[k].rarity !== 5);
+const WHEEL_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity !== 3 && SKIN_DEFS[k].rarity < 5);
 const SKIN_IDS = Object.keys(SKIN_DEFS);
 // Soft round glow used for the top rank skins' auras
 const auraTex = (() => {
@@ -2440,11 +2451,11 @@ function animatePig(a, pos, dt) {
   a.ears[0].rotation.x = Math.sin(a.run * 4) * 0.5 * amt; a.ears[1].rotation.x = -Math.sin(a.run * 4 + 0.6) * 0.5 * amt;
   a.tail.rotation.z = Math.sin(a.run * (amt > 0.1 ? 6 : 2)) * (0.25 + 0.5 * amt);
 }
-function setAvatarName(a, name, pts) {
-  const key = tagKey(name, pts);
+function setAvatarName(a, name, pts, pro) {
+  const key = tagKey(name, pts, pro);
   if (a.tagKey === key) return;
   a.g.remove(a.tag); a.tag.material.map.dispose(); a.tag.material.dispose();
-  a.tag = nameSprite(name, pts); a.tag.position.set(0, TAG_Y, 0); a.g.add(a.tag); a.name = name; a.tagKey = key;
+  a.tag = nameSprite(name, pts, pro); a.tag.position.set(0, TAG_Y, 0); a.g.add(a.tag); a.name = name; a.tagKey = key;
 }
 // The gun in another player's hands matches the length of the gun they're holding
 function setAvatarGun(a, wi) {
@@ -2816,7 +2827,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 46;
+const BUILD = 47;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3362,7 +3373,7 @@ function addRank(delta) {
   renderRank(); publish(true);
 }
 function renderRank() {
-  const rk = rankOf(rankPts);
+  const rk = rankFor(rankPts, myPro());
   const n = $("#rankName"); n.textContent = rk.label; n.style.color = rk.color; $("#rankPts").textContent = rankPts + " RP";
   const m = $("#menuRank"), dia = document.createElement("i"), txt = document.createElement("span"), b = document.createElement("b"), c = document.createElement("small");
   dia.style.background = rk.color; dia.style.color = rk.color; b.textContent = rk.label; b.style.color = rk.color; c.textContent = rankPts + " RP";
@@ -3386,7 +3397,7 @@ function rankSteps() {
   return steps;
 }
 function showRanks() {
-  const steps = rankSteps(), mine = rankOf(rankPts);
+  const steps = rankSteps(), mine = rankFor(rankPts, myPro());
   let at = 0; steps.forEach((s, i) => { if (rankPts >= s.min) at = i; });
   const cur = steps[at], nxt = steps[at + 1];
   // you: rank, points and how far to the next level
@@ -3412,6 +3423,15 @@ function showRanks() {
     else mid.append(b, sm);
     row.append(dia, mid, em); list.appendChild(row);
   });
+  {                                                       // Pro: the top 3 Legends
+    const row = document.createElement("div"), dia = document.createElement("i"), mid = document.createElement("div"), b = document.createElement("b"), sm = document.createElement("small"), rw = document.createElement("small"), em = document.createElement("em");
+    row.className = "rankrow" + (myPro() ? " here" : " locked"); dia.style.background = PRO_COLOR; dia.style.boxShadow = "0 0 10px " + PRO_COLOR;
+    b.textContent = "Pro"; b.style.color = PRO_COLOR;
+    sm.textContent = "The top 3 Legends" + (PROS.length ? ": " + PROS.map(p => "#" + p.place + " " + p.name).join(" · ") : " (nobody yet)");
+    rw.textContent = "Reward: the Pro skin and a glowing Pro icon over your head, while you stay in the top 3"; rw.style.color = PRO_COLOR;
+    em.textContent = myPro() ? "You're Pro #" + myPro() : "Top 3 Legends";
+    mid.append(b, sm, rw); row.append(dia, mid, em); list.appendChild(row);
+  }
   $("#ranks").hidden = false;
   loadLeaderboard();
 }
@@ -3421,14 +3441,14 @@ async function loadLeaderboard() {
   const box = $("#leaderboard"), note = $("#lbNote");
   if (!lbRows || performance.now() - lbAt > 20000) {
     if (!lbRows) { box.replaceChildren(); note.textContent = "Loading…"; }
-    try { lbRows = (await api("top")).top; lbAt = performance.now(); }
+    try { const j = await api("top"); lbRows = j.top; lbAt = performance.now(); if (Array.isArray(j.pros)) { PROS = j.pros.slice(0, 3); proKey++; } }
     catch (e) { box.replaceChildren(); note.textContent = API ? "Open the game's own site to see the leaderboard" : "Couldn't load the leaderboard"; return; }
   }
   note.textContent = acct ? "Top " + lbRows.length + " players" : "Sign in from the Locker to get on it";
   box.replaceChildren(...lbRows.map((r, i) => {
-    const row = document.createElement("div"), n = document.createElement("i"), who = document.createElement("span"), rk = document.createElement("b"), pts = document.createElement("em"), R = rankOf(r.rank);
+    const row = document.createElement("div"), n = document.createElement("i"), who = document.createElement("span"), rk = document.createElement("b"), pts = document.createElement("em"), R = rankFor(r.rank, proPlace(r.name));
     row.className = "lbrow" + (acct && acct.name.toLowerCase() === r.name.toLowerCase() ? " me" : "");
-    n.textContent = "#" + (i + 1); who.textContent = r.name; rk.textContent = R.label; rk.style.color = R.color; pts.textContent = r.rank + " RP";
+    n.textContent = "#" + (i + 1); who.textContent = r.name; rk.textContent = (proPlace(r.name) ? "★ " : "") + R.label; if (proPlace(r.name)) rk.style.textShadow = "0 0 8px " + PRO_COLOR; rk.style.color = R.color; pts.textContent = r.rank + " RP";
     row.append(n, who, rk, pts); return row;
   }));
   if (!lbRows.length) note.textContent = "Nobody yet. Play online rounds to get on it";
@@ -4763,11 +4783,16 @@ async function api(op, body) {
   return j;
 }
 function setAcct(a) {
-  const hacksBefore = acctHacks().join();
+  const hacksBefore = acctHacks().join(), proBefore = acct ? acct.pro || 0 : 0;
   acct = a; save("cfa.acct", JSON.stringify(a));
   if (acctHacks().join() !== hacksBefore) { applyDuke(); if (sock && sock.readyState === 1) sock.send(JSON.stringify({ t: "acct", token: acctToken })); }
   if (typeof a.rank === "number" && a.rank !== rankPts) { rankPts = a.rank; save("cfa.rank", rankPts); renderRank(); }
   applyGunFinish(); renderLocker(); publish(true); renderAcctUI();
+  if ((a.pro || 0) !== proBefore) {
+    proKey++; renderRank(); renderPlate();
+    if (a.pro && !proBefore) brToast("★ You're Pro #" + a.pro + "!", "You're one of the top 3 Legends. The Pro skin is in your Locker, and everyone sees your glowing Pro icon", 9);
+    else if (!a.pro && proBefore) banner("You dropped out of the top 3 Legends · no longer Pro");
+  }
 }
 function signOutLocal() { acct = null; acctToken = ""; save("cfa.tok", ""); save("cfa.acct", ""); applyGunFinish(); renderLocker(); publish(true); renderAcctUI(); }
 // Points toward tickets (online eliminations 2, bot ones 1) and round wins, sent every so often
@@ -4912,11 +4937,11 @@ function renderLocker() {
   const grid = $("#skinGrid"); grid.replaceChildren();
   const none = el("button", { type: "button", className: "skin none" + (!id ? " on" : ""), textContent: "No skin" });
   none.addEventListener("click", () => equipSkin(null)); grid.appendChild(none);
-  for (const rar of [5, 4, 3, 2, 1, 0]) for (const sid of SKIN_IDS.filter(k => SKIN_DEFS[k].rarity === rar)) {
+  for (const rar of [6, 5, 4, 3, 2, 1, 0]) for (const sid of SKIN_IDS.filter(k => SKIN_DEFS[k].rarity === rar)) {
     const owned = !!acct && acct.owned.includes(sid), D = SKIN_DEFS[sid];
-    const tagTxt = D.rarity === 3 ? (owned ? "Rank reward" : "Reach " + rankOf(D.rank).label.split(" ")[0]) : D.rarity === 5 ? (owned ? "Battle royale winner" : "Win a battle royale") : RARITY[D.rarity].name;
+    const tagTxt = D.rarity === 3 ? (owned ? "Rank reward" : "Reach " + rankOf(D.rank).label.split(" ")[0]) : D.rarity === 5 ? (owned ? "Battle royale winner" : "Win a battle royale") : D.rarity === 6 ? (owned ? "Top 3 Legend" : "Be a top 3 Legend") : RARITY[D.rarity].name;
     const b = el("button", { type: "button", className: "skin" + (owned ? "" : " locked") + (sid === id ? " on" : "") }, [thumbImg(sid), el("span", { textContent: D.name }), el("small", { className: "r" + D.rarity, textContent: tagTxt })]);
-    b.dataset.skin = sid; b.title = owned ? "Wear " + D.name : D.rarity === 5 ? "Win a battle royale to unlock" : D.rarity === 3 ? "Reach " + rankOf(D.rank).label.split(" ")[0] + " to unlock" : "Win it on the wheel";
+    b.dataset.skin = sid; b.title = owned ? "Wear " + D.name : D.rarity === 6 ? "Be one of the top 3 Legends to wear it" : D.rarity === 5 ? "Win a battle royale to unlock" : D.rarity === 3 ? "Reach " + rankOf(D.rank).label.split(" ")[0] + " to unlock" : "Win it on the wheel";
     b.addEventListener("click", () => { if (owned) equipSkin(sid); });
     grid.appendChild(b);
   }
@@ -5234,6 +5259,12 @@ function brSetCrown(c) {
 // The crown: the winners of the last battle royale (by account name, or callsign if not signed in)
 function brIsChamp(name) { if (!BR.crown || !name) return false; const n = String(name).toLowerCase(); return BR.crown.names.some(x => x.toLowerCase() === n); }
 const myChampName = () => acct ? acct.name : cleanName(nick.value) || myName;
+function myPro() { try { return (acct && acct.pro) || proPlace(acct ? acct.name : "") || 0; } catch (e) { return 0; } }   // your place among the top 3 Legends (0: not Pro)
+// Who the top 3 Legends are, for everyone's name tags and icons
+async function loadPros() {
+  try { const j = await api("pros"); const was = myPro(); PROS = Array.isArray(j.pros) ? j.pros.slice(0, 3) : []; proKey++; renderRank(); renderPlate(); if (acct && myPro() !== was) api("me").catch(() => {}); } catch (e) {}
+}
+if (onOwnSite) { loadPros(); setInterval(loadPros, 60000); }
 function brToast(title, text, sec) {
   $("#brToastTitle").textContent = title; $("#brToastText").textContent = text; $("#brToast").hidden = false;
   clearTimeout(brToast.t); brToast.t = setTimeout(() => { $("#brToast").hidden = true; }, (sec || 6) * 1000);
@@ -5280,7 +5311,7 @@ async function openBrPick() {
     parts.push(el("p", { textContent: "No friends yet." }), el("div", { className: "btns" }, [b]));
   }
   for (const f of list) {
-    const R = rankOf(f.rank), rk = el("b", { textContent: R.label }); rk.style.color = R.color;
+    const R = rankFor(f.rank, proPlace(f.name)), rk = el("b", { textContent: R.label }); rk.style.color = R.color;
     const b = el("button", { type: "button", className: "btn primary", textContent: "Invite" });
     b.addEventListener("click", () => { brSend({ t: "invite", to: f.name.toLowerCase() }); b.textContent = "Sent"; b.disabled = true; });
     const j = el("button", { type: "button", className: "btn", textContent: "Join", hidden: true });   // shows once we know they're online
@@ -5808,11 +5839,33 @@ function setCrown(av, on, y) {
   if (on && !av.crown) { av.crown = crownMesh(); av.g.add(av.crown); }
   if (av.crown) { av.crown.visible = on; av.crown.position.y = y || TAG_Y + 0.55; }
 }
+function proMesh() {
+  const g = new THREE.Group();
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.3, 0), new THREE.MeshBasicMaterial({ color: 0xff5cf0 }));
+  gem.scale.y = 1.35; g.add(gem);
+  const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.15, 0), new THREE.MeshBasicMaterial({ color: 0xffffff })); core.scale.y = 1.35; g.add(core);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.035, 6, 32), new THREE.MeshBasicMaterial({ color: 0x5ff0ff })); ring.rotation.x = Math.PI / 2; g.add(ring);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: auraTex, color: 0xff5cf0, transparent: true, opacity: 0.9, depthWrite: false }));
+  glow.scale.set(1.7, 1.7, 1); g.add(glow);
+  g.userData = { gem, ring, glow };
+  return g;
+}
+function setPro(av, on, y) {
+  if (on && !av.pro) { av.pro = proMesh(); av.g.add(av.pro); }
+  if (av.pro) { av.pro.visible = on; av.pro.position.y = y; }
+}
+function animPro(av, t) {
+  if (!av.pro || !av.pro.visible) return;
+  const u = av.pro.userData; u.gem.rotation.y = t * 2; u.ring.rotation.z = -t * 1.4;
+  u.glow.material.opacity = 0.6 + 0.3 * Math.sin(t * 4); av.pro.scale.setScalar((u.base || 1) * (1 + 0.06 * Math.sin(t * 3)));
+}
 function animCrown(av, t) { if (av.crown && av.crown.visible) { av.crown.rotation.y = t * 1.3; av.crown.userData.glow.material.opacity = 0.65 + 0.25 * Math.sin(t * 3); } }
 function brDecorate(r, t) {
   const av = r.av;
   if (av.crownKey !== BR.crownKey) { av.crownKey = BR.crownKey; setCrown(av, brIsChamp(r.ac || r.name)); }
-  animCrown(av, t);
+  const crowned = !!(av.crown && av.crown.visible);
+  if (av.proKey !== proKey + "|" + crowned) { av.proKey = proKey + "|" + crowned; setPro(av, !!proPlace(r.ac || r.name), TAG_Y + (crowned ? 1.35 : 0.65)); }
+  animCrown(av, t); animPro(av, t);
   const mate = brMate(r);
   if (mate && !av.mark) {
     const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d");
@@ -5820,7 +5873,7 @@ function brDecorate(r, t) {
     av.mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
     av.mark.scale.set(0.55, 0.55, 1); av.mark.renderOrder = 9; av.g.add(av.mark);
   }
-  if (av.mark) { av.mark.visible = mate; av.mark.position.y = TAG_Y + (av.crown && av.crown.visible ? 1.15 : 0.5); av.mark.material.color.set(r.bs === "down" ? 0xff4f5e : 0xffffff); }
+  if (av.mark) { av.mark.visible = mate; av.mark.position.y = TAG_Y + 0.5 + (av.crown && av.crown.visible ? 0.65 : 0) + (av.pro && av.pro.visible ? 0.8 : 0); av.mark.material.color.set(r.bs === "down" ? 0xff4f5e : 0xffffff); }
 }
 // ======================================================================
 // Lobby: your character on a glowing stage, tabs on top, mode switch and a big Play button
@@ -5873,26 +5926,35 @@ function updateHero(dt, t) {
     k.padA.position.x = duo ? 0.95 : 0; k.padB.p.position.x = -0.95; k.padB.p.visible = duo;
     $(".lb-hero .plate").hidden = duo;
   }
-  const skin = pigMode ? "pig" : mySkin() || "default", champ = brIsChamp(myChampName()), key = skin + "|" + myColor + "|" + (duo ? cleanName(nick.value) || myName : "") + "|" + rankPts;
-  if (key !== k.key) { if (k.av) disposeAvatar(k.av); k.av = makeAvatar(PAL[myColor], duo ? cleanName(nick.value) || myName : null, skin, duo ? rankPts : null, k.sc); k.key = key; k.av.crownKey = null; }
+  const skin = pigMode ? "pig" : mySkin() || "default", champ = brIsChamp(myChampName()), key = skin + "|" + myColor + "|" + (duo ? cleanName(nick.value) || myName : "") + "|" + rankPts + "|" + myPro();
+  if (key !== k.key) {
+    if (k.av) disposeAvatar(k.av); k.av = makeAvatar(PAL[myColor], duo ? cleanName(nick.value) || myName : null, skin, duo ? rankPts : null, k.sc); k.key = key; k.av.crownKey = null;
+    if (duo && myPro()) setAvatarName(k.av, cleanName(nick.value) || myName, rankPts, myPro());
+  }
   if (k.av.crownKey !== BR.crownKey + "|" + champ) { k.av.crownKey = BR.crownKey + "|" + champ; setCrown(k.av, champ, duo ? TAG_Y + 0.55 : 1.97); if (k.av.crown) k.av.crown.scale.setScalar(duo ? 1 : 0.8); }
-  const mk = mate ? [mate.skin, mate.color, mate.name, mate.rk].join("|") : "";
+  const iAmPro = myPro();
+  if (k.av.proKey !== proKey + "|" + iAmPro + "|" + champ) { k.av.proKey = proKey + "|" + iAmPro + "|" + champ; setPro(k.av, !!iAmPro, duo ? TAG_Y + (champ ? 1.35 : 0.65) : champ ? 2.5 : 2.17); if (k.av.pro) k.av.pro.userData.base = duo ? 1 : champ ? 0.55 : 0.68; }
+  animPro(k.av, t);
+  const mk = mate ? [mate.skin, mate.color, mate.name, mate.rk, proKey].join("|") : "";
   if (mk !== k.mateKey) {
     if (k.mate) disposeAvatar(k.mate); k.mate = null; k.mateKey = mk;
-    if (mate) { k.mate = makeAvatar(PAL[mate.color], mate.name, mate.skin || "default", mate.rk, k.sc); k.mate.g.position.x = -0.95; setCrown(k.mate, brIsChamp(mate.name)); }
+    if (mate) {
+      k.mate = makeAvatar(PAL[mate.color], mate.name, mate.skin || "default", mate.rk, k.sc); k.mate.g.position.x = -0.95; setCrown(k.mate, brIsChamp(mate.name));
+      const mp = proPlace(mate.name); if (mp) { setAvatarName(k.mate, mate.name, mate.rk, mp); setPro(k.mate, true, TAG_Y + (brIsChamp(mate.name) ? 1.35 : 0.65)); }
+    }
   }
   if (!heroDrag) heroYaw = duo ? heroYaw + (0.35 - heroYaw) * Math.min(1, dt * 3) : heroYaw + dt * 0.45;
   k.av.g.rotation.y = heroYaw; k.av.g.position.x = duo ? 0.95 : 0;
   k.av.g.position.y = Math.sin(t * 1.6) * 0.02;
   if (k.av.anim) k.av.anim(k.av, t);
   animCrown(k.av, t);
-  if (k.mate) { k.mate.g.rotation.y = -0.35; k.mate.g.position.y = Math.sin(t * 1.6 + 1) * 0.02; if (k.mate.anim) k.mate.anim(k.mate, t); animCrown(k.mate, t); const mc = new THREE.Color(PAL[mate.color]); k.padB.ring.material.color.copy(mc); k.padB.glow.material.color.copy(mc); k.padB.glow.material.opacity = 0.45 + 0.12 * Math.sin(t * 2 + 1); }
+  if (k.mate) { k.mate.g.rotation.y = -0.35; k.mate.g.position.y = Math.sin(t * 1.6 + 1) * 0.02; if (k.mate.anim) k.mate.anim(k.mate, t); animCrown(k.mate, t); animPro(k.mate, t); const mc = new THREE.Color(PAL[mate.color]); k.padB.ring.material.color.copy(mc); k.padB.glow.material.color.copy(mc); k.padB.glow.material.opacity = 0.45 + 0.12 * Math.sin(t * 2 + 1); }
   const col = new THREE.Color(PAL[myColor]); k.ring.material.color.copy(col); k.glow.material.color.copy(col);
   k.glow.material.opacity = 0.45 + 0.12 * Math.sin(t * 2);
   k.r.render(k.sc, k.cam);
 }
 function renderPlate() {
-  const R = rankOf(rankPts);
+  const R = rankFor(rankPts, myPro());
   $("#heroName").textContent = cleanName(nick.value) || "Player";
   $("#heroRank").textContent = (brIsChamp(myChampName()) ? "👑 Royale Champion · " : "") + R.label; $("#heroRank").style.color = R.color;
 }
@@ -5969,7 +6031,7 @@ async function renderFriends(reload) {
     catch (e) { box.replaceChildren(el("p", { className: "pm-why", textContent: e.message })); return; }
   }
   const act = async (op, name, done) => { try { await api(op, { name }); if (done) banner(done); } catch (e) { banner(e.message); } renderFriends(true); };
-  const row = (f, buttons) => { const R = rankOf(f.rank), rk = el("b", { textContent: R.label }); rk.style.color = R.color;
+  const row = (f, buttons) => { const R = rankFor(f.rank, proPlace(f.name)), rk = el("b", { textContent: R.label }); rk.style.color = R.color;
     return el("div", { className: "frow" }, [el("span", { textContent: f.name }), rk, el("div", { className: "btns" }, buttons.map(([t, cls, fn]) => { const b = el("button", { type: "button", className: "btn " + cls, textContent: t }); b.addEventListener("click", fn); return b; }))]); };
   const inp = el("input", { type: "text", placeholder: "Friend's account name", maxLength: 16 }); inp.setAttribute("autocapitalize", "off"); inp.setAttribute("spellcheck", "false");
   const add = el("button", { type: "button", className: "btn primary", textContent: "Add friend" });
@@ -6157,7 +6219,7 @@ function tick() {
     if (!r.av) continue;
     r.av.g.visible = show;
     if (!show) continue;
-    setAvatarName(r.av, r.name, r.rk); setAvatarGun(r.av, r.w);
+    setAvatarName(r.av, r.name, r.rk, proPlace(r.ac || r.name)); setAvatarGun(r.av, r.w);
     if (r.av.colorIdx !== r.color) { r.av.colorIdx = r.color; r.av.body.color.set(PAL[r.color]); }
     r.pos.lerp(r.target, kk);
     r.av.g.position.copy(r.pos);
