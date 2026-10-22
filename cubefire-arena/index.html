@@ -2815,7 +2815,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 43;
+const BUILD = 44;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3030,6 +3030,7 @@ function onPeer(p) {
   r.rk = clamp(Math.floor(num(s.rk) || 0), 0, 99999);
   r.w = clamp(Math.floor(num(s.w) || 0), 0, WEAPONS.length - 1);
   r.sp = s.sp === 1;
+  r.hx = s.hx === 1;                                                       // using hacks (the server marks anyone given hacks)
   r.ac = typeof s.ac === "string" ? cleanName(s.ac) : null;               // their account (for the crown)
   if (mode === "royale" && BR.m) brPeer(r, s);
   const pos = vec(s.p);
@@ -3123,7 +3124,7 @@ function publish(force, target) {
     n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0, afk: playing && !royale && iAmAfk() ? 1 : 0, ac: acct ? acct.name : null, hb: Math.floor(now()),
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
-    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : mySkin(), k: playing ? kills : 0, d: playing ? deaths : 0, rk: rankPts, pg: pingMs, pm: playing && partyCode ? $("#partyMap").value : null, sp: playing && spectating ? 1 : 0,
+    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : mySkin(), hx: playing && duke.on ? 1 : 0, k: playing ? kills : 0, d: playing ? deaths : 0, rk: rankPts, pg: pingMs, pm: playing && partyCode ? $("#partyMap").value : null, sp: playing && spectating ? 1 : 0,
     sh: playing ? lastShot : null, gr: playing ? lastNade : null, nk: playing ? lastNuke : null, md: playing ? lastMud : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
   if (royale) { Object.assign(P, brState()); brSend(P); return; }          // the battle royale runs on its own server
@@ -3488,10 +3489,10 @@ function applyDuke() {
     duke.profile = profile; duke.perks = perks;
     for (const k of Object.keys(PERK_DEFAULT)) duke[k] = duke.perks.includes(k) && !!dkPicks[k];
   }
-  duke.on = !!profile;
+  duke.on = !!profile && mode !== "royale";                // no hacks for anyone in the battle royale
   for (const [k, id] of Object.entries(PERK_BUTTON)) $("#" + id).hidden = !duke.perks.includes(k);
   Object.assign(WEAPONS[SNIPER], duke.on && duke.snipe ? SNIPER_DUKE : SNIPER_NORMAL);
-  ammo[SNIPER] = WEAPONS[SNIPER].mag; buildLoadout();
+  ammo[SNIPER] = WEAPONS[SNIPER].mag; if (mode !== "royale") buildLoadout();
   $("#duke").hidden = true;                             // no buttons in the round: hacks are picked beforehand
   renderHackPick();
   $("#dkAim").setAttribute("aria-pressed", String(duke.aim));
@@ -3695,7 +3696,9 @@ function takeDamage(dm, src, head, unblockable) {
 }
 function die(src, free) {
   if (mode === "royale") { brDown(src); return; }
-  if (rankedNow() && !free) addRank(-rpLoss(RP.death));          // free: the admin's kill button costs no points
+  const byHacker = !!(src && src.peer && remotes.has(src.peer) && remotes.get(src.peer).hx);
+  if (rankedNow() && !free && !byHacker) addRank(-rpLoss(RP.death));          // free: the admin's kill button costs no points
+  if (rankedNow() && byHacker) setTimeout(() => banner(src.name + " is using hacks · you lose no RP"), 400);
   hp = 0; alive = false; deaths++; streak = 0;
   respawnAt = now() + 3;
   dthOut = { s: ++deathSeq, by: src.peer || null };
@@ -5393,7 +5396,7 @@ function brStart(m) {
   startGame("royale");
   $("#brMap").hidden = false; $("#shWrap").hidden = false;
   const mate = BR.m.mates.length ? (players.get(BR.m.mates[0]) || {}).name : null;
-  brToast("Battle royale!", `${plural(teams, "team")}${mate ? " · your duo: " + mate : " · you're on your own"} · last team standing wins ${BR_RP} RP and the crown`, 6);
+  brToast("Battle royale!", `No hacks allowed · ${plural(teams, "team")}${mate ? " · your duo: " + mate : " · you're on your own"} · last team standing wins ${BR_RP} RP and the crown`, 6);
   blip(523, 0.15, 0.12); blip(659, 0.15, 0.12, "square", 0.12); blip(784, 0.3, 0.12, "square", 0.24);
 }
 // Your duo's spawn slot (the server gives each team a different one, spread across the map);

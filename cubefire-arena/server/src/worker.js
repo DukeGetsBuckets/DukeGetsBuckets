@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 43;
+const MIN_BUILD = 44;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -414,6 +414,8 @@ export class Lobby {
       return;
     }
     const perk = a.auth && PROTECTED[a.auth] || {}, given = a.perks || [];
+    if (given.length || Object.keys(perk).length) d.hx = 1;      // has hacks: dying to them costs no rank points
+    else if (d.hx !== 1) delete d.hx;
     if (!perk.invisible && !given.includes("inv")) delete d.iv;  // only players given the hack can be invisible
     if (!perk.nuke && !given.includes("nuke")) {                 // or nuke
       delete d.nk;

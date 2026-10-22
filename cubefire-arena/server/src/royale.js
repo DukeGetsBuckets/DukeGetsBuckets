@@ -338,6 +338,9 @@ export class Royale {
   // ---- during the match
   relay(ws, a, d) {
     const m = this.match, P = m.players.get(a.id); if (!P) return;
+    // no hacks in the battle royale: no invisibility, no nukes
+    delete d.iv; delete d.nk; delete d.hx;
+    if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => h && !h.nk);
     P.gone = 0; P.n++;
     this.last.set(a.id, d);
     const bs = ["up", "down", "out"].includes(d.bs) ? d.bs : P.bs, changed = bs !== P.bs;
