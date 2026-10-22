@@ -656,7 +656,7 @@ body.pig #pigTint{display:block}
         </div>
         <div class="brparty" id="brParty" hidden>
           <div class="top"><span class="lbl-sm">Your duo</span><button type="button" id="brLeave" hidden>Leave party</button></div>
-          <button type="button" class="btn primary" id="brDoug" hidden>👑 Start a battle royale in 3 min</button>
+          <div class="btns" id="brDougBox" hidden><button type="button" class="btn primary" id="brDougNow">⚡ Start battle royale now</button><button type="button" class="btn" id="brDoug">👑 Start in 3 min</button></div>
           <div id="brInvites"></div>
           <div class="brslots" id="brSlots"></div>
         </div>
@@ -5305,6 +5305,7 @@ function brAnswer(from, yes) {
 $("#brInvYes").addEventListener("click", () => { if (BR.inv) brAnswer(BR.inv.from, true); else $("#brInvite").hidden = true; });
 $("#brInvNo").addEventListener("click", () => { if (BR.inv) brAnswer(BR.inv.from, false); else $("#brInvite").hidden = true; });
 $("#brLeave").addEventListener("click", () => brSend({ t: "leaveparty" }));
+$("#brDougNow").addEventListener("click", () => { if (confirm("Start a battle royale right now with everyone who's queued?")) brSend({ t: "dougnow" }); });
 $("#brDoug").addEventListener("click", () => { if (confirm("Start a battle royale in 3 minutes? Everyone gets pulled out of their match and has to queue.")) brSend({ t: "dougstart" }); });
 async function openBrPick() {
   const box = $("#brPickBody"); $("#brPick").hidden = false;
@@ -5390,7 +5391,7 @@ function renderBrParty() {
   else { const b = document.createElement("button"); b.type = "button"; b.className = "brslot add"; const sm = document.createElement("small"); sm.textContent = "Empty"; b.append(sm, "+ Invite / join"); b.addEventListener("click", openBrPick); kids.push(b); }
   $("#brSlots").replaceChildren(...kids);
   $("#brLeave").hidden = !BR.party;
-  $("#brDoug").hidden = !(acct && acct.name.toLowerCase() === "doug");
+  $("#brDougBox").hidden = !(acct && acct.name.toLowerCase() === "doug");
 }
 function renderBrPlay() {
   const bp = $("#bigPlay"), royale = playMode === "royale";

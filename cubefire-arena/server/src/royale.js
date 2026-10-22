@@ -18,8 +18,8 @@ const MIN = 60000;
 export function brConfig(env) {
   const minTeams = Number(env && env.BR_MIN_TEAMS);
   if (env && env.BR_TEST === "1") return { every: 4 * MIN, open: 90000, stop: 45000, resume: 30000, minTeams: minTeams || 1, test: true };
-  // one every hour on the hour (and whenever Doug starts one); the queue opens 5 minutes before
-  return { every: 60 * MIN, open: 5 * MIN, stop: 2 * MIN, resume: MIN, minTeams: minTeams || 5, test: false };
+  // one every hour on the hour (and whenever Doug starts one); you can queue for the next one any time
+  return { every: 60 * MIN, open: 60 * MIN, stop: 2 * MIN, resume: MIN, minTeams: minTeams || 5, test: false };
 }
 const MAX_TEAMS = 25, SLOTS = 32;              // team spawn slots on the map (the game page has the same 32)
 const NEAR = 110, FAR_EVERY = 5;               // full-rate updates within NEAR blocks, every 5th one beyond
@@ -116,7 +116,7 @@ export class Royale {
   pushPlan() {
     const t = this.times(), c = this.cfg;
     if (c.every < 20 * MIN) return t.start % (30 * MIN) === 0 || c.test ? [["soon", t.start - 2 * MIN]] : [];
-    return [["15", t.start - 15 * MIN], ["open", t.open], ["last", t.start - MIN]].filter(([k, at]) => !c.test || k !== "15");
+    return [["15", t.start - 15 * MIN], ["open", t.start - 5 * MIN], ["last", t.start - MIN]].filter(([k, at]) => !c.test || k !== "15");
   }
   quietHours() {
     let h = 12; try { h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hourCycle: "h23" }).format(new Date())); } catch {}
@@ -130,8 +130,8 @@ export class Royale {
       if (this.quietHours() || this.env.BR_PUSH === "0") continue;
       const q = this.queueCount(), skip = this.hubs().filter(h => h.a.queued && h.a.acc).map(h => h.a.acc);   // already queued: no need
       const msg = kind === "soon" ? { title: "⚔️ Battle Royale in 2 minutes!", body: `A new one every 5 minutes${q.teams ? ` · ${q.teams} team${q.teams === 1 ? "" : "s"} queued` : ""}. Grab your duo and tap to jump in!` }
-        : kind === "15" ? { title: "⚔️ Battle Royale in 15 minutes!", body: "Get your duo ready. The queue opens in 10 minutes. Last duo standing wins 500 RP and the crown 👑" }
-        : kind === "open" ? { title: "🔥 Battle Royale queue is OPEN!", body: `Starts in 5 minutes${q.teams ? ` · ${q.teams} team${q.teams === 1 ? "" : "s"} queued` : ""}. Tap to queue with your duo!` }
+        : kind === "15" ? { title: "⚔️ Battle Royale in 15 minutes!", body: "Get your duo ready and queue up. Last duo standing wins 500 RP and the crown 👑" }
+        : kind === "open" ? { title: "🔥 Battle Royale in 5 minutes!", body: `Starts in 5 minutes${q.teams ? ` · ${q.teams} team${q.teams === 1 ? "" : "s"} queued` : ""}. Tap to queue with your duo!` }
         : { title: "🚨 LAST CALL: Battle Royale in 1 minute!", body: `${q.teams ? `${q.teams} team${q.teams === 1 ? "" : "s"} queued. ` : ""}Tap now to jump in!` };
       let offset = 0;
       for (let i = 0; i < 30 && offset != null; i++) {
@@ -245,6 +245,7 @@ export class Royale {
     if (d.t === "join") return this.join(ws, a, String(d.to || "").trim().toLowerCase());
     if (d.t === "online") return this.online(ws, Array.isArray(d.accs) ? d.accs.slice(0, 200).map(x => String(x).toLowerCase()) : []);
     if (d.t === "dougstart") return this.dougStart(ws, a);
+    if (d.t === "dougnow") return this.dougNow(ws, a);
     if (d.t === "queue") return this.queue(ws, a, true);
     if (d.t === "unqueue") return this.queue(ws, a, false);
     const m = this.matchOf(a);
@@ -337,6 +338,17 @@ export class Royale {
     this.broadcastInfo(true); this.schedule();
     accounts(this.env).fetch("https://internal/internal/pushall", { method: "POST", body: JSON.stringify({ title: "⚔️ Doug started a Battle Royale!", body: "It starts in 3 minutes. Tap to queue with your duo!", url: "/?br=1", tag: "cfa-br", offset: 0 }) }).catch(() => {});
   }
+  // Doug's other button: start one right now with everyone queued (no 5-team minimum)
+  dougNow(ws, a) {
+    if (a.acc !== "doug") return this.send(ws, { t: "invited", ok: false, msg: "Only Doug can do that" });
+    const mine = a.party ? this.members(a.party) : [{ ws, a }];         // Doug (and his duo) are in it too
+    for (const h of mine) if (!this.matchOf(h.a)) this.setAtt(h.ws, { ...this.att(h.ws), queued: true });
+    const q = this.queueCount();
+    this.start = Date.now(); this.ctx.storage.put("start", this.start).catch(() => {}); this.ctx.storage.put("custom", true).catch(() => {});
+    this.launch(true);
+    this.send(ws, { t: "invited", ok: true, msg: `Battle royale started with ${q.players} player${q.players === 1 ? "" : "s"}` });
+    this.schedule();
+  }
   // ---- the queue
   queue(ws, a, on) {
     if (on && this.phase() !== "queue") return this.send(ws, { t: "queue", on: false, msg: "The queue isn't open yet" });
@@ -348,7 +360,7 @@ export class Royale {
   }
 
   // ---- starting (or cancelling) a match
-  launch() {
+  launch(force) {
     const now = Date.now(); this.lastStart = this.start;
     const q = this.hubs().filter(h => h.a.queued && !this.matchOf(h.a) && now - (this.seen.get(h.a.id) || 0) < 20000);
     const parties = new Map(), solos = [];
@@ -359,7 +371,7 @@ export class Royale {
     for (let i = solos.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [solos[i], solos[j]] = [solos[j], solos[i]]; }
     const per = this.pairSolos() ? 2 : 1;
     for (let i = 0; i < solos.length; i += per) teams.push(solos.slice(i, i + per));   // random partners (a last odd one plays alone)
-    if (teams.length < this.cfg.minTeams) {                  // not enough teams: everyone queued stays queued for the next one
+    if (teams.length < (force ? 1 : this.cfg.minTeams)) {                  // not enough teams: everyone queued stays queued for the next one
       this.cancelledAt = this.start;
       const next = Math.round(this.cfg.every / MIN), many = this.cfg.every < 20 * MIN;
       const msg = `Only ${teams.length} team${teams.length === 1 ? "" : "s"} queued (${this.cfg.minTeams} needed), so it didn't start. ` + (many ? `You stay queued for the next one in ${next} minutes` : `Next one in ${next} minutes`);
