@@ -95,6 +95,8 @@ export default {
     }
     return env.ASSETS.fetch(request);
   },
+  // once a minute: wake the battle royale so its starts and reminders happen even with nobody connected
+  async scheduled(event, env, ctx) { ctx.waitUntil(royale(env).fetch("https://internal/poke").catch(() => {})); },
 };
 
 export class Lobby {

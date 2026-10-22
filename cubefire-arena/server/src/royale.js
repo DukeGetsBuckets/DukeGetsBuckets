@@ -87,6 +87,8 @@ export class Royale {
     if (!this.start || now > this.start + 5000) { this.start = this.nextSlot(now); this.ctx.storage.put("start", this.start).catch(() => {}); this.ctx.storage.put("custom", false).catch(() => {}); }
   }
   times() {
+    const ev = Number(this.env.BR_AT) || 0;                  // a one-off battle royale at this time (a deploy setting)
+    if (ev && ev > Date.now() - 5000 && this.lastStart !== ev && this.start !== ev) this.start = ev;
     this.ensureStart();
     const s = this.start, c = this.cfg;
     return { start: s, open: s - c.open, stop: s - c.stop, resume: s + c.resume };
@@ -117,6 +119,7 @@ export class Royale {
   // Every 20 to 59 minutes: one reminder per battle royale, 5 minutes before.
   pushPlan() {
     const t = this.times(), c = this.cfg;
+    if (t.start === (Number(this.env.BR_AT) || -1)) return [["ev0", t.start - 3 * MIN], ["ev1", t.start - 70000], ["ev2", t.start - 25000]];   // the special one: lots of reminders
     if (c.every < 20 * MIN) return t.start % (30 * MIN) === 0 || c.test ? [["soon", t.start - 2 * MIN]] : [];
     if (c.every < 60 * MIN) return [["open", t.start - 5 * MIN]];
     return [["15", t.start - 15 * MIN], ["open", t.start - 5 * MIN], ["last", t.start - MIN]].filter(([k, at]) => !c.test || k !== "15");
@@ -132,7 +135,8 @@ export class Royale {
       this.markPushed(t.start, kind);
       if (this.quietHours() || this.env.BR_PUSH === "0" || this.env.CLOSED) continue;   // no reminders while the game is closed
       const q = this.queueCount(), skip = this.hubs().filter(h => h.a.queued && h.a.acc).map(h => h.a.acc);   // already queued: no need
-      const msg = kind === "soon" ? { title: "⚔️ Battle Royale in 2 minutes!", body: `A new one every 5 minutes${q.teams ? ` · ${q.teams} team${q.teams === 1 ? "" : "s"} queued` : ""}. Grab your duo and tap to jump in!` }
+      const msg = kind.startsWith("ev") ? { title: kind === "ev2" ? "🚨 BATTLE ROYALE STARTING NOW! GET ON!" : kind === "ev1" ? "🔥 Battle Royale in 1 minute! Get on now!" : "⚔️ Cubefire is back! Battle Royale at 2:47!", body: "Everyone's jumping in. Open Cubefire and tap Queue!" }
+        : kind === "soon" ? { title: "⚔️ Battle Royale in 2 minutes!", body: `A new one every 5 minutes${q.teams ? ` · ${q.teams} team${q.teams === 1 ? "" : "s"} queued` : ""}. Grab your duo and tap to jump in!` }
         : kind === "15" ? { title: "⚔️ Battle Royale in 15 minutes!", body: "Get your duo ready and queue up. Last duo standing wins 500 RP and the crown 👑" }
         : kind === "open" ? { title: "🔥 Battle Royale in 5 minutes!", body: `Starts in 5 minutes${q.teams ? ` · ${q.teams} team${q.teams === 1 ? "" : "s"} queued` : ""}. Tap to queue with your duo!` }
         : { title: "🚨 LAST CALL: Battle Royale in 1 minute!", body: `${q.teams ? `${q.teams} team${q.teams === 1 ? "" : "s"} queued. ` : ""}Tap now to jump in!` };
@@ -147,7 +151,7 @@ export class Royale {
   markPushed(start, kind) { this.pushed = start + ":" + [...this.sentKinds(start), kind].join(","); this.ctx.storage.put("pushed", this.pushed).catch(() => {}); }
   schedule() {
     const now = Date.now(), t = this.times(), wake = [];
-    for (const [kind, at] of this.pushPlan()) if (at > now && !this.sentKinds(t.start).includes(kind)) wake.push(at);
+    for (const [kind, at] of this.pushPlan()) if (now - at < 3 * MIN && !this.sentKinds(t.start).includes(kind)) wake.push(Math.max(at, now + 500));
     if (t.open > now) wake.push(t.open);
     if (t.start > now) wake.push(t.start);
     for (const m of this.matches.values()) wake.push(Math.min(m.deadline, now + 5000));   // keep an eye on the matches
@@ -155,6 +159,7 @@ export class Royale {
   }
   async alarm() {
     const now = Date.now();
+    await this.sendPushes(now);                              // reminders first (before a start moves on to the next one)
     if (this.start && now >= this.start - 200 && this.lastStart !== this.start) this.launch();
     for (const m of [...this.matches.values()]) { this.sweepMatch(m); if (this.matches.has(m.id) && now > m.deadline) this.endMatch(m, null); }
     this.broadcastInfo(true);
@@ -173,6 +178,7 @@ export class Royale {
       }
       return Response.json({ ...t, windows, match: this.matches.size > 0 });
     }
+    if (path === "/poke") { await this.alarm(); return Response.json({ ok: true }); }   // the worker's once-a-minute wake-up
     if (path === "/status") { const i = this.info(); return Response.json({ ...i, hubs: this.hubs().length }); }
     if (path === "/admin-now") {
       const now = Date.now();
