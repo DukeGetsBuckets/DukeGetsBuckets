@@ -662,7 +662,7 @@ body.pig #pigTint{display:block}
 
 <div id="brPick" hidden>
   <div class="card" role="dialog" aria-labelledby="brPickTitle">
-    <h2 id="brPickTitle">Invite to your duo <button class="btn" type="button" id="brPickClose">Close</button></h2>
+    <h2 id="brPickTitle">Duo with a friend <button class="btn" type="button" id="brPickClose">Close</button></h2>
     <div id="brPickBody"></div>
   </div>
 </div>
@@ -5095,7 +5095,7 @@ function applyInvite(q) {
 renderPremium();
 // ======================================================================
 // Battle royale. Every game keeps a "hub" socket to the battle royale server: duo parties,
-// the schedule (one every 30 minutes) and the queue go over it, and so does the match.
+// the schedule (one every hour, on the half hour) and the queue go over it, and so does the match.
 // In the match you land with a pistol and find guns, med kits, shields and grenades while
 // the storm closes in. At 0 health you're knocked down: you crawl and bleed out in 30
 // seconds unless your duo holds F (or Use) on you for 5 seconds. Eliminated while your duo
@@ -5155,6 +5155,13 @@ function brMsg(m) {
     else if (had && !now_) banner(had.name + " left your duo");
     renderBrLobby();
   } else if (m.t === "invite") brShowInvite(m);
+  else if (m.t === "online" && m.on && BR.pickRows) {                  // which friends you can join
+    for (const [acc, row] of BR.pickRows) {
+      const o = m.on[acc];
+      row.st.textContent = !o ? "· offline" : o.match ? "· in a battle royale" : o.party >= 2 ? "· in a full duo" : o.party ? "· in a party" : "· online";
+      row.j.hidden = !o || o.match || o.party >= 2;
+    }
+  }
   else if (m.t === "invited") banner(String(m.msg || ""));
   else if (m.t === "declined") banner((cleanName(m.by) || "Your friend") + " can't join right now");
   else if (m.t === "queue") {
@@ -5206,7 +5213,8 @@ async function openBrPick() {
   box.replaceChildren(el("p", { className: "fine", textContent: "Loading your friends…" }));
   let fr; try { fr = await api("friends-list"); } catch (e) { box.replaceChildren(el("p", { className: "pm-why", textContent: e.message })); return; }
   const list = fr.friends || [];
-  const parts = [el("p", { className: "fine", textContent: "Your friend needs the game open to get the invite. No partner? Queue solo and you'll get a random one." })];
+  const parts = [el("p", { className: "fine", textContent: "Invite a friend to your duo, or join theirs. They need the game open. No partner? Queue solo and you'll get a random one." })];
+  BR.pickRows = new Map();
   if (!list.length) {
     const b = el("button", { type: "button", className: "btn", textContent: "Add friends" }); b.addEventListener("click", () => { $("#brPick").hidden = true; renderFriends(true); });
     parts.push(el("p", { textContent: "No friends yet." }), el("div", { className: "btns" }, [b]));
@@ -5215,9 +5223,14 @@ async function openBrPick() {
     const R = rankOf(f.rank), rk = el("b", { textContent: R.label }); rk.style.color = R.color;
     const b = el("button", { type: "button", className: "btn primary", textContent: "Invite" });
     b.addEventListener("click", () => { brSend({ t: "invite", to: f.name.toLowerCase() }); b.textContent = "Sent"; b.disabled = true; });
-    parts.push(el("div", { className: "frow" }, [el("span", { textContent: f.name }), rk, el("div", { className: "btns" }, [b])]));
+    const j = el("button", { type: "button", className: "btn", textContent: "Join", hidden: true });   // shows once we know they're online
+    j.addEventListener("click", () => { brSend({ t: "join", to: f.name.toLowerCase() }); j.textContent = "Joining…"; j.disabled = true; });
+    const st = el("small", { className: "fine", textContent: "" });
+    BR.pickRows.set(f.name.toLowerCase(), { j, st });
+    parts.push(el("div", { className: "frow" }, [el("span", {}, [f.name, " ", st]), rk, el("div", { className: "btns" }, [j, b])]));
   }
   box.replaceChildren(...parts);
+  if (list.length) brSend({ t: "online", accs: list.map(f => f.name.toLowerCase()) });
 }
 $("#brPickClose").addEventListener("click", () => { $("#brPick").hidden = true; });
 $("#brPick").addEventListener("click", e => { if (e.target.id === "brPick") $("#brPick").hidden = true; });
@@ -5256,7 +5269,7 @@ function renderBrParty() {
   const slot = (cls, top, name) => { const d = document.createElement("div"); d.className = "brslot " + cls; const sm = document.createElement("small"); sm.textContent = top; d.append(sm, name); return d; };
   const kids = [slot(BR.queued ? "ready" : "", BR.queued ? "Queued" : "You", mine)];
   if (mate) kids.push(slot(mate.queued ? "ready" : "", mate.queued ? "Queued" : "Duo", mate.name));
-  else { const b = document.createElement("button"); b.type = "button"; b.className = "brslot add"; const sm = document.createElement("small"); sm.textContent = "Empty"; b.append(sm, "+ Invite friend"); b.addEventListener("click", openBrPick); kids.push(b); }
+  else { const b = document.createElement("button"); b.type = "button"; b.className = "brslot add"; const sm = document.createElement("small"); sm.textContent = "Empty"; b.append(sm, "+ Invite or join a friend"); b.addEventListener("click", openBrPick); kids.push(b); }
   $("#brSlots").replaceChildren(...kids);
   $("#brLeave").hidden = !BR.party;
 }

@@ -2,8 +2,8 @@
 // Battle royale. One Durable Object runs it for everyone, so everybody is in the same match.
 //
 // Every game keeps a "hub" socket to it (GET /ws?room=royale) for:
-//   - duo parties: invite a friend, accept, leave ({t: "invite" | "accept" | "decline" | "leaveparty"})
-//   - the schedule: a battle royale every 30 minutes on the clock. The queue opens 5 minutes
+//   - duo parties: invite a friend, accept, join a friend's party, leave ({t: "invite" | "accept" | "decline" | "join" | "leaveparty"})
+//   - the schedule: a battle royale every hour on the half hour. The queue opens 5 minutes
 //     before; ranked lobbies pause from 2 minutes before until 1 minute after the start
 //     (they ask this object for the times at /sched)
 //   - queueing ({t: "queue" | "unqueue"}): a duo, or a solo player who gets a random partner
@@ -17,7 +17,8 @@ const MIN = 60000;
 export function brConfig(env) {
   const minTeams = Number(env && env.BR_MIN_TEAMS);
   if (env && env.BR_TEST === "1") return { every: 4 * MIN, open: 90000, stop: 45000, resume: 30000, minTeams: minTeams || 1, test: true };
-  return { every: 30 * MIN, open: 5 * MIN, stop: 2 * MIN, resume: MIN, minTeams: minTeams || 5, test: false };
+  // every hour on the half hour (8:30, 9:30, ... in any US time zone); the first one is 8:30 am Eastern on Oct 22, 2026
+  return { every: 60 * MIN, offset: 30 * MIN, first: Date.UTC(2026, 9, 22, 12, 30), open: 5 * MIN, stop: 2 * MIN, resume: MIN, minTeams: minTeams || 5, test: false };
 }
 const MAX_TEAMS = 25, SLOTS = 32;              // team spawn slots on the map (the game page has the same 32)
 const NEAR = 110, FAR_EVERY = 5;               // full-rate updates within NEAR blocks, every 5th one beyond
@@ -69,7 +70,10 @@ export class Royale {
   send(ws, m) { try { ws.send(typeof m === "string" ? m : JSON.stringify(m)); } catch {} }
 
   // ---- schedule
-  nextSlot(after) { return Math.ceil((after + 1000) / this.cfg.every) * this.cfg.every; }
+  nextSlot(after) {
+    const c = this.cfg, off = c.offset || 0;
+    return Math.max(c.first || 0, Math.ceil((after + 1000 - off) / c.every) * c.every + off);
+  }
   ensureStart() {
     const now = Date.now();
     if (!this.start || (!this.match && now > this.start + 5000)) { this.start = this.nextSlot(now); this.ctx.storage.put("start", this.start).catch(() => {}); }
@@ -190,6 +194,8 @@ export class Royale {
     if (d.t === "accept") return this.accept(ws, a, String(d.from || ""));
     if (d.t === "decline") { const h = this.byId(String(d.from || "")); if (h) this.send(h.ws, { t: "declined", by: a.disp || a.name }); return; }
     if (d.t === "leaveparty") { if (a.party) this.leaveParty(ws, a, false); return; }
+    if (d.t === "join") return this.join(ws, a, String(d.to || "").trim().toLowerCase());
+    if (d.t === "online") return this.online(ws, Array.isArray(d.accs) ? d.accs.slice(0, 200).map(x => String(x).toLowerCase()) : []);
     if (d.t === "queue") return this.queue(ws, a, true);
     if (d.t === "unqueue") return this.queue(ws, a, false);
     if (this.match && a.inMatch) {
@@ -213,6 +219,25 @@ export class Royale {
     if (!targets.length) return this.send(ws, { t: "invited", ok: false, msg: "That friend isn't online right now" });
     for (const h of targets) this.send(h.ws, { t: "invite", from: a.id, name: a.disp || a.name || "A friend" });
     this.send(ws, { t: "invited", ok: true, msg: "Invite sent" });
+  }
+  // Join a friend's party (or start a duo with them) without waiting for an invite
+  async join(ws, a, to) {
+    if (!a.acc) return this.send(ws, { t: "invited", ok: false, msg: "Sign in to join your friends" });
+    const host = this.hubs().filter(h => h.a.acc === to && h.ws !== ws).sort((x, y) => (y.a.party ? 1 : 0) - (x.a.party ? 1 : 0))[0];
+    if (!host) return this.send(ws, { t: "invited", ok: false, msg: "That friend isn't online right now" });
+    let ok = false;
+    try { ok = !!(await (await accounts(this.env).fetch("https://internal/internal/isfriend", { method: "POST", body: JSON.stringify({ a: a.acc, b: to }) })).json()).ok; } catch {}
+    if (!ok) return this.send(ws, { t: "invited", ok: false, msg: "You can only join your friends' parties" });
+    const cur = this.att(ws); if (!cur || cur.gone) return;
+    if (host.a.party && host.a.party === cur.party) return this.send(ws, { t: "invited", ok: true, msg: "You're already in their party" });
+    this.accept(ws, cur, host.a.id);
+    this.send(host.ws, { t: "invited", ok: true, msg: (cur.disp || cur.name || "A friend") + " joined your party" });
+  }
+  // Which of your friends have the game open, and whether they're in a party or a match
+  online(ws, accs) {
+    const on = {};
+    for (const h of this.hubs()) if (h.a.acc && accs.includes(h.a.acc)) on[h.a.acc] = { party: this.members(h.a.party).length, match: !!h.a.inMatch };
+    this.send(ws, { t: "online", on });
   }
   accept(ws, a, from) {
     const host = this.byId(from);

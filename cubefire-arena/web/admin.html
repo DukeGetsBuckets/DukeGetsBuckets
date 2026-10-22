@@ -227,7 +227,7 @@ function renderBr() {
   const b = data.br; if (!b) { $("#brBox").textContent = "Battle royale server not reachable"; return; }
   const skew = Date.now() - b.now, at = t => new Date(t + skew).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const left = s => { const v = Math.max(0, Math.round((s + skew - Date.now()) / 1000)); return Math.floor(v / 60) + ":" + String(v % 60).padStart(2, "0"); };
-  $("#brNote").textContent = b.test ? "TEST MODE (every 4 min, 1 team is enough)" : "every 30 min · needs " + b.minTeams + " teams";
+  $("#brNote").textContent = b.test ? "TEST MODE (every 4 min, 1 team is enough)" : "every hour at :30 · needs " + b.minTeams + " teams";
   $("#brBox").textContent = b.match ? `Running now: ${b.match.alive} of ${b.match.teams} teams still in` :
     b.ph === "queue" ? `Queue open: ${b.teams} teams (${b.players} players) queued · starts at ${at(b.start)} (in ${left(b.start)}) · ranked stops at ${at(b.stop)}` :
     `Next one at ${at(b.start)} (in ${left(b.start)}) · queue opens at ${at(b.open)} · ${b.hubs} games connected`;

@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 40;
+const MIN_BUILD = 42;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -653,6 +653,10 @@ export class Accounts {
     if (op === "who") {                                       // the battle royale hub checks who a game is signed in as
       const t = String(b.token || ""), s = t && this.sql.exec("SELECT name FROM sessions WHERE token = ?", t).toArray()[0], u = s && this.user(s.name);
       return u ? { acc: u.name, display: u.display } : {};
+    }
+    if (op === "isfriend") {                                  // joining a friend's battle royale party
+      const x = String(b.a || "").toLowerCase(), y = String(b.b || "").toLowerCase();
+      return { ok: !!x && !!y && this.friendsOf(x).includes(y) };
     }
     if (op === "brwin") {                                     // battle royale winners: the Royale Champion skin and the crown
       for (const n of (Array.isArray(b.accts) ? b.accts : []).slice(0, 2)) { const u = this.user(String(n)); if (u) { const d = this.data(u); d.brWins = (d.brWins || 0) + 1; this.saveData(u.name, d); } }
