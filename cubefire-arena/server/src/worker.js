@@ -656,6 +656,16 @@ export class Accounts {
       const t = String(b.token || ""), s = t && this.sql.exec("SELECT name FROM sessions WHERE token = ?", t).toArray()[0], u = s && this.user(s.name);
       return u ? { acc: u.name, display: u.display } : {};
     }
+    if (op === "pushall") {                                   // battle royale reminders: everyone with notifications on, 40 at a time
+      const jwk = this.vapid(), offset = Math.max(0, Math.floor(Number(b.offset) || 0)), skip = new Set((Array.isArray(b.skip) ? b.skip : []).map(String));
+      const message = { title: cleanText(b.title, 60) ? String(b.title).slice(0, 60) : "Cubefire Arena", body: String(b.body || "").slice(0, 200), url: String(b.url || "/").slice(0, 60), tag: String(b.tag || "cfa-br").slice(0, 20) };
+      const subs = this.sql.exec("SELECT * FROM push ORDER BY created LIMIT 40 OFFSET ?", offset).toArray();
+      const res = await Promise.all(subs.map(sub => skip.has(sub.acct) ? 0 : sendPush(jwk, sub, message)));
+      let sent = 0, gone = 0;
+      res.forEach((st, k) => { if (st >= 200 && st < 300) sent++; else if (st === 404 || st === 410) { this.sql.exec("DELETE FROM push WHERE endpoint = ?", subs[k].endpoint); gone++; } });
+      if (sent) this.bump("calls");
+      return { sent, next: subs.length === 40 ? offset + 40 - gone : null };
+    }
     if (op === "pushinvite") {                                // a battle royale duo invite to a friend whose game is closed
       const from = String(b.from || "").toLowerCase(), to = String(b.to || "").toLowerCase();
       if (!from || !to || !this.friendsOf(from).includes(to)) return { sent: 0 };

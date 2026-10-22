@@ -7,7 +7,7 @@ self.addEventListener("push", e => {
   try { d = e.data ? e.data.json() : {}; } catch (err) {}
   e.waitUntil(self.registration.showNotification(d.title || "Cubefire Arena", {
     body: d.body || "Someone is playing. Tap to join!",
-    icon: "icon-192.png", badge: "icon-192.png", tag: "cfa-call", renotify: true,
+    icon: "icon-192.png", badge: "icon-192.png", tag: d.tag || "cfa-call", renotify: true,
     data: { url: d.url || "/" },
   }));
 });

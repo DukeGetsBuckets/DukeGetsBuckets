@@ -59,7 +59,8 @@ export class Royale {
     this.infoT = null;
     this.invites = new Map();     // account -> Map(inviter id -> {from, name, at}): invites wait here until answered
     this.pushedAt = new Map();    // "from>to" -> when we last sent that invite as a notification
-    ctx.blockConcurrencyWhile(async () => { this.start = (await ctx.storage.get("start")) || 0; });
+    this.pushed = "";             // the last notification sent ("start:kind"), so each goes out once
+    ctx.blockConcurrencyWhile(async () => { this.start = (await ctx.storage.get("start")) || 0; this.pushed = (await ctx.storage.get("pushed")) || ""; });
   }
   att(ws) { let a = this.atts.get(ws); if (a === undefined) { a = ws.deserializeAttachment() || null; this.atts.set(ws, a); } return a; }
   setAtt(ws, a) { this.atts.set(ws, a); try { ws.serializeAttachment(a); } catch {} }
@@ -103,8 +104,38 @@ export class Royale {
     if (this.infoT) return;
     this.infoT = setTimeout(() => this.broadcastInfo(true), 1000);
   }
+  // Notifications to everyone with notifications on: 15 minutes before, when the queue opens
+  // (5 before) and a last call 1 minute before. Not overnight (10 pm to 7 am Eastern).
+  pushPlan() {
+    const t = this.times(), c = this.cfg;
+    return [["15", t.start - 15 * MIN], ["open", t.open], ["last", t.start - MIN]].filter(([k, at]) => !c.test || k !== "15");
+  }
+  quietHours() {
+    let h = 12; try { h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hourCycle: "h23" }).format(new Date())); } catch {}
+    return h >= 22 || h < 7;
+  }
+  async sendPushes(now) {
+    const t = this.times();
+    for (const [kind, at] of this.pushPlan()) {
+      if (now < at || now - at > 3 * MIN || this.sentKinds(t.start).includes(kind)) continue;
+      this.markPushed(t.start, kind);
+      if (this.quietHours() || this.env.BR_PUSH === "0") continue;
+      const q = this.queueCount(), skip = this.hubs().filter(h => h.a.queued && h.a.acc).map(h => h.a.acc);   // already queued: no need
+      const msg = kind === "15" ? { title: "⚔️ Battle Royale in 15 minutes!", body: "Get your duo ready. The queue opens in 10 minutes. Last duo standing wins 500 RP and the crown 👑" }
+        : kind === "open" ? { title: "🔥 Battle Royale queue is OPEN!", body: `Starts in 5 minutes${q.teams ? ` · ${q.teams} team${q.teams === 1 ? "" : "s"} queued` : ""}. Tap to queue with your duo!` }
+        : { title: "🚨 LAST CALL: Battle Royale in 1 minute!", body: `${q.teams ? `${q.teams} team${q.teams === 1 ? "" : "s"} queued. ` : ""}Tap now to jump in!` };
+      let offset = 0;
+      for (let i = 0; i < 30 && offset != null; i++) {
+        try { const r = await (await accounts(this.env).fetch("https://internal/internal/pushall", { method: "POST", body: JSON.stringify({ ...msg, url: "/?br=1", tag: "cfa-br", skip, offset }) })).json(); offset = r.next; }
+        catch { break; }
+      }
+    }
+  }
+  sentKinds(start) { return this.pushed.startsWith(start + ":") ? this.pushed.slice(String(start).length + 1).split(",") : []; }
+  markPushed(start, kind) { this.pushed = start + ":" + [...this.sentKinds(start), kind].join(","); this.ctx.storage.put("pushed", this.pushed).catch(() => {}); }
   schedule() {
     const now = Date.now(), t = this.times(), wake = [];
+    for (const [kind, at] of this.pushPlan()) if (at > now && !this.sentKinds(t.start).includes(kind)) wake.push(at);
     if (t.open > now) wake.push(t.open);
     if (t.start > now) wake.push(t.start);
     if (this.match) wake.push(Math.min(this.match.deadline, now + 5000));   // keep an eye on the match
@@ -116,6 +147,7 @@ export class Royale {
     if (this.match) { this.sweepMatch(); if (this.match && now > this.match.deadline) this.endMatch(null); }
     this.broadcastInfo(true);
     this.schedule();
+    await this.sendPushes(now);
   }
 
   // ---- internal calls (ranked lobbies, the admin dashboard)

@@ -5105,6 +5105,10 @@ $("#callHud").addEventListener("click", () => { if (!isTouchUI()) callPlayers();
 // Opening a "come play" notification: pick that map and party, ready to join
 var brJoinWant = "";                              // opened from a battle royale invite notification: join that friend's party
 function applyInvite(q) {
+  if (q.get("br")) {                              // a battle royale reminder: straight to the Royale tab
+    if (state === "menu") { playMode = "royale"; save("cfa.mode", "royale"); renderPlayMode(); }
+    return;
+  }
   if (q.get("brjoin")) {
     brJoinWant = String(q.get("brjoin")).toLowerCase().slice(0, 16);
     if (state === "menu") { playMode = "royale"; save("cfa.mode", "royale"); renderPlayMode(); }
@@ -5120,7 +5124,7 @@ function applyInvite(q) {
 }
 {
   const q = new URLSearchParams(location.search);
-  if (q.get("join") || q.get("brjoin")) { applyInvite(q); try { history.replaceState(null, "", location.pathname); } catch (e) {} }
+  if (q.get("join") || q.get("brjoin") || q.get("br")) { applyInvite(q); try { history.replaceState(null, "", location.pathname); } catch (e) {} }
   if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => { if (e.data && e.data.join) applyInvite(new URLSearchParams(e.data.join)); });
 }
 renderPremium();
