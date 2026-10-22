@@ -441,6 +441,10 @@ body.pig #pigTint{display:block}
 .brparty{display:grid;gap:6px;background:var(--panel);border:1px solid rgba(185,139,255,.6);border-radius:6px;padding:8px}
 .brparty .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .brparty .top button{border:0;background:transparent;color:var(--muted);font:700 11px var(--ui);letter-spacing:.08em;text-transform:uppercase;padding:2px 4px}
+#brInvites{display:grid;gap:6px}
+.brinv{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:6px;padding:6px 6px 6px 10px;border:1px solid #ffd23a;border-radius:6px;background:rgba(255,210,58,.12);font-weight:700}
+.brinv span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brinv .btn{padding:6px 12px}
 .brslots{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .brslot{border:1px solid var(--line);border-radius:6px;padding:7px 8px;background:rgba(255,255,255,.04);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;min-width:0}
 .brslot small{display:block;font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
@@ -637,6 +641,7 @@ body.pig #pigTint{display:block}
         </div>
         <div class="brparty" id="brParty" hidden>
           <div class="top"><span class="lbl-sm">Your duo</span><button type="button" id="brLeave" hidden>Leave party</button></div>
+          <div id="brInvites"></div>
           <div class="brslots" id="brSlots"></div>
         </div>
         <button type="button" class="bigplay" id="bigPlay"><b>Play</b><span id="playSub">Ranked · matched by rank</span></button>
@@ -2795,7 +2800,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 42;
+const BUILD = 43;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2920,7 +2925,8 @@ async function initNet() {
     await joinLobby("");
     return;
   }
-  if (await probeServer()) { netKind = "ws"; await joinLobby(""); brConnect(); return; }
+  if (await probeServer() || await probeServer()) { netKind = "ws"; await joinLobby(""); brConnect(); return; }   // a second try for slow Wi-Fi
+  brConnect();                                      // on the game's own site the battle royale is still worth reaching
   try { p2p = await loadP2P(); } catch (e) { p2p = null; }
   if (p2p && p2p.joinRoom) {
     netKind = "p2p"; myPeer = p2p.selfId;
@@ -5079,7 +5085,14 @@ async function callPlayers() {
 $("#callPlayers").addEventListener("click", () => { callPlayers(); resumeFromPause(); });
 $("#callHud").addEventListener("click", () => { if (!isTouchUI()) callPlayers(); });
 // Opening a "come play" notification: pick that map and party, ready to join
+var brJoinWant = "";                              // opened from a battle royale invite notification: join that friend's party
 function applyInvite(q) {
+  if (q.get("brjoin")) {
+    brJoinWant = String(q.get("brjoin")).toLowerCase().slice(0, 16);
+    if (state === "menu") { playMode = "royale"; save("cfa.mode", "royale"); renderPlayMode(); }
+    try { if (BR.acc) { brSend({ t: "join", to: brJoinWant }); brJoinWant = ""; } } catch (e) {}   // the game was already open
+    return;
+  }
   const map = String(q.get("map") || ""), from = cleanName(q.get("from") || "") || "Someone";
   if (state !== "menu") { banner(`${from} is calling players to ${MAPS[map] ? MAPS[map].name : "a match"}`); return; }
   // (an invite never carries a party code: private matches are join-by-code only)
@@ -5089,7 +5102,7 @@ function applyInvite(q) {
 }
 {
   const q = new URLSearchParams(location.search);
-  if (q.get("join")) { applyInvite(q); try { history.replaceState(null, "", location.pathname); } catch (e) {} }
+  if (q.get("join") || q.get("brjoin")) { applyInvite(q); try { history.replaceState(null, "", location.pathname); } catch (e) {} }
   if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => { if (e.data && e.data.join) applyInvite(new URLSearchParams(e.data.join)); });
 }
 renderPremium();
@@ -5103,7 +5116,7 @@ renderPremium();
 // The last duo standing wins 500 RP, the Royale Champion skin and the crown, which shows
 // over their heads everywhere until the next battle royale is won.
 // ======================================================================
-const BR = { sock: null, id: "", retry: 0, info: null, skew: 0, party: null, queued: false, inv: null, helloKey: "", crown: null, crownAsked: false, m: null, bs: "up", guns: [], partyKey: "" };
+const BR = { invites: new Map(), acc: null, sock: null, id: "", retry: 0, info: null, skew: 0, party: null, queued: false, inv: null, helloKey: "", crown: null, crownAsked: false, m: null, bs: "up", guns: [], partyKey: "" };
 const BR_RP = 500, BLEED = 30, REVIVE_T = 5, REBOOT_T = 4, CARD_T = 90, MAX_GUNS = 3;
 const brNow = () => Date.now() + BR.skew;
 let shield = 0, useHeld = false, useTap = false, pwThen = "";
@@ -5114,7 +5127,7 @@ const plural = (n, w) => n + " " + w + (n === 1 ? "" : "s");
 
 // ---- the hub
 function brConnect() {
-  if (netKind !== "ws" || BR.sock || mustRefresh) return;
+  if ((netKind !== "ws" && !onOwnSite) || BR.sock || mustRefresh) return;
   let s; try { s = new WebSocket(serverUrl("royale")); } catch (e) { return; }
   BR.sock = s;
   s.onopen = () => {
@@ -5139,6 +5152,10 @@ setInterval(() => { if (BR.sock && BR.sock.readyState === 1) { brSend({ t: "ping
 setInterval(() => { renderBrLobby(); renderBrSoon(); }, 500);
 function brMsg(m) {
   if (m.t === "welcome") BR.id = String(m.id || "");
+  else if (m.t === "you") {                                            // who the server says you're signed in as
+    BR.acc = m.acc || null;
+    if (BR.acc && brJoinWant) { brSend({ t: "join", to: brJoinWant }); brJoinWant = ""; }
+  }
   else if (m.t === "pong") { if (mode === "royale" && state === "play" && num(m.c) !== null) { const rtt = performance.now() - m.c; pingMs = Math.round(pingMs == null ? rtt : pingMs * 0.6 + rtt * 0.4); } }
   else if (m.t === "brinfo") {
     BR.info = { ...m }; if (num(m.now) !== null) BR.skew = m.now - Date.now();
@@ -5162,7 +5179,7 @@ function brMsg(m) {
       row.j.hidden = !o || o.match || o.party >= 2;
     }
   }
-  else if (m.t === "invited") banner(String(m.msg || ""));
+  else if (m.t === "invited") brToast(m.ok ? "Duo" : "Can't do that", String(m.msg || ""), 6);
   else if (m.t === "declined") banner((cleanName(m.by) || "Your friend") + " can't join right now");
   else if (m.t === "queue") {
     BR.queued = !!m.on; if (m.msg) brToast(m.on ? "Queued" : "Battle royale", String(m.msg), 5);
@@ -5190,17 +5207,26 @@ function brToast(title, text, sec) {
 }
 
 // ---- duo invites
+// Invites stay in your duo panel for 10 minutes (and pop up at the top for 2) until you answer them
 function brShowInvite(m) {
-  BR.inv = { from: String(m.from || ""), name: cleanName(m.name) || "A friend" };
-  $("#brInvWho").textContent = BR.inv.name; $("#brInvite").hidden = false;
-  blip(880, 0.1, 0.1); blip(1320, 0.14, 0.1, "square", 0.1);
-  clearTimeout(brShowInvite.t); brShowInvite.t = setTimeout(() => { $("#brInvite").hidden = true; BR.inv = null; }, 30000);
+  const inv = { from: String(m.from || ""), name: cleanName(m.name) || "A friend", at: Date.now() };
+  if (!inv.from || (brPartner() && brPartner().id === inv.from)) return;
+  const fresh = !BR.invites.has(inv.from);
+  BR.invites.set(inv.from, inv); BR.inv = inv; BR.partyKey = "";
+  $("#brInvWho").textContent = inv.name; $("#brInvite").hidden = false;
+  if (fresh) { blip(880, 0.1, 0.1); blip(1320, 0.14, 0.1, "square", 0.1); }
+  clearTimeout(brShowInvite.t); brShowInvite.t = setTimeout(() => { $("#brInvite").hidden = true; }, 120000);
+  renderBrLobby();
 }
-$("#brInvYes").addEventListener("click", () => {
-  if (BR.inv) { brSend({ t: "accept", from: BR.inv.from }); if (state === "menu") { playMode = "royale"; save("cfa.mode", "royale"); renderPlayMode(); } }
-  BR.inv = null; $("#brInvite").hidden = true;
-});
-$("#brInvNo").addEventListener("click", () => { if (BR.inv) brSend({ t: "decline", from: BR.inv.from }); BR.inv = null; $("#brInvite").hidden = true; });
+function brAnswer(from, yes) {
+  if (yes) { brSend({ t: "accept", from }); if (state === "menu") { playMode = "royale"; save("cfa.mode", "royale"); renderPlayMode(); } }
+  else brSend({ t: "decline", from });
+  BR.invites.delete(from); BR.partyKey = "";
+  if (BR.inv && BR.inv.from === from) { BR.inv = null; $("#brInvite").hidden = true; }
+  renderBrLobby();
+}
+$("#brInvYes").addEventListener("click", () => { if (BR.inv) brAnswer(BR.inv.from, true); else $("#brInvite").hidden = true; });
+$("#brInvNo").addEventListener("click", () => { if (BR.inv) brAnswer(BR.inv.from, false); else $("#brInvite").hidden = true; });
 $("#brLeave").addEventListener("click", () => brSend({ t: "leaveparty" }));
 async function openBrPick() {
   const box = $("#brPickBody"); $("#brPick").hidden = false;
@@ -5260,16 +5286,30 @@ function renderBrLobby() {
 }
 $("#brCount").addEventListener("click", () => { if (playMode !== "royale") { playMode = "royale"; save("cfa.mode", "royale"); renderPlayMode(); } });
 function renderBrParty() {
-  const royale = playMode === "royale";
+  const royale = playMode === "royale", n = BR.invites.size;
+  $("#modeRoyale").textContent = n && !royale ? "Royale ●" : "Royale";   // an invite is waiting
   $("#brParty").hidden = !royale;
   if (!royale) return;
   const mate = brPartner(), mine = cleanName(nick.value) || myName;
-  const key = JSON.stringify([mine, BR.queued, mate && [mate.name, mate.queued], !!BR.party]);
+  for (const [id, inv] of BR.invites) if (Date.now() - inv.at > 600000 || (mate && mate.id === id)) BR.invites.delete(id);
+  const key = JSON.stringify([mine, BR.queued, mate && [mate.name, mate.queued], !!BR.party, [...BR.invites.keys()], !!acct]);
   if (key === BR.partyKey) return; BR.partyKey = key;
+  const invBox = $("#brInvites"); invBox.replaceChildren();
+  if (!acct) {                                                          // invites go to accounts
+    const b = document.createElement("button"); b.type = "button"; b.className = "brinv"; b.style.gridTemplateColumns = "1fr";
+    b.textContent = "Sign in so your friends can invite you"; b.addEventListener("click", openSignIn); invBox.appendChild(b);
+  }
+  if (!mate) for (const inv of BR.invites.values()) {
+    const row = document.createElement("div"); row.className = "brinv";
+    const t = document.createElement("span"); t.textContent = inv.name + " invited you";
+    const y = document.createElement("button"); y.type = "button"; y.className = "btn primary"; y.textContent = "Join"; y.addEventListener("click", () => brAnswer(inv.from, true));
+    const n = document.createElement("button"); n.type = "button"; n.className = "btn"; n.textContent = "✕"; n.setAttribute("aria-label", "Decline"); n.addEventListener("click", () => brAnswer(inv.from, false));
+    row.append(t, y, n); invBox.appendChild(row);
+  }
   const slot = (cls, top, name) => { const d = document.createElement("div"); d.className = "brslot " + cls; const sm = document.createElement("small"); sm.textContent = top; d.append(sm, name); return d; };
   const kids = [slot(BR.queued ? "ready" : "", BR.queued ? "Queued" : "You", mine)];
   if (mate) kids.push(slot(mate.queued ? "ready" : "", mate.queued ? "Queued" : "Duo", mate.name));
-  else { const b = document.createElement("button"); b.type = "button"; b.className = "brslot add"; const sm = document.createElement("small"); sm.textContent = "Empty"; b.append(sm, "+ Invite or join a friend"); b.addEventListener("click", openBrPick); kids.push(b); }
+  else { const b = document.createElement("button"); b.type = "button"; b.className = "brslot add"; const sm = document.createElement("small"); sm.textContent = "Empty"; b.append(sm, "+ Invite / join"); b.addEventListener("click", openBrPick); kids.push(b); }
   $("#brSlots").replaceChildren(...kids);
   $("#brLeave").hidden = !BR.party;
 }

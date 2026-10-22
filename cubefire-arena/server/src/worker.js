@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 42;
+const MIN_BUILD = 43;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -653,6 +653,16 @@ export class Accounts {
     if (op === "who") {                                       // the battle royale hub checks who a game is signed in as
       const t = String(b.token || ""), s = t && this.sql.exec("SELECT name FROM sessions WHERE token = ?", t).toArray()[0], u = s && this.user(s.name);
       return u ? { acc: u.name, display: u.display } : {};
+    }
+    if (op === "pushinvite") {                                // a battle royale duo invite to a friend whose game is closed
+      const from = String(b.from || "").toLowerCase(), to = String(b.to || "").toLowerCase();
+      if (!from || !to || !this.friendsOf(from).includes(to)) return { sent: 0 };
+      const jwk = this.vapid(), name = (this.user(from) || {}).display || from;
+      const message = { title: "Cubefire Arena", body: `${name} invited you to a battle royale duo. Tap to join!`, url: "/?" + new URLSearchParams({ brjoin: from }) };
+      const subs = this.sql.exec("SELECT * FROM push WHERE acct = ?", to).toArray();
+      let sent = 0;
+      for (const sub of subs.slice(0, 10)) { const st = await sendPush(jwk, sub, message); if (st >= 200 && st < 300) sent++; else if (st === 404 || st === 410) this.sql.exec("DELETE FROM push WHERE endpoint = ?", sub.endpoint); }
+      return { sent };
     }
     if (op === "isfriend") {                                  // joining a friend's battle royale party
       const x = String(b.a || "").toLowerCase(), y = String(b.b || "").toLowerCase();

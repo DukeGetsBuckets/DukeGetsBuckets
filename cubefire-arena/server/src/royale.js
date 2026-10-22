@@ -57,6 +57,8 @@ export class Royale {
     this.start = 0;               // the next battle royale's start time
     this.cancelledAt = 0;         // start time of the last one cancelled for too few teams
     this.infoT = null;
+    this.invites = new Map();     // account -> Map(inviter id -> {from, name, at}): invites wait here until answered
+    this.pushedAt = new Map();    // "from>to" -> when we last sent that invite as a notification
     ctx.blockConcurrencyWhile(async () => { this.start = (await ctx.storage.get("start")) || 0; });
   }
   att(ws) { let a = this.atts.get(ws); if (a === undefined) { a = ws.deserializeAttachment() || null; this.atts.set(ws, a); } return a; }
@@ -184,7 +186,9 @@ export class Royale {
         accounts(this.env).fetch("https://internal/internal/who", { method: "POST", body: JSON.stringify({ token: d.token }) }).then(r => r.json()).then(r => {
           const cur = this.att(ws); if (!cur || cur.gone) return;
           this.setAtt(ws, { ...cur, acc: r.acc || null, disp: r.display || null });
+          this.send(ws, { t: "you", acc: r.acc || null });
           if (cur.party) this.sendParty(cur.party);
+          if (r.acc) this.deliverInvites(ws, r.acc);
         }).catch(() => {});
       } else if (a.acc) this.setAtt(ws, { ...a, acc: null, disp: null });
       if (a.party) this.sendParty(a.party);
@@ -192,7 +196,7 @@ export class Royale {
     }
     if (d.t === "invite") return this.invite(ws, a, String(d.to || "").trim().toLowerCase());
     if (d.t === "accept") return this.accept(ws, a, String(d.from || ""));
-    if (d.t === "decline") { const h = this.byId(String(d.from || "")); if (h) this.send(h.ws, { t: "declined", by: a.disp || a.name }); return; }
+    if (d.t === "decline") { this.dropInvite(a.acc, String(d.from || "")); const h = this.byId(String(d.from || "")); if (h) this.send(h.ws, { t: "declined", by: a.disp || a.name }); return; }
     if (d.t === "leaveparty") { if (a.party) this.leaveParty(ws, a, false); return; }
     if (d.t === "join") return this.join(ws, a, String(d.to || "").trim().toLowerCase());
     if (d.t === "online") return this.online(ws, Array.isArray(d.accs) ? d.accs.slice(0, 200).map(x => String(x).toLowerCase()) : []);
@@ -211,15 +215,30 @@ export class Royale {
     const list = m.map(h => ({ id: h.a.id, name: h.a.disp || h.a.name || "Player", acc: h.a.acc || null, skin: h.a.skin || null, color: h.a.color || 0, rk: h.a.rk || 0, queued: !!h.a.queued }));
     for (const h of m) this.send(h.ws, { t: "party", id: pid, members: list });
   }
+  // An invite waits for 10 minutes: it shows on every screen your friend has the game open on,
+  // reaches them when they open it (or sign in), and comes as a notification if the game is closed
   invite(ws, a, to) {
     if (!a.acc) return this.send(ws, { t: "invited", ok: false, msg: "Sign in to invite friends" });
     if (!to || to === a.acc) return this.send(ws, { t: "invited", ok: false, msg: "Pick a friend to invite" });
     if (this.members(a.party).length >= 2) return this.send(ws, { t: "invited", ok: false, msg: "Your party is full (duos only)" });
+    const inv = { from: a.id, name: a.disp || a.name || "A friend", at: Date.now() };
+    if (!this.invites.has(to)) this.invites.set(to, new Map());
+    this.invites.get(to).set(a.id, inv);
     const targets = this.hubs().filter(h => h.a.acc === to);
-    if (!targets.length) return this.send(ws, { t: "invited", ok: false, msg: "That friend isn't online right now" });
-    for (const h of targets) this.send(h.ws, { t: "invite", from: a.id, name: a.disp || a.name || "A friend" });
-    this.send(ws, { t: "invited", ok: true, msg: "Invite sent" });
+    for (const h of targets) this.send(h.ws, { t: "invite", ...inv });
+    if (targets.length) return this.send(ws, { t: "invited", ok: true, msg: "Invite sent! It shows on their screen now" });
+    const k = a.acc + ">" + to, last = this.pushedAt.get(k) || 0;
+    if (Date.now() - last > 60000) {
+      this.pushedAt.set(k, Date.now());
+      accounts(this.env).fetch("https://internal/internal/pushinvite", { method: "POST", body: JSON.stringify({ from: a.acc, to }) }).catch(() => {});
+    }
+    this.send(ws, { t: "invited", ok: true, msg: "They don't have the game open, so we sent a notification. The invite waits 10 minutes: they'll see it when they open the game (signed in)" });
   }
+  deliverInvites(ws, acc) {
+    const list = this.invites.get(acc); if (!list) return;
+    for (const [id, inv] of list) { if (Date.now() - inv.at > 10 * MIN) list.delete(id); else this.send(ws, { t: "invite", ...inv }); }
+  }
+  dropInvite(acc, from) { const list = acc && this.invites.get(acc); if (list) { list.delete(from); if (!list.size) this.invites.delete(acc); } }
   // Join a friend's party (or start a duo with them) without waiting for an invite
   async join(ws, a, to) {
     if (!a.acc) return this.send(ws, { t: "invited", ok: false, msg: "Sign in to join your friends" });
@@ -247,6 +266,7 @@ export class Royale {
     if (!pid) { pid = host.a.id; this.setAtt(host.ws, { ...host.a, party: pid, queued: false }); }
     if (this.members(pid).filter(h => h.a.id !== a.id).length >= 2) return this.send(ws, { t: "invited", ok: false, msg: "That party is already full" });
     if (a.party && a.party !== pid) this.leaveParty(ws, a, false);
+    this.dropInvite(a.acc, host.a.id);
     for (const h of this.members(pid)) this.setAtt(h.ws, { ...h.a, queued: false });   // a new duo queues again together
     this.setAtt(ws, { ...this.att(ws), party: pid, queued: false });
     this.sendParty(pid); this.broadcastInfo();
