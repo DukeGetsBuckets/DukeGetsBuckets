@@ -2829,7 +2829,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 45;
+const BUILD = 46;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3712,7 +3712,6 @@ function die(src, free) {
   if (mode === "royale") { brDown(src); return; }
   const byHacker = !!(src && src.peer && remotes.has(src.peer) && remotes.get(src.peer).hx);
   if (rankedNow() && !free && !byHacker) addRank(-rpLoss(RP.death));          // free: the admin's kill button costs no points
-  if (rankedNow() && byHacker) setTimeout(() => banner(src.name + " is using hacks · you lose no RP"), 400);
   hp = 0; alive = false; deaths++; streak = 0;
   respawnAt = now() + 3;
   dthOut = { s: ++deathSeq, by: src.peer || null };
