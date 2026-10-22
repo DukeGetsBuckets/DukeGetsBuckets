@@ -656,6 +656,7 @@ body.pig #pigTint{display:block}
         </div>
         <div class="brparty" id="brParty" hidden>
           <div class="top"><span class="lbl-sm">Your duo</span><button type="button" id="brLeave" hidden>Leave party</button></div>
+          <button type="button" class="btn primary" id="brDoug" hidden>👑 Start a battle royale in 3 min</button>
           <div id="brInvites"></div>
           <div class="brslots" id="brSlots"></div>
         </div>
@@ -2828,7 +2829,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 44;
+const BUILD = 45;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -5143,7 +5144,7 @@ function applyInvite(q) {
 renderPremium();
 // ======================================================================
 // Battle royale. Every game keeps a "hub" socket to the battle royale server: duo parties,
-// the schedule (one every hour, on the half hour) and the queue go over it, and so does the match.
+// the schedule (one every 5 minutes) and the queue go over it, and so does the match.
 // In the match you land with a pistol and find guns, med kits, shields and grenades while
 // the storm closes in. At 0 health you're knocked down: you crawl and bleed out in 30
 // seconds unless your duo holds F (or Use) on you for 5 seconds. Eliminated while your duo
@@ -5220,10 +5221,21 @@ function brMsg(m) {
     BR.queued = !!m.on; if (m.msg) brToast(m.on ? "Queued" : "Battle royale", String(m.msg), 5);
     else if (m.on) banner("Queued for the battle royale!");
     renderBrLobby();
-  } else if (m.t === "br" && m.ph === "cancelled") { BR.queued = false; brToast("Battle royale cancelled", String(m.msg || "Not enough teams queued"), 9); renderBrLobby(); }
+  } else if (m.t === "br" && m.ph === "cancelled") { BR.queued = BR.queued && !!m.stay; if (BR.queued || state === "menu") brToast("Not enough teams yet", String(m.msg || "Not enough teams queued"), 7); renderBrLobby(); }
   else if (m.t === "brstart") brStart(m);
   else if (m.t === "st" && m.id) { if (mode === "royale" && state === "play" && BR.m) onPeer({ peer: String(m.id), presence: m.d && typeof m.d === "object" ? m.d : {}, kind: "viewer", sameTab: false }); }
   else if (m.t === "taken") brTaken(m);
+  else if (m.t === "brcall") {                                          // Doug started one: everyone out of their match, to the queue
+    if (num(m.now) !== null) BR.skew = m.now - Date.now();
+    if (BR.info && num(m.start) !== null) BR.info.start = m.start;
+    if (!(state === "play" && mode === "royale")) {
+      if (state === "play") leaveMatch();
+      playMode = "royale"; save("cfa.mode", "royale"); renderPlayMode();
+      brToast("⚔️ " + (cleanName(m.by) || "Doug") + " started a battle royale!", "It starts in 3 minutes. Tap Queue to get in!", 10);
+      blip(523, 0.15, 0.12); blip(784, 0.3, 0.12, "square", 0.15);
+    }
+    renderBrLobby();
+  }
   else if (m.t === "teamout") brTeamOut(m);
   else if (m.t === "brend") brEnd(m);
   else if (m.t === "crown") { brSetCrown(m); if (!BR.m) brToast("👑 New Royale Champions", (BR.crown ? BR.crown.names.join(" & ") : "") + " won the battle royale!", 6); }
@@ -5263,6 +5275,7 @@ function brAnswer(from, yes) {
 $("#brInvYes").addEventListener("click", () => { if (BR.inv) brAnswer(BR.inv.from, true); else $("#brInvite").hidden = true; });
 $("#brInvNo").addEventListener("click", () => { if (BR.inv) brAnswer(BR.inv.from, false); else $("#brInvite").hidden = true; });
 $("#brLeave").addEventListener("click", () => brSend({ t: "leaveparty" }));
+$("#brDoug").addEventListener("click", () => { if (confirm("Start a battle royale in 3 minutes? Everyone gets pulled out of their match and has to queue.")) brSend({ t: "dougstart" }); });
 async function openBrPick() {
   const box = $("#brPickBody"); $("#brPick").hidden = false;
   const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); for (const k of kids || []) e.append(k); return e; };
@@ -5310,7 +5323,7 @@ function renderBrLobby() {
   if (P) {
     let top, time, sub, hot = false;
     if (P.ph === "match") { top = "Battle royale live"; time = P.I.match ? plural(P.I.match.alive, "team") + " left" : "Live"; sub = "Next one in " + mmss(Math.ceil(P.toStart)); }
-    else if (P.ph === "queue") { top = "Queue open · starts in"; time = mmss(Math.ceil(P.toStart)); sub = `${plural(P.I.teams, "team")} queued · ${P.I.minTeams} needed`; hot = true; }
+    else if (P.ph === "queue") { top = "Next battle royale in"; time = mmss(Math.ceil(P.toStart)); sub = `${plural(P.I.teams, "team")} queued · ${P.I.minTeams} needed` + (P.I.live ? ` · ${P.I.live} live now` : ""); hot = P.toStart < 60; }
     else { top = "Next battle royale in"; time = mmss(Math.ceil(P.toStart)); sub = "Queue opens in " + mmss(Math.ceil(P.toOpen)); }
     if (BR.queued) sub = "You're queued · " + sub;
     else if (!royale && P.ph !== "match") sub += " · tap to queue";
@@ -5347,6 +5360,7 @@ function renderBrParty() {
   else { const b = document.createElement("button"); b.type = "button"; b.className = "brslot add"; const sm = document.createElement("small"); sm.textContent = "Empty"; b.append(sm, "+ Invite / join"); b.addEventListener("click", openBrPick); kids.push(b); }
   $("#brSlots").replaceChildren(...kids);
   $("#brLeave").hidden = !BR.party;
+  $("#brDoug").hidden = !(acct && acct.name.toLowerCase() === "doug");
 }
 function renderBrPlay() {
   const bp = $("#bigPlay"), royale = playMode === "royale";
@@ -5383,7 +5397,7 @@ function brQueueToggle() {
 let brSoonBeep = 0;
 function renderBrSoon() {
   const el = $("#brSoon"), P = brPhase();
-  const show = state === "play" && mode !== "royale" && P && P.ph === "queue";
+  const show = state === "play" && mode !== "royale" && P && P.ph === "queue" && (BR.queued || P.toStart <= 60);   // the last minute, or when you're queued
   el.hidden = !show; if (!show) return;
   el.textContent = BR.queued ? "Queued · battle royale in " + mmss(Math.ceil(P.toStart)) + " · you'll be pulled in" : "Battle royale in " + mmss(Math.ceil(P.toStart)) + " · queue in the lobby";
   const sec = Math.ceil(P.toStart);
