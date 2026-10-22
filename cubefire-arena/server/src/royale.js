@@ -4,9 +4,9 @@
 //
 // Every game keeps a "hub" socket to it (GET /ws?room=royale) for:
 //   - duo parties: invite a friend, accept, join a friend's party, leave ({t: "invite" | "accept" | "decline" | "join" | "leaveparty"})
-//   - the schedule: a battle royale every hour on the hour, or when Doug starts one (3 minutes
-//     out). The queue opens 5 minutes before; ranked lobbies pause from 2 minutes before until
-//     1 minute after the start (they ask this object for the times at /sched)
+//   - the schedule: a battle royale every 20 minutes (:00, :20, :40), or when Doug starts one.
+//     You can queue any time; ranked lobbies pause from 2 minutes before until 1 minute after
+//     each start (they ask this object for the times at /sched)
 //   - queueing ({t: "queue" | "unqueue"}): a duo, or a solo player who gets a random partner
 //   - the match itself: player states are relayed (near players every update, far ones less
 //     often), loot is claimed first come first served, and the last team with someone standing wins
@@ -18,8 +18,8 @@ const MIN = 60000;
 export function brConfig(env) {
   const minTeams = Number(env && env.BR_MIN_TEAMS);
   if (env && env.BR_TEST === "1") return { every: 4 * MIN, open: 90000, stop: 45000, resume: 30000, minTeams: minTeams || 1, test: true };
-  // one every hour on the hour (and whenever Doug starts one); you can queue for the next one any time
-  return { every: 60 * MIN, open: 60 * MIN, stop: 2 * MIN, resume: MIN, minTeams: minTeams || 5, test: false };
+  // one every 20 minutes (:00, :20, :40), and whenever Doug starts one; you can queue for the next one any time
+  return { every: 20 * MIN, open: 20 * MIN, stop: 2 * MIN, resume: MIN, minTeams: minTeams || 5, test: false };
 }
 const MAX_TEAMS = 25, SLOTS = 32;              // team spawn slots on the map (the game page has the same 32)
 const NEAR = 110, FAR_EVERY = 5;               // full-rate updates within NEAR blocks, every 5th one beyond
@@ -62,8 +62,8 @@ export class Royale {
     this.pushed = "";             // the last notification sent ("start:kind"), so each goes out once
     ctx.blockConcurrencyWhile(async () => {
       this.start = (await ctx.storage.get("start")) || 0; this.pushed = (await ctx.storage.get("pushed")) || "";
-      // a start that isn't on the schedule (and wasn't set by Doug or the admin page) is from an old schedule
-      if (this.start && this.start % this.cfg.every !== (this.cfg.offset || 0) % this.cfg.every && !(await ctx.storage.get("custom"))) this.start = 0;
+      // a start that isn't on the schedule, or further off than one gap (and wasn't set by Doug or the admin page), is from an old schedule
+      if (this.start && (this.start % this.cfg.every !== (this.cfg.offset || 0) % this.cfg.every || this.start - Date.now() > this.cfg.every) && !(await ctx.storage.get("custom"))) this.start = 0;
     });
   }
   att(ws) { let a = this.atts.get(ws); if (a === undefined) { a = ws.deserializeAttachment() || null; this.atts.set(ws, a); } return a; }
@@ -113,9 +113,11 @@ export class Royale {
   // Notifications to everyone with notifications on: 15 minutes before, when the queue opens
   // (5 before) and a last call 1 minute before. Not overnight (10 pm to 7 am Eastern).
   // Battle royales every few minutes: one reminder every half hour instead, 2 minutes before.
+  // Every 20 to 59 minutes: one reminder per battle royale, 5 minutes before.
   pushPlan() {
     const t = this.times(), c = this.cfg;
     if (c.every < 20 * MIN) return t.start % (30 * MIN) === 0 || c.test ? [["soon", t.start - 2 * MIN]] : [];
+    if (c.every < 60 * MIN) return [["open", t.start - 5 * MIN]];
     return [["15", t.start - 15 * MIN], ["open", t.start - 5 * MIN], ["last", t.start - MIN]].filter(([k, at]) => !c.test || k !== "15");
   }
   quietHours() {
@@ -373,7 +375,7 @@ export class Royale {
     for (let i = 0; i < solos.length; i += per) teams.push(solos.slice(i, i + per));   // random partners (a last odd one plays alone)
     if (teams.length < (force ? 1 : this.cfg.minTeams)) {                  // not enough teams: everyone queued stays queued for the next one
       this.cancelledAt = this.start;
-      const next = Math.round(this.cfg.every / MIN), many = this.cfg.every < 20 * MIN;
+      const next = Math.round(this.cfg.every / MIN), many = this.cfg.every < 60 * MIN;
       const msg = `Only ${teams.length} team${teams.length === 1 ? "" : "s"} queued (${this.cfg.minTeams} needed), so it didn't start. ` + (many ? `You stay queued for the next one in ${next} minutes` : `Next one in ${next} minutes`);
       if (teams.length) for (const h of this.hubs()) this.send(h.ws, { t: "br", ph: "cancelled", teams: teams.length, need: this.cfg.minTeams, msg, stay: many && !!h.a.queued });
       if (!many) for (const h of q) this.setAtt(h.ws, { ...this.att(h.ws), queued: false });
