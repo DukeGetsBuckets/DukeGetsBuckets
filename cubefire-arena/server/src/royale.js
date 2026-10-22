@@ -1,12 +1,12 @@
 // ======================================================================
 // Battle royale. One Durable Object runs them all: everyone queued at a start time is in the same
-// match, and since one starts every 5 minutes, several can be running at once.
+// match, and several can be running at once (Doug can start one while another is going).
 //
 // Every game keeps a "hub" socket to it (GET /ws?room=royale) for:
 //   - duo parties: invite a friend, accept, join a friend's party, leave ({t: "invite" | "accept" | "decline" | "join" | "leaveparty"})
-//   - the schedule: a battle royale every 5 minutes on the clock, and the queue is always open.
-//     (With battle royales 20+ minutes apart, ranked lobbies pause from 2 minutes before until
-//     1 minute after each start; they ask this object for the times at /sched)
+//   - the schedule: a battle royale every hour on the hour, or when Doug starts one (3 minutes
+//     out). The queue opens 5 minutes before; ranked lobbies pause from 2 minutes before until
+//     1 minute after the start (they ask this object for the times at /sched)
 //   - queueing ({t: "queue" | "unqueue"}): a duo, or a solo player who gets a random partner
 //   - the match itself: player states are relayed (near players every update, far ones less
 //     often), loot is claimed first come first served, and the last team with someone standing wins
@@ -18,9 +18,8 @@ const MIN = 60000;
 export function brConfig(env) {
   const minTeams = Number(env && env.BR_MIN_TEAMS);
   if (env && env.BR_TEST === "1") return { every: 4 * MIN, open: 90000, stop: 45000, resume: 30000, minTeams: minTeams || 1, test: true };
-  // a new one every 5 minutes on the clock; the queue is always open, ranked doesn't pause
-  // (that's only for battle royales 20 or more minutes apart), and several can run at once
-  return { every: 5 * MIN, open: 5 * MIN, stop: 2 * MIN, resume: MIN, minTeams: minTeams || 5, test: false };
+  // one every hour on the hour (and whenever Doug starts one); the queue opens 5 minutes before
+  return { every: 60 * MIN, open: 5 * MIN, stop: 2 * MIN, resume: MIN, minTeams: minTeams || 5, test: false };
 }
 const MAX_TEAMS = 25, SLOTS = 32;              // team spawn slots on the map (the game page has the same 32)
 const NEAR = 110, FAR_EVERY = 5;               // full-rate updates within NEAR blocks, every 5th one beyond
@@ -61,7 +60,11 @@ export class Royale {
     this.invites = new Map();     // account -> Map(inviter id -> {from, name, at}): invites wait here until answered
     this.pushedAt = new Map();    // "from>to" -> when we last sent that invite as a notification
     this.pushed = "";             // the last notification sent ("start:kind"), so each goes out once
-    ctx.blockConcurrencyWhile(async () => { this.start = (await ctx.storage.get("start")) || 0; this.pushed = (await ctx.storage.get("pushed")) || ""; });
+    ctx.blockConcurrencyWhile(async () => {
+      this.start = (await ctx.storage.get("start")) || 0; this.pushed = (await ctx.storage.get("pushed")) || "";
+      // a start that isn't on the schedule (and wasn't set by Doug or the admin page) is from an old schedule
+      if (this.start && this.start % this.cfg.every !== (this.cfg.offset || 0) % this.cfg.every && !(await ctx.storage.get("custom"))) this.start = 0;
+    });
   }
   att(ws) { let a = this.atts.get(ws); if (a === undefined) { a = ws.deserializeAttachment() || null; this.atts.set(ws, a); } return a; }
   setAtt(ws, a) { this.atts.set(ws, a); try { ws.serializeAttachment(a); } catch {} }
@@ -80,7 +83,7 @@ export class Royale {
   }
   ensureStart() {
     const now = Date.now();
-    if (!this.start || now > this.start + 5000) { this.start = this.nextSlot(now); this.ctx.storage.put("start", this.start).catch(() => {}); }
+    if (!this.start || now > this.start + 5000) { this.start = this.nextSlot(now); this.ctx.storage.put("start", this.start).catch(() => {}); this.ctx.storage.put("custom", false).catch(() => {}); }
   }
   times() {
     this.ensureStart();
@@ -170,7 +173,7 @@ export class Royale {
     if (path === "/status") { const i = this.info(); return Response.json({ ...i, hubs: this.hubs().length }); }
     if (path === "/admin-now") {
       const now = Date.now();
-      this.start = now + Math.min(this.cfg.open, 2 * MIN); this.ctx.storage.put("start", this.start).catch(() => {});
+      this.start = now + Math.min(this.cfg.open, 2 * MIN); this.ctx.storage.put("start", this.start).catch(() => {}); this.ctx.storage.put("custom", true).catch(() => {});
       this.broadcastInfo(true); this.schedule();
       return Response.json({ ok: true, start: this.start });
     }
@@ -328,7 +331,7 @@ export class Royale {
   dougStart(ws, a) {
     if (a.acc !== "doug") return this.send(ws, { t: "invited", ok: false, msg: "Only Doug can do that" });
     const now = Date.now();
-    this.start = now + 3 * MIN; this.ctx.storage.put("start", this.start).catch(() => {});
+    this.start = now + 3 * MIN; this.ctx.storage.put("start", this.start).catch(() => {}); this.ctx.storage.put("custom", true).catch(() => {});
     const call = JSON.stringify({ t: "brcall", start: this.start, now, by: a.disp || "Doug" });
     for (const h of this.hubs()) this.send(h.ws, call);
     this.broadcastInfo(true); this.schedule();
@@ -362,7 +365,7 @@ export class Royale {
       const msg = `Only ${teams.length} team${teams.length === 1 ? "" : "s"} queued (${this.cfg.minTeams} needed), so it didn't start. ` + (many ? `You stay queued for the next one in ${next} minutes` : `Next one in ${next} minutes`);
       if (teams.length) for (const h of this.hubs()) this.send(h.ws, { t: "br", ph: "cancelled", teams: teams.length, need: this.cfg.minTeams, msg, stay: many && !!h.a.queued });
       if (!many) for (const h of q) this.setAtt(h.ws, { ...this.att(h.ws), queued: false });
-      this.start = this.nextSlot(now); this.ctx.storage.put("start", this.start).catch(() => {});
+      this.start = this.nextSlot(now); this.ctx.storage.put("start", this.start).catch(() => {}); this.ctx.storage.put("custom", false).catch(() => {});
       for (const pid of parties.keys()) this.sendParty(pid);
       return;
     }
@@ -382,7 +385,7 @@ export class Royale {
     });
     this.matches.set(m.id, m);
     for (const id of m.players.keys()) { const h = this.byId(id); if (h) this.send(h.ws, this.startMsg(m, id)); }
-    this.start = this.nextSlot(now + 30000); this.ctx.storage.put("start", this.start).catch(() => {});
+    this.start = this.nextSlot(now + 30000); this.ctx.storage.put("start", this.start).catch(() => {}); this.ctx.storage.put("custom", false).catch(() => {});
     this.broadcastInfo(true);
   }
   startMsg(m, id) {
