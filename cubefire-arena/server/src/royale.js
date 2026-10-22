@@ -7,7 +7,8 @@
 //   - the schedule: a battle royale every 20 minutes (:00, :20, :40), or when Doug starts one.
 //     You can queue any time; ranked lobbies pause from 2 minutes before until 1 minute after
 //     each start (they ask this object for the times at /sched)
-//   - queueing ({t: "queue" | "unqueue"}): a duo, or a solo player who gets a random partner
+//   - queueing ({t: "queue" | "unqueue"}): a duo, or a solo player who gets a random partner.
+//     Everyone playing ranked at a start time is put in too ({t: "where", in: "ranked"} from their game)
 //   - the match itself: player states are relayed (near players every update, far ones less
 //     often), loot is claimed first come first served, and the last team with someone standing wins
 // It only starts with at least 5 teams (else the queued stay queued for the next) and holds up to 25 duos.
@@ -93,7 +94,7 @@ export class Royale {
   phase() { return Date.now() >= this.times().open ? "queue" : "idle"; }
   matchOf(a) { return a && a.inMatch ? this.matches.get(a.inMatch) || null : null; }
   queueCount() {
-    const q = this.hubs().filter(h => h.a.queued), parties = new Map();
+    const q = this.hubs().filter(h => h.a.queued || h.a.in === "ranked"), parties = new Map();
     for (const h of q) { const k = h.a.party || h.a.id; parties.set(k, (parties.get(k) || 0) + 1); }
     let duos = 0, solos = 0; for (const n of parties.values()) { if (n >= 2) duos++; else solos++; }
     return { teams: duos + (this.pairSolos() ? Math.ceil(solos / 2) : solos), players: q.length };
@@ -240,6 +241,7 @@ export class Royale {
       if (a.party) this.sendParty(a.party);
       return;
     }
+    if (d.t === "where") { this.setAtt(ws, { ...a, in: ["ranked", "party", "bots", "royale", "menu"].includes(d.in) ? d.in : "menu" }); return; }   // what the game is doing
     if (d.t === "invite") return this.invite(ws, a, String(d.to || "").trim().toLowerCase());
     if (d.t === "accept") return this.accept(ws, a, String(d.from || ""));
     if (d.t === "decline") { this.dropInvite(a.acc, String(d.from || "")); const h = this.byId(String(d.from || "")); if (h) this.send(h.ws, { t: "declined", by: a.disp || a.name }); return; }
@@ -364,7 +366,8 @@ export class Royale {
   // ---- starting (or cancelling) a match
   launch(force) {
     const now = Date.now(); this.lastStart = this.start;
-    const q = this.hubs().filter(h => h.a.queued && !this.matchOf(h.a) && now - (this.seen.get(h.a.id) || 0) < 20000);
+    // everyone queued, and everyone playing ranked right now: they're pulled in (with a random partner if they have no duo)
+    const q = this.hubs().filter(h => (h.a.queued || h.a.in === "ranked") && !this.matchOf(h.a) && now - (this.seen.get(h.a.id) || 0) < 20000);
     const parties = new Map(), solos = [];
     for (const h of q) { if (h.a.party) { if (!parties.has(h.a.party)) parties.set(h.a.party, []); parties.get(h.a.party).push(h); } else solos.push(h); }
     const teams = [];

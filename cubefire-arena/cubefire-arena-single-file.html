@@ -2840,7 +2840,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 47;
+const BUILD = 48;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3357,7 +3357,7 @@ function onRoundPhase(prev, ph) {
     if (prev !== "wait") banner("Not enough players · warm-up");
   } else if (ph === "pause") {                    // everyone into the battle royale: ranked waits until a minute after it starts
     if (spectating) { spectating = false; respawn(); }
-    brToast("Battle royale time!", "Ranked is paused until a minute after the battle royale starts. Queue for it from the lobby", 7);
+    brToast("Battle royale time!", "When it starts, everyone in ranked is put in the battle royale with a partner. Ranked is back a minute after", 7);
   }
 }
 function startSpectate() {
@@ -5191,7 +5191,7 @@ function brConnect() {
   let s; try { s = new WebSocket(serverUrl("royale")); } catch (e) { return; }
   BR.sock = s;
   s.onopen = () => {
-    BR.retry = 0; BR.helloKey = ""; brHello();
+    BR.retry = 0; BR.helloKey = ""; BR.where = ""; brHello(); brWhere();
     if (!BR.crownAsked) { BR.crownAsked = true; api("crown").then(j => brSetCrown(j.crown)).catch(() => {}); }
   };
   s.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (err) { return; } if (m && typeof m === "object") brMsg(m); };
@@ -5208,7 +5208,12 @@ function brHello() {
   const k = JSON.stringify(h); if (k === BR.helloKey) return;
   BR.helloKey = k; brSend(h);
 }
-setInterval(() => { if (BR.sock && BR.sock.readyState === 1) { brSend({ t: "ping", c: performance.now() }); brHello(); } }, 2000);
+// What this game is doing: everyone playing ranked when a battle royale starts gets put in it
+function brWhere() {
+  const w = state !== "play" ? "menu" : mode === "royale" ? "royale" : mode === "bots" ? "bots" : partyCode ? "party" : document.hidden || now() - lastInputT > 180 ? "menu" : "ranked";   // gone 3+ minutes: left out
+  if (w !== BR.where) { BR.where = w; brSend({ t: "where", in: w }); }
+}
+setInterval(() => { if (BR.sock && BR.sock.readyState === 1) { brSend({ t: "ping", c: performance.now() }); brHello(); brWhere(); } }, 2000);
 setInterval(() => { renderBrLobby(); renderBrSoon(); }, 500);
 function brMsg(m) {
   if (m.t === "welcome") BR.id = String(m.id || "");
@@ -5428,11 +5433,12 @@ function brQueueToggle() {
 let brSoonBeep = 0;
 function renderBrSoon() {
   const el = $("#brSoon"), P = brPhase();
-  const show = state === "play" && mode !== "royale" && P && P.ph === "queue" && (BR.queued || P.toStart <= 60);   // the last minute, or when you're queued
+  const ranked = state === "play" && mode === "online" && !partyCode;
+  const show = state === "play" && mode !== "royale" && P && P.ph === "queue" && (BR.queued || P.toStart <= (ranked ? 150 : 60));   // the last minutes, or when you're queued
   el.hidden = !show; if (!show) return;
-  el.textContent = BR.queued ? "Queued · battle royale in " + mmss(Math.ceil(P.toStart)) + " · you'll be pulled in" : "Battle royale in " + mmss(Math.ceil(P.toStart)) + " · queue in the lobby";
+  el.textContent = ranked && !BR.queued ? "Battle royale in " + mmss(Math.ceil(P.toStart)) + " · everyone in ranked joins it" : BR.queued ? "Queued · battle royale in " + mmss(Math.ceil(P.toStart)) + " · you'll be pulled in" : "Battle royale in " + mmss(Math.ceil(P.toStart)) + " · queue in the lobby";
   const sec = Math.ceil(P.toStart);
-  if (BR.queued && sec <= 10 && sec > 0 && sec !== brSoonBeep) { brSoonBeep = sec; banner("Battle royale in " + sec); blip(660, 0.1, 0.1); }
+  if ((BR.queued || ranked) && sec <= 10 && sec > 0 && sec !== brSoonBeep) { brSoonBeep = sec; banner("Battle royale in " + sec); blip(660, 0.1, 0.1); }
 }
 
 // ---- starting the match
@@ -5441,6 +5447,7 @@ function brStart(m) {
   if (num(m.now) !== null) BR.skew = m.now - Date.now();
   BR.queued = false; $("#brInvite").hidden = true; $("#brPick").hidden = true;
   if (BR.m && BR.m.at === at && state === "play" && mode === "royale") { for (const i of Array.isArray(m.taken) ? m.taken : []) brTaken({ i }); return; }   // back after a reconnect
+  const fromRanked = state === "play" && mode === "online";
   if (state === "play") leaveMatch();
   const players = new Map();
   for (const p of Array.isArray(m.players) ? m.players : []) if (p && p.id) players.set(String(p.id), { name: cleanName(p.name) || "Player", team: String(p.team || "") });
@@ -5458,7 +5465,8 @@ function brStart(m) {
   startGame("royale");
   $("#brMap").hidden = false; $("#shWrap").hidden = false;
   const mate = BR.m.mates.length ? (players.get(BR.m.mates[0]) || {}).name : null;
-  brToast("Battle royale!", `No hacks allowed · ${plural(teams, "team")}${mate ? " · your duo: " + mate : " · you're on your own"} · last team standing wins ${BR_RP} RP and the crown`, 6);
+  if (fromRanked) brToast("Battle royale time!", `Everyone in ranked is in the battle royale now${mate ? ", your partner is " + mate : ""}. Ranked is back after it`, 7);
+  else brToast("Battle royale!", `No hacks allowed · ${plural(teams, "team")}${mate ? " · your duo: " + mate : " · you're on your own"} · last team standing wins ${BR_RP} RP and the crown`, 6);
   blip(523, 0.15, 0.12); blip(659, 0.15, 0.12, "square", 0.12); blip(784, 0.3, 0.12, "square", 0.24);
 }
 // Your duo's spawn slot (the server gives each team a different one, spread across the map);
