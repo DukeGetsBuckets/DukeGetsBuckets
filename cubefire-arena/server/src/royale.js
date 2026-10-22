@@ -130,7 +130,7 @@ export class Royale {
     for (const [kind, at] of this.pushPlan()) {
       if (now < at || now - at > 3 * MIN || this.sentKinds(t.start).includes(kind)) continue;
       this.markPushed(t.start, kind);
-      if (this.quietHours() || this.env.BR_PUSH === "0") continue;
+      if (this.quietHours() || this.env.BR_PUSH === "0" || this.env.CLOSED) continue;   // no reminders while the game is closed
       const q = this.queueCount(), skip = this.hubs().filter(h => h.a.queued && h.a.acc).map(h => h.a.acc);   // already queued: no need
       const msg = kind === "soon" ? { title: "⚔️ Battle Royale in 2 minutes!", body: `A new one every 5 minutes${q.teams ? ` · ${q.teams} team${q.teams === 1 ? "" : "s"} queued` : ""}. Grab your duo and tap to jump in!` }
         : kind === "15" ? { title: "⚔️ Battle Royale in 15 minutes!", body: "Get your duo ready and queue up. Last duo standing wins 500 RP and the crown 👑" }

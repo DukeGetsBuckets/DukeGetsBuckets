@@ -71,6 +71,8 @@ export default {
     if (url.pathname === "/ws") {
       if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket upgrade", { status: 426 });
       if ((Number(url.searchParams.get("v")) || 0) < MIN_BUILD) return closingSocket({ t: "update" }, 4001, "Refresh to get the new version");
+      // CLOSED (a deploy setting, e.g. wrangler deploy --var CLOSED:"message"): the whole game is shut with that message
+      if (env.CLOSED) return closingSocket({ t: "blocked", why: String(env.CLOSED) }, 4003, "Closed");
       // the admin's kill switch and bans (by address) are checked before joining a lobby
       const room = lobbyName(url.searchParams.get("room"));
       let gate = {};
