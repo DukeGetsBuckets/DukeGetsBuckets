@@ -106,7 +106,7 @@ export class Royale {
     const t = this.times(), q = this.queueCount();
     let live = 0; for (const m of this.matches.values()) live += m.players.size;
     return { t: "brinfo", now: Date.now(), ...t, ph: this.phase(), teams: q.teams, players: q.players, minTeams: this.cfg.minTeams, maxTeams: MAX_TEAMS, test: this.cfg.test,
-      match: null, live: this.matches.size, livePlayers: live, cancelled: this.cancelledAt && this.cancelledAt === this.lastStart ? true : false };
+      closeAt: Number(this.env.CLOSE_AT) || 0, closedMsg: this.env.CLOSED_MSG || "", match: null, live: this.matches.size, livePlayers: live, cancelled: this.cancelledAt && this.cancelledAt === this.lastStart ? true : false };
   }
   broadcastInfo(now) {
     if (now) { clearTimeout(this.infoT); this.infoT = null; const out = JSON.stringify(this.info()); for (const h of this.hubs()) this.send(h.ws, out); return; }
@@ -133,7 +133,8 @@ export class Royale {
     for (const [kind, at] of this.pushPlan()) {
       if (now < at || now - at > 3 * MIN || this.sentKinds(t.start).includes(kind)) continue;
       this.markPushed(t.start, kind);
-      if (this.quietHours() || this.env.BR_PUSH === "0" || this.env.CLOSED) continue;   // no reminders while the game is closed
+      const closeAt = Number(this.env.CLOSE_AT) || 0;
+      if (this.quietHours() || this.env.BR_PUSH === "0" || this.env.CLOSED || (closeAt && now >= closeAt - 5 * MIN)) continue;   // no reminders while closed (or about to close)   // no reminders while the game is closed
       const q = this.queueCount(), skip = this.hubs().filter(h => h.a.queued && h.a.acc).map(h => h.a.acc);   // already queued: no need
       const msg = kind.startsWith("ev") ? { title: kind === "ev2" ? "🚨 BATTLE ROYALE STARTING NOW! GET ON!" : kind === "ev1" ? "🔥 Battle Royale in 1 minute! Get on now!" : "⚔️ Cubefire is back! Battle Royale at 2:47!", body: "Everyone's jumping in. Open Cubefire and tap Queue!" }
         : kind === "soon" ? { title: "⚔️ Battle Royale in 2 minutes!", body: `A new one every 5 minutes${q.teams ? ` · ${q.teams} team${q.teams === 1 ? "" : "s"} queued` : ""}. Grab your duo and tap to jump in!` }

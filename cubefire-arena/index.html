@@ -2827,7 +2827,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 48;
+const BUILD = 49;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -5211,6 +5211,7 @@ function brMsg(m) {
   else if (m.t === "pong") { if (mode === "royale" && state === "play" && num(m.c) !== null) { const rtt = performance.now() - m.c; pingMs = Math.round(pingMs == null ? rtt : pingMs * 0.6 + rtt * 0.4); } }
   else if (m.t === "brinfo") {
     BR.info = { ...m }; if (num(m.now) !== null) BR.skew = m.now - Date.now();
+    if (num(m.closeAt) && m.closeAt > 0) brCloseAt(m.closeAt, String(m.closedMsg || ""));
     if (BR.m && m.match && num(m.match.alive) !== null && !BR.m.done) BR.m.alive = m.match.alive;
     renderBrLobby();
   } else if (m.t === "party") {
@@ -5255,6 +5256,14 @@ function brMsg(m) {
   else if (m.t === "teamout") brTeamOut(m);
   else if (m.t === "brend") brEnd(m);
   else if (m.t === "crown") { brSetCrown(m); if (!BR.m) brToast("👑 New Royale Champions", (BR.crown ? BR.crown.names.join(" & ") : "") + " won the battle royale!", 6); }
+}
+// The game closes at a set time: everyone is taken out of their match and shown the closed message
+function brCloseAt(at, msg) {
+  if (BR.closeAt === at) return; BR.closeAt = at;
+  clearTimeout(brCloseAt.t);
+  const close = () => { mustRefresh = true; if (state === "play") leaveMatch(); $("#blockedWhy").textContent = msg || "Cubefire Arena is closed for now. Check back soon!"; $("#blocked").hidden = false; };
+  const wait = at - brNow();
+  if (wait <= 0) close(); else brCloseAt.t = setTimeout(close, Math.min(wait, 2147000000));
 }
 function brSetCrown(c) {
   BR.crown = c && Array.isArray(c.names) && c.names.length ? { names: c.names.map(n => String(n).slice(0, 24)).slice(0, 2), at: num(c.at) || 0 } : null;
