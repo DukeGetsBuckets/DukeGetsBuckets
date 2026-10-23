@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 55;
+const MIN_BUILD = 56;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -536,6 +536,9 @@ const ALL_SKINS = [...SKINS.common, ...SKINS.rare, ...SKINS.super, ...SKINS.ultr
 const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200], ["diamondwarden", 1800], ["masterphantom", 2500], ["champion", 3500], ["mythic", 8000], ["legend", 15000]];
 const BR_SKIN = "royalechamp";   // only for battle royale winners
 const PRO_SKIN = "proskin", LEGEND_RP = 15000;   // Pro: the top 3 Legends (their own skin while they stay in the top 3)
+// One-time gifts (given the next time the account opens the game) and skins only one account has
+const GIFTS = { gavin: { id: "gavin-12500rp", rp: 12500, skin: "trump" } };
+const CUSTOM_SKINS = { gavin: ["trump"] };
 const HACK_ACCOUNTS = { luka: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"] };   // the only accounts with hacks (every mode)
 const BR_TOP_SKIN = "royalelegend";   // the top 3 on the battle royale wins leaderboard (while they stay there)
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
@@ -839,7 +842,7 @@ export class Accounts {
   view(u, d) {
     const pro = this.proPlace(u.name), brTop = this.brPlace(u.name), brWins = d.brWins || 0;
     if (OWNER_ACCOUNTS[u.name]) return { name: u.display, pro, brTop, brWins, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k), BR_SKIN, PRO_SKIN, BR_TOP_SKIN], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false, rareSpins: 999, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
-    const owned = [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0)), ...(d.brWins ? [BR_SKIN] : []), ...(pro ? [PRO_SKIN] : []), ...(brTop ? [BR_TOP_SKIN] : [])];
+    const owned = [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0)), ...(d.brWins ? [BR_SKIN] : []), ...(pro ? [PRO_SKIN] : []), ...(brTop ? [BR_TOP_SKIN] : []), ...(CUSTOM_SKINS[u.name] || [])];
     const lost = (d.equipped === PRO_SKIN && !pro) || (d.equipped === BR_TOP_SKIN && !brTop);
     return { name: u.display, pro, brTop, brWins, tickets: d.tickets || 0, owned, equipped: lost ? null : d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), rareSpins: d.rareSpins || 0, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
   }
@@ -1001,6 +1004,12 @@ export class Accounts {
       return { top: top.map(r => ({ name: r.display, rank: r.rank })), pros: this.pros().map(({ name, rank, place }) => ({ name, rank, place })) };
     }
     const u = this.who(body), d = this.data(u);
+    const gift = GIFTS[u.name];
+    if (gift && !(d.gifts || []).includes(gift.id)) {               // a gift: RP (added to their rank) and their skin, put on
+      d.gifts = [...(d.gifts || []), gift.id]; d.rank = Math.min(99999, (d.rank || 0) + gift.rp); d.best = Math.max(d.best || 0, d.rank);
+      if (gift.skin) d.equipped = gift.skin;
+      d.giftAt = Date.now(); this.saveData(u.name, d);
+    }
     if (Date.now() - (d.seen || 0) > 300000) { d.seen = Date.now(); this.saveData(u.name, d); }   // last seen, for the dashboard
     if (op === "me") return { account: this.view(u, d) };
     if (op.startsWith("friend")) return { ...this.friendOp(op, u.name, body), account: this.view(u, d) };
@@ -1017,7 +1026,8 @@ export class Accounts {
       d.bank = (d.bank || 0) + pts + wins * PTS_PER_WIN;
       d.tickets = (d.tickets || 0) + Math.floor(d.bank / PTS_PER_TICKET);
       d.bank %= PTS_PER_TICKET;
-      if (body.rank != null) d.rank = Math.max(0, Math.min(99999, Math.floor(Number(body.rank) || 0)));
+      // (for 10 minutes after a gift, an older game that hasn't seen it can't send the rank back down)
+      if (body.rank != null && !(d.giftAt && Date.now() - d.giftAt < 600000 && Number(body.rank) < (d.rank || 0) - 5000)) d.rank = Math.max(0, Math.min(99999, Math.floor(Number(body.rank) || 0)));
       d.best = Math.max(d.best || 0, d.rank || 0);                    // rank skins stay yours for good
       this.saveData(u.name, d); return { account: this.view(u, d) };
     }

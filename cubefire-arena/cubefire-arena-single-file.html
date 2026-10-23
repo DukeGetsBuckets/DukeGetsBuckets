@@ -392,7 +392,7 @@ body.pig #pigTint{display:block}
 .wheelwrap canvas{width:240px;height:240px;display:block}
 .wheelwrap::after{content:"";position:absolute;left:50%;top:-6px;transform:translateX(-50%);border:12px solid transparent;border-top:20px solid var(--ink);filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))}
 .odds{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;font-weight:700}
-.r0{color:#b7c3cf}.r1{color:#4fb0ff}.r2{color:#d17bff}.r3{color:#ffc93c}.r4{color:#ff4f8b;text-shadow:0 0 8px rgba(255,79,139,.6)}.r5{color:#ffd23a;text-shadow:0 0 10px rgba(255,210,58,.7)}.r6{color:#ff5cf0;text-shadow:0 0 10px rgba(255,92,240,.75)}.r7{color:#ffae00;text-shadow:0 0 10px rgba(255,174,0,.8)}
+.r0{color:#b7c3cf}.r1{color:#4fb0ff}.r2{color:#d17bff}.r3{color:#ffc93c}.r4{color:#ff4f8b;text-shadow:0 0 8px rgba(255,79,139,.6)}.r5{color:#ffd23a;text-shadow:0 0 10px rgba(255,210,58,.7)}.r6{color:#ff5cf0;text-shadow:0 0 10px rgba(255,92,240,.75)}.r7{color:#ffae00;text-shadow:0 0 10px rgba(255,174,0,.8)}.r8{color:#ffd23a;text-shadow:0 0 12px rgba(255,210,58,.9)}
 .prize{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;align-items:center;border:1px solid var(--accent);border-radius:6px;padding:8px 10px;background:rgba(255,182,39,.08)}
 .prize img{width:72px;height:90px;object-fit:contain}
 .prize b{font:400 18px var(--display);display:block}
@@ -2035,7 +2035,7 @@ const skinFor = (name, color) => color === 6 ? "default" : SKINS[String(name || 
 // Skins from the skin wheel. rarity: 0 common, 1 rare, 2 super rare, 4 ultra (1%). Colors for each
 // part of the body; glow: emissive color (super rares glow); gun: tint for your own gun;
 // extra(add, head, body) adds details; anim(av, t) animates the skin for everyone.
-const RARITY = [{ name: "Common", color: "#b7c3cf" }, { name: "Rare", color: "#4fb0ff" }, { name: "Super rare", color: "#d17bff" }, { name: "Rank reward", color: "#ffc93c" }, { name: "Ultra 1%", color: "#ff4f8b" }, { name: "Royale Champion", color: "#ffd23a" }, { name: "Pro", color: "#ff5cf0" }, { name: "Royale Legend", color: "#ffae00" }];
+const RARITY = [{ name: "Common", color: "#b7c3cf" }, { name: "Rare", color: "#4fb0ff" }, { name: "Super rare", color: "#d17bff" }, { name: "Rank reward", color: "#ffc93c" }, { name: "Ultra 1%", color: "#ff4f8b" }, { name: "Royale Champion", color: "#ffd23a" }, { name: "Pro", color: "#ff5cf0" }, { name: "Royale Legend", color: "#ffae00" }, { name: "Custom", color: "#ffd23a" }];
 const SKIN_DEFS = {
   camo: { name: "Jungle Camo", rarity: 0, legs: 0x3b4526, body: 0x56683a, helmet: 0x4a5a30,
     extra(add) { for (const [x, y, w, h, c] of [[-0.16, 1.18, 0.16, 0.12, 0x2f3b20], [0.12, 0.96, 0.2, 0.1, 0x6f7f45], [0.15, 1.24, 0.12, 0.1, 0x2f3b20], [-0.1, 0.9, 0.14, 0.08, 0x6f7f45]]) add(w, h, 0.02, c, x, y, -0.18); } },
@@ -2326,6 +2326,20 @@ for (const [id, name, rarity, body, legs, helmet, parts, a, b, x = {}] of MORE_S
     extra(add, head) { for (const p of parts.split("+")) PART[p](add, head, a, b != null ? b : a, o); },
     anim: fancy ? (av, t) => { const k = 0.55 + 0.45 * Math.sin(t * 3); for (const m of av.pulse) m.emissiveIntensity = k; if (own) own(av, t); } : own };
 }
+// Custom skins: one player's own (the server says who owns them)
+SKIN_DEFS.trump = { name: "Donald Trump", rarity: 8, legs: 0x1b2847, body: 0x1f2d52, arms: 0x1f2d52, head: 0xf2a65a, helmet: 0xf7d774, visor: 0xf2a65a, gun: 0xffd23a, aura: 0xffd23a,
+  extra(add, head) {
+    add(0.52, 0.1, 0.24, 0xf7d774, 0, 0.47, -0.17, head, { glow: 0x6a4a00 });                           // the famous hair, swept forward
+    add(0.07, 0.16, 0.44, 0xf7d774, -0.25, 0.37, 0.01, head); add(0.07, 0.16, 0.44, 0xf7d774, 0.25, 0.37, 0.01, head);
+    add(0.08, 0.05, 0.02, 0x2a3a5a, -0.1, 0.27, -0.237, head); add(0.08, 0.05, 0.02, 0x2a3a5a, 0.1, 0.27, -0.237, head);   // eyes
+    add(0.14, 0.04, 0.02, 0xc2584a, 0, 0.12, -0.237, head);                                                 // mouth
+    add(0.24, 0.3, 0.02, 0xffffff, 0, 1.22, -0.18);                                                          // white shirt
+    add(0.09, 0.52, 0.02, 0xd61f2c, 0, 1.0, -0.19, null, { glow: 0xd61f2c, pulse: true });                   // the long red tie
+    add(0.05, 0.035, 0.02, 0x3b5bdb, -0.2, 1.25, -0.19);                                                     // flag pin
+    add(0.64, 0.05, 0.36, 0xffd23a, 0, 0.79, 0, null, { glow: 0xffb000, pulse: true });                      // gold belt
+    add(0.2, 0.2, 0.02, 0xffd23a, 0, 1.06, 0.18, null, { glow: 0xffb000, pulse: true });                     // gold emblem on the back
+  },
+  anim(av, t) { const k = 0.55 + 0.45 * Math.sin(t * 3); for (const m of av.pulse || []) m.emissiveIntensity = k; } };
 const RANK_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity === 3);
 const WHEEL_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity !== 3 && SKIN_DEFS[k].rarity < 5);
 const SKIN_IDS = Object.keys(SKIN_DEFS);
@@ -2883,7 +2897,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 55;
+const BUILD = 56;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -5045,9 +5059,9 @@ function renderLocker() {
   const grid = $("#skinGrid"); grid.replaceChildren();
   const none = el("button", { type: "button", className: "skin none" + (!id ? " on" : ""), textContent: "No skin" });
   none.addEventListener("click", () => equipSkin(null)); grid.appendChild(none);
-  for (const rar of [7, 6, 5, 4, 3, 2, 1, 0]) for (const sid of SKIN_IDS.filter(k => SKIN_DEFS[k].rarity === rar)) {
+  for (const rar of [8, 7, 6, 5, 4, 3, 2, 1, 0]) for (const sid of SKIN_IDS.filter(k => SKIN_DEFS[k].rarity === rar)) {
     const owned = !!acct && acct.owned.includes(sid), D = SKIN_DEFS[sid];
-    const tagTxt = D.rarity === 3 ? (owned ? "Rank reward" : "Reach " + rankOf(D.rank).label.split(" ")[0]) : D.rarity === 5 ? (owned ? "Battle royale winner" : "Win a battle royale") : D.rarity === 6 ? (owned ? "Top 3 Legend" : "Be a top 3 Legend") : D.rarity === 7 ? (owned ? "Top 3 battle royale winner" : "Top 3 in battle royale wins") : RARITY[D.rarity].name;
+    const tagTxt = D.rarity === 3 ? (owned ? "Rank reward" : "Reach " + rankOf(D.rank).label.split(" ")[0]) : D.rarity === 5 ? (owned ? "Battle royale winner" : "Win a battle royale") : D.rarity === 6 ? (owned ? "Top 3 Legend" : "Be a top 3 Legend") : D.rarity === 7 ? (owned ? "Top 3 battle royale winner" : "Top 3 in battle royale wins") : D.rarity === 8 ? "Custom" : RARITY[D.rarity].name;
     const b = el("button", { type: "button", className: "skin" + (owned ? "" : " locked") + (sid === id ? " on" : "") }, [thumbImg(sid), el("span", { textContent: D.name }), el("small", { className: "r" + D.rarity, textContent: tagTxt })]);
     b.dataset.skin = sid; b.title = owned ? "Wear " + D.name : D.rarity === 7 ? "Be in the top 3 for battle royale wins to wear it" : D.rarity === 6 ? "Be one of the top 3 Legends to wear it" : D.rarity === 5 ? "Win a battle royale to unlock" : D.rarity === 3 ? "Reach " + rankOf(D.rank).label.split(" ")[0] + " to unlock" : "Win it on the wheel";
     b.addEventListener("click", () => { if (owned) equipSkin(sid); });
