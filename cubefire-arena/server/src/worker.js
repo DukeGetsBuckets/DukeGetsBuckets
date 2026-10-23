@@ -51,7 +51,6 @@ function lobbyName(raw) {
   return name || "arena-open";
 }
 
-import { SITE } from "./site.js";
 import { Royale } from "./royale.js";
 export { Royale };
 const accounts = env => env.ACCOUNTS.get(env.ACCOUNTS.idFromName("all"));
@@ -546,7 +545,7 @@ async function hashPw(password, salt) {
 //   POST /api/push-unsub {endpoint}   POST /api/push-call {endpoint, name, map, mapName, code}
 // A call only goes to the caller's friends (both signed in; the subscription remembers its account).
 // ======================================================================
-const PUSH_SUBJECT = SITE;
+const PUSH_SUBJECT = "https://cubefire-arena.secret321.workers.dev";
 // Only real push services, so the server can't be pointed at any other address
 const PUSH_HOSTS = /(^|\.)push\.apple\.com$|^fcm\.googleapis\.com$|(^|\.)push\.services\.mozilla\.com$|(^|\.)notify\.windows\.com$/;
 const CALL_EACH_MS = 2 * 60000;   // one call per player every 2 min
@@ -664,7 +663,7 @@ export class Accounts {
     }
     if (op === "pushall") {                                   // battle royale reminders: everyone with notifications on, 40 at a time
       const jwk = this.vapid(), offset = Math.max(0, Math.floor(Number(b.offset) || 0)), skip = new Set((Array.isArray(b.skip) ? b.skip : []).map(String));
-      const message = { title: cleanText(b.title, 60) ? String(b.title).slice(0, 60) : "Cubefire Arena", body: String(b.body || "").slice(0, 200), url: SITE + String(b.url || "/").replace(/^https?:\/\/[^/]+/, "").slice(0, 60), tag: String(b.tag || "cfa-br").slice(0, 20) };
+      const message = { title: cleanText(b.title, 60) ? String(b.title).slice(0, 60) : "Cubefire Arena", body: String(b.body || "").slice(0, 200), url: String(b.url || "/").slice(0, 60), tag: String(b.tag || "cfa-br").slice(0, 20) };
       const subs = this.sql.exec("SELECT * FROM push ORDER BY created LIMIT 40 OFFSET ?", offset).toArray();
       const res = await Promise.all(subs.map(sub => skip.has(sub.acct) ? 0 : sendPush(jwk, sub, message)));
       let sent = 0, gone = 0;
@@ -676,7 +675,7 @@ export class Accounts {
       const from = String(b.from || "").toLowerCase(), to = String(b.to || "").toLowerCase();
       if (!from || !to || !this.friendsOf(from).includes(to)) return { sent: 0 };
       const jwk = this.vapid(), name = (this.user(from) || {}).display || from;
-      const message = { title: "Cubefire Arena", body: `${name} invited you to a battle royale duo. Tap to join!`, url: SITE + "/?" + new URLSearchParams({ brjoin: from }) };
+      const message = { title: "Cubefire Arena", body: `${name} invited you to a battle royale duo. Tap to join!`, url: "/?" + new URLSearchParams({ brjoin: from }) };
       const subs = this.sql.exec("SELECT * FROM push WHERE acct = ?", to).toArray();
       let sent = 0;
       for (const sub of subs.slice(0, 10)) { const st = await sendPush(jwk, sub, message); if (st >= 200 && st < 300) sent++; else if (st === 404 || st === 410) this.sql.exec("DELETE FROM push WHERE endpoint = ?", sub.endpoint); }
@@ -860,7 +859,7 @@ export class Accounts {
       const name = (this.user(acct) || {}).display || cleanText(body.name, 16) || "Your friend", mapName = cleanText(body.mapName, 24) || "the arena";
       // calls are for ranked only: never a party code (private matches are join-by-code only)
       const q = new URLSearchParams({ join: "1", map: cleanText(body.map, 16).replace(/[^a-z]/g, ""), from: name });
-      const message = { title: "Cubefire Arena", body: `${name} is playing ranked on ${mapName}. Tap to join!`, url: SITE + "/?" + q };
+      const message = { title: "Cubefire Arena", body: `${name} is playing ranked on ${mapName}. Tap to join!`, url: "/?" + q };
       const subs = this.sql.exec(`SELECT * FROM push WHERE endpoint != ? AND acct IN (${friends.map(() => "?").join(",")})`, endpoint, ...friends).toArray();
       let sent = 0;
       for (let i = 0; i < subs.length; i += 20) {
