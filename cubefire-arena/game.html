@@ -278,6 +278,22 @@ body.pig #pigTint{display:block}
 #death{position:absolute;inset:0;display:grid;place-items:center;background:rgba(40,6,10,.35);text-align:center}
 #death h3{font:400 clamp(24px,6vw,40px) var(--display);margin:0;color:var(--hot)}
 #death p{margin:8px 0 0;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+#podium{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100% - 32px));display:grid;gap:10px;justify-items:center;pointer-events:none;padding:16px 18px 12px;border-radius:12px;background:radial-gradient(ellipse at center,rgba(8,12,18,.72),rgba(8,12,18,.45) 70%,transparent)}
+#podium h3{margin:0;font:400 clamp(22px,4vw,32px) var(--display);color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.55)}
+#podium .spots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:8px;width:100%}
+#podium .spot{display:grid;justify-items:center;gap:3px;text-align:center;min-width:0}
+#podium .fig img{width:84px;height:84px;object-fit:contain;filter:drop-shadow(0 6px 8px rgba(0,0,0,.5))}
+#podium .p1 .fig img{width:110px;height:110px}
+#podium .fig i{display:grid;place-items:center;width:58px;height:58px;border-radius:50%;font:400 26px var(--display);font-style:normal;color:#fff;border:3px solid rgba(255,255,255,.7);box-shadow:0 6px 12px rgba(0,0,0,.45)}
+#podium .spot b{font:400 clamp(14px,2.4vw,19px) var(--display);text-shadow:0 2px 0 rgba(0,0,0,.6);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#podium .spot small{font-weight:700;font-size:12px;text-shadow:0 1px 0 rgba(0,0,0,.6)}
+#podium .block{width:100%;display:grid;place-items:center;font:400 clamp(30px,6vw,48px) var(--display);color:rgba(0,0,0,.45);border-radius:6px 6px 0 0;box-shadow:inset 0 -6px 0 rgba(0,0,0,.18),0 10px 24px rgba(0,0,0,.4)}
+#podium .p1 .block{height:150px;background:linear-gradient(180deg,#ffe27a,#ffb627)}
+#podium .p2 .block{height:110px;background:linear-gradient(180deg,#eef2f6,#aeb8c2)}
+#podium .p3 .block{height:80px;background:linear-gradient(180deg,#f0b98a,#c97a3e)}
+#podium .spot em{font-style:normal;font:400 18px var(--display);color:var(--ok);text-shadow:0 2px 0 rgba(0,0,0,.6);min-height:22px}
+#podium .spot.me b{color:var(--accent)}
+#podium .spot.empty .block{opacity:.35}
 #board{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px 18px;display:grid;gap:6px;font-size:14px}
 #board h3{margin:0 0 6px;font:400 20px var(--display);display:flex;justify-content:space-between;align-items:baseline}
 #board h3 small{font:600 12px var(--ui);color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
@@ -555,6 +571,7 @@ body.pig #pigTint{display:block}
   <div id="dnums"></div>
   <div id="death" hidden><div><h3 id="deathTitle">Eliminated</h3><p id="deathSub">Respawning in 3</p></div></div>
   <div id="brOver" hidden><div class="card"><h4 id="brOverTop"></h4><h3 id="brOverBig"></h3><p id="brOverText"></p><p class="fine" id="brOverSub"></p><div class="btns"><button class="btn primary" type="button" id="brOverLobby">Back to lobby</button><button class="btn" type="button" id="brOverWatch">Keep watching</button></div></div></div>
+  <div id="podium" hidden><h3 id="podiumTitle">Results</h3><div class="spots" id="podiumSpots"></div></div>
   <div id="board" hidden><h3>Scoreboard <small id="boardSub"></small></h3><div id="boardRows"></div></div>
 </div>
 
@@ -805,7 +822,7 @@ body.pig #pigTint{display:block}
     <p class="fine" style="margin:0">The top 3 wear the Royale Legend skin while they stay in the top 3.</p>
     <div class="lb" id="brLeaderboard"></div>
     <div class="ranklist" id="rankList"></div>
-    <p class="fine">+30 RP for each elimination (+5 for a headshot). A death costs more the higher your rank: Bronze −2, Silver −5, Gold −9, Platinum −12, Diamond −15, Master −18, Champion −22, Mythic −25, Legend −28. Winning a round gives +100 RP, or +300 RP when 4 or more players are in it, and second place gets a third of that (+33 or +100 RP). Only online rounds count. Every rank but Legend has three levels: III, II, then I.</p>
+    <p class="fine">+30 RP for each elimination (+5 for a headshot). A death costs more the higher your rank: Bronze −2, Silver −5, Gold −9, Platinum −12, Diamond −15, Master −18, Champion −22, Mythic −25, Legend −28. With 4 or more players in a round, the podium wins RP: 1st +300, 2nd +150, 3rd +50. In smaller rounds the winner gets +100 and second +33. Only online rounds count. Every rank but Legend has three levels: III, II, then I.</p>
     <div class="btns"><button class="btn primary" type="button" id="ranksClose">Close</button></div>
   </div>
 </div>
@@ -1932,7 +1949,7 @@ const RANKS = [
   { name: "Mythic", min: 8000, color: "#ff8f3a" },
   { name: "Legend", min: 15000, color: "#fff08a" },
 ];
-const RP = { kill: 30, head: 5, death: 20, win: 100, bigWin: 300, bigRound: 4 };   // bigWin: rounds with 4+ players; 2nd place gets a third
+const RP = { kill: 30, head: 5, death: 20, win: 100, bigWin: 300, bigRound: 4, podium: [300, 150, 50] };   // rounds with 4+ players: 1st 300, 2nd 150, 3rd 50; smaller ones: 1st 100, 2nd a third
 // +30 for every elimination at any rank; deaths cost more the higher you are (Bronze 2 … Legend 28)
 const DEATH_LOSS = [2, 5, 9, 12, 15, 18, 22, 25, 28];   // one per rank in RANKS
 const rankTier = () => { let i = 0; RANKS.forEach((R, k) => { if (rankPts >= R.min) i = k; }); return i; };
@@ -2838,7 +2855,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 53;
+const BUILD = 54;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3334,6 +3351,7 @@ function setRound(m) {
 }
 function onRoundPhase(prev, ph) {
   countBeep = 0;
+  if (ph !== "end") $("#podium").hidden = true;
   if (ph === "count") {
     if (spectating) { spectating = false; respawn(); }
     banner("Round " + (round.n + 1) + " starts in " + Math.ceil(roundLeft()));
@@ -3342,16 +3360,25 @@ function onRoundPhase(prev, ph) {
     kills = 0; lastKills = 0; deaths = 0; streak = 0; respawn();
     banner("Round " + round.n + " · Fight!"); blip(880, 0.12, 0.12); blip(1320, 0.25, 0.12, "square", 0.12);
   } else if (ph === "end") {
-    const st = standings(), top = st[0];
+    const st = standings().filter(p => !p.sp), big = st.length >= RP.bigRound;
+    const prizes = big ? RP.podium : [RP.win, Math.round(RP.win / 3), 0];
     if (round.wonN === round.n) banner("You won round " + round.n + "!");                 // already won: everyone else left
-    else if (prev === "live" && top && top.k > 0) {
-      const winners = st.filter(p => p.k === top.k && p.d === top.d);       // a tie on kills goes to whoever died less
-      const onDeaths = winners.length === 1 && st.filter(p => p.k === top.k).length > 1;
-      banner(winners.length === 1 ? top.name + " wins round " + round.n + (onDeaths ? " on fewer deaths!" : "!") : "Round " + round.n + " is a tie!");
-      const prize = st.filter(p => !p.sp).length >= RP.bigRound ? RP.bigWin : RP.win;
-      const second = st.find(p => !winners.includes(p) && p.k > 0);         // the next-best score after the winners
-      if (winners.some(p => p.me) && !spectating) { addRank(prize); pendWins++; if (st.filter(p => !p.sp).length > 8 && rankedLobby()) earnRareSpin(); }
-      else if (second && st.some(p => p.me && p.k === second.k && p.d === second.d) && !spectating) addRank(Math.round(prize / 3));
+    else if (prev === "live" && st.length && st[0].k > 0) {
+      // places 1 to 3 by eliminations, then fewer deaths; the same score shares a place
+      const podium = []; let place = 0, last = null;
+      for (const p of st) {
+        if (p.k <= 0) break;
+        if (!last || p.k !== last.k || p.d !== last.d) { place++; if (place > 3) break; }
+        p.place = place; podium.push(p); last = p;
+      }
+      const firsts = podium.filter(p => p.place === 1), onDeaths = firsts.length === 1 && st.filter(p => p.k === firsts[0].k).length > 1;
+      banner(firsts.length === 1 ? firsts[0].name + " wins round " + round.n + (onDeaths ? " on fewer deaths!" : "!") : "Round " + round.n + " is a tie!");
+      const mine = podium.find(p => p.me);
+      if (mine && !spectating) {
+        if (prizes[mine.place - 1]) addRank(prizes[mine.place - 1]);
+        if (mine.place === 1) { pendWins++; if (st.length > 8 && rankedLobby()) earnRareSpin(); }
+      }
+      showPodium(podium, prizes, round.n);
     } else banner("Round over");
     resetAim();
   } else if (ph === "wait") {
@@ -3361,6 +3388,25 @@ function onRoundPhase(prev, ph) {
     if (spectating) { spectating = false; respawn(); }
     brToast("Battle royale time!", "When it starts, everyone in ranked is put in the battle royale with a partner. Ranked is back a minute after", 7);
   }
+}
+// The top 3 at the end of a round: 2nd, 1st and 3rd on a podium, with what each one won
+function showPodium(podium, prizes, n) {
+  const box = $("#podiumSpots"), el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const half = !rankedLobby();                                              // party matches: half
+  $("#podiumTitle").textContent = "Round " + n + " results";
+  box.replaceChildren(...[2, 1, 3].map(pl => {
+    const who = podium.filter(p => p.place === pl), spot = el("div", "spot p" + pl + (who.some(p => p.me) ? " me" : ""));
+    if (!who.length) { spot.classList.add("empty"); spot.append(el("div", "block", String(pl))); return spot; }
+    const fig = el("div", "fig"), p0 = who[0];
+    if (p0.sk && (SKIN_DEFS[p0.sk] || p0.sk === "pig")) fig.appendChild(thumbImg(p0.sk));
+    else { const dot = el("i", "", (p0.name[0] || "?").toUpperCase()); dot.style.background = PAL[p0.c || 0]; fig.appendChild(dot); }
+    const prize = prizes[pl - 1] ? Math.round(prizes[pl - 1] / (half ? 2 : 1)) : 0;
+    spot.append(fig, el("b", "", who.map(p => p.me ? p.name + " (you)" : p.name).join(" & ")), el("small", "", p0.k + " elim" + (p0.k === 1 ? "" : "s") + " · " + p0.d + " death" + (p0.d === 1 ? "" : "s")),
+      el("div", "block", String(pl)), el("em", "", prize ? "+" + prize + " RP" : ""));
+    return spot;
+  }));
+  $("#podium").hidden = false;
+  clearTimeout(showPodium.t); showPodium.t = setTimeout(() => { $("#podium").hidden = true; }, 7500);
 }
 function startSpectate() {
   spectating = true; alive = false; hp = 100; reloading = false; resetAim();
@@ -4511,8 +4557,8 @@ function showDmgDir(p) {
 }
 function playersOnline() { let n = 0; for (const r of remotes.values()) if (activePeer(r)) n++; return n; }
 function standings() {
-  const list = [{ name: myName, k: kills, d: deaths, me: true, rk: rankPts, sp: spectating }];
-  if (netMode()) { for (const r of remotes.values()) if (activePeer(r)) list.push({ name: r.name, k: r.k, d: r.d, rk: r.rk, sp: r.sp }); }
+  const list = [{ name: myName, k: kills, d: deaths, me: true, rk: rankPts, sp: spectating, sk: pigMode ? "pig" : mySkin(), c: myColor }];
+  if (netMode()) { for (const r of remotes.values()) if (activePeer(r)) list.push({ name: r.name, k: r.k, d: r.d, rk: r.rk, sp: r.sp, sk: r.sk, c: r.color }); }
   else for (const b of bots) list.push({ name: b.name, k: b.k, d: b.d, rk: b.rk });
   list.sort((a, b) => b.k - a.k || a.d - b.d);
   return list;
@@ -4624,7 +4670,7 @@ function renderHud(t) {
   $("#nadeN").textContent = nades; $("#tNadeN").textContent = nades;
   $("#tNade").style.opacity = nades > 0 ? 1 : 0.45;
   const results = roundsOn() && round.ph === "end";
-  const board = $("#board"); board.hidden = !(boardOpen || results);
+  const board = $("#board"); board.hidden = !(boardOpen || (results && $("#podium").hidden));   // the podium shows the results first
   if (!board.hidden) {
     $("#boardSub").textContent = mode === "bots" ? "Bot match" : results ? `Round ${round.n} results` : roundsOn() && round.ph === "live" ? `Round ${round.n} · ${st.length} playing` : `${st.length} playing`;
     const br = $("#boardRows"); br.replaceChildren(rowEl(["Player", "Rank", "K", "D"], "head"));
@@ -6186,6 +6232,7 @@ $("#playBots").addEventListener("click", () => startGame("bots"));
 $("#resume").addEventListener("click", () => { initAudio(); requestLock(); if (isTouch || noLock) showPause(false); });
 $("#leave").addEventListener("click", () => leaveMatch());
 function leaveMatch() {
+  $("#podium").hidden = true;
   if (mode === "royale") brLeave();
   state = "menu"; alive = false; resetAim(); spectating = false; joinPending = false; specCur = null;
   $(".lb-side").appendChild($("#classField"));
