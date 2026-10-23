@@ -308,6 +308,9 @@ body.pig #pigTint{display:block}
 #blocked .card{text-align:center;justify-items:center}
 #blocked h2{font:400 26px var(--display);margin:0}
 #blocked p{margin:0;color:var(--muted)}
+#blocked .opencount{display:grid;justify-items:center;gap:2px;padding:10px 26px 12px;border:2px solid var(--accent);border-radius:10px;background:rgba(255,182,39,.1);box-shadow:0 0 30px rgba(255,182,39,.25)}
+#blocked .opencount small{font:700 12px var(--ui);letter-spacing:.2em;text-transform:uppercase;color:var(--accent)}
+#blocked .opencount b{font:400 clamp(44px,9vw,76px)/1 var(--display);color:#fff;font-variant-numeric:tabular-nums;text-shadow:0 4px 0 rgba(0,0,0,.45)}
 #refresh{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,18,.78);padding:16px;z-index:7}
 #refresh .card{text-align:center;justify-items:center}
 #refresh h2{font:400 26px var(--display);margin:0}
@@ -759,8 +762,9 @@ body.pig #pigTint{display:block}
 
 <div id="blocked" hidden>
   <div class="card">
-    <h2>Can't play online</h2>
+    <h2 id="blockedTitle">Can't play online</h2>
     <p id="blockedWhy"></p>
+    <div class="opencount" id="blockedCount" hidden><small>Opens in</small><b id="blockedTime">--:--</b></div>
     <div class="btns"><button class="btn primary" type="button" id="blockedRetry">Try again</button></div>
   </div>
 </div>
@@ -2842,7 +2846,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 50;
+const BUILD = 51;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -2928,7 +2932,7 @@ function connectServer(name) {
     else if (m.t === "full" && state === "play" && mode === "online") { leaveMatch(); banner(`Ranked is full (${num(m.max) || 18} players). Try again in a minute`); }
     else if (m.t === "round") setRound(m);
     else if (m.t === "update") { mustRefresh = true; autoReload(); }
-    else if (m.t === "blocked") { mustRefresh = true; if (state === "play") leaveMatch(); $("#blockedWhy").textContent = String(m.why || "The game is closed right now."); $("#blocked").hidden = false; }
+    else if (m.t === "blocked") { mustRefresh = true; if (state === "play") leaveMatch(); $("#blockedWhy").textContent = String(m.why || "The game is closed right now."); $("#blocked").hidden = false; openCountdown(num(m.openAt), num(m.now)); }
     else if (m.t === "kicked") { if (state === "play" && mode === "online") leaveMatch(); banner(String(m.why || "An admin removed you from the match.")); }
     else if (m.t === "smite" && state === "play" && mode === "online" && alive) die({ name: "an admin", pos: me.pos.clone() }, true);
     else if (m.t === "auth") { authedAs = m.ok ? authWho : null; if (authWait) authWait(!!m.ok); }
@@ -5271,6 +5275,20 @@ function brMsg(m) {
   else if (m.t === "teamout") brTeamOut(m);
   else if (m.t === "brend") brEnd(m);
   else if (m.t === "crown") { brSetCrown(m); if (!BR.m) brToast("👑 New Royale Champions", (BR.crown ? BR.crown.names.join(" & ") : "") + " won the battle royale!", 6); }
+}
+// Closed until a set time: a big countdown, then the page reloads into the open game
+function openCountdown(at, serverNow) {
+  clearInterval(openCountdown.t);
+  if (!at) { $("#blockedCount").hidden = true; return; }
+  const skew = serverNow ? serverNow - Date.now() : 0;
+  $("#blockedTitle").textContent = "Opening soon"; $("#blockedCount").hidden = false;
+  const tick = () => {
+    const left = Math.ceil((at - (Date.now() + skew)) / 1000);
+    if (left <= 0) { clearInterval(openCountdown.t); $("#blockedTime").textContent = "Opening…"; setTimeout(() => location.reload(), 1500 + Math.random() * 3000); return; }
+    const h = Math.floor(left / 3600), m = Math.floor(left % 3600 / 60), sec = left % 60;
+    $("#blockedTime").textContent = (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(sec).padStart(2, "0");
+  };
+  tick(); openCountdown.t = setInterval(tick, 250);
 }
 // The game closes at a set time: everyone is taken out of their match and shown the closed message
 function brCloseAt(at, msg) {

@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 50;
+const MIN_BUILD = 51;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -66,11 +66,14 @@ function closingSocket(msg, code, why) {
   return new Response(null, { status: 101, webSocket: client });
 }
 
-// Closed: always (CLOSED: "message"), or from a set time on (CLOSE_AT: ms timestamp, with CLOSED_MSG)
+// Closed: always (CLOSED: "message"), before a set opening time (OPEN_AT, with OPEN_MSG; the
+// closed screen counts down to it), or from a set closing time on (CLOSE_AT, with CLOSED_MSG).
+// Times are ms timestamps.
 export function closedNow(env) {
   if (env.CLOSED) return String(env.CLOSED);
-  const at = Number(env.CLOSE_AT) || 0;
-  return at && Date.now() >= at ? String(env.CLOSED_MSG || "Cubefire Arena is closed for now. Check back soon!") : "";
+  const now = Date.now(), open = Number(env.OPEN_AT) || 0, close = Number(env.CLOSE_AT) || 0;
+  if (open && now < open) return String(env.OPEN_MSG || "Cubefire Arena opens soon!");
+  return close && now >= close ? String(env.CLOSED_MSG || "Cubefire Arena is closed for now. Check back soon!") : "";
 }
 export default {
   async fetch(request, env) {
@@ -79,7 +82,7 @@ export default {
       if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket upgrade", { status: 426 });
       if ((Number(url.searchParams.get("v")) || 0) < MIN_BUILD) return closingSocket({ t: "update" }, 4001, "Refresh to get the new version");
       // CLOSED (a deploy setting, e.g. wrangler deploy --var CLOSED:"message"): the whole game is shut with that message
-      if (closedNow(env)) return closingSocket({ t: "blocked", why: closedNow(env) }, 4003, "Closed");
+      if (closedNow(env)) return closingSocket({ t: "blocked", why: closedNow(env), openAt: Date.now() < (Number(env.OPEN_AT) || 0) ? Number(env.OPEN_AT) : 0, now: Date.now() }, 4003, "Closed");
       // the admin's kill switch and bans (by address) are checked before joining a lobby
       const room = lobbyName(url.searchParams.get("room"));
       if (badName(room.replace(/^[a-z0-9]+-/, ""))) return closingSocket({ t: "kicked", why: "That party code isn't allowed. Pick another one" }, 4003, "Bad code");

@@ -130,6 +130,14 @@ export class Royale {
     return h >= 22 || h < 7;
   }
   async sendPushes(now) {
+    // the moment the game opens (OPEN_AT): tell everyone with notifications on
+    const openAt = Number(this.env.OPEN_AT) || 0;
+    if (openAt && now >= openAt && now - openAt < 3 * MIN && !this.env.CLOSED && (await this.ctx.storage.get("openPushed")) !== openAt) {
+      await this.ctx.storage.put("openPushed", openAt);
+      const until = Number(this.env.CLOSE_AT) ? " until " + new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(Number(this.env.CLOSE_AT))) : "";
+      accounts(this.env).fetch("https://internal/internal/pushall", { method: "POST", body: JSON.stringify({ title: "🔥 Cubefire Arena is OPEN!", body: `Play now${until}! Tap to jump in.`, url: "/", tag: "cfa-br", offset: 0 }) }).catch(() => {});
+    }
+    if (openAt && now < openAt) return;                      // no reminders before the game opens
     const t = this.times();
     for (const [kind, at] of this.pushPlan()) {
       if (now < at || now - at > 3 * MIN || this.sentKinds(t.start).includes(kind)) continue;
