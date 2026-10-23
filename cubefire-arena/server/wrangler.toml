@@ -1,9 +1,12 @@
-# Cubefire Arena: game page + multiplayer relay on Cloudflare Workers.
-# Deploy with `npx wrangler deploy` after running ../build.py.
+# Cubefire Arena's data: accounts, lobbies and the battle royale (Durable Objects).
+# This worker has no web address any more (the old cubefire-arena address is off);
+# the game is served by the worker in wrangler.site.toml, which uses these objects.
+# Deploy both after ../build.py: `npx wrangler deploy` then `npx wrangler deploy -c wrangler.site.toml`.
 name = "cubefire-arena"
 main = "src/worker.js"
 compatibility_date = "2025-09-01"
-workers_dev = true
+workers_dev = false
+preview_urls = false
 
 [assets]
 directory = "./public"
@@ -32,6 +35,3 @@ class_name = "Royale"
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = ["Royale"]
-
-[triggers]
-crons = ["* * * * *"]   # wake the battle royale every minute
