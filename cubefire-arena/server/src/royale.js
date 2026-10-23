@@ -15,6 +15,7 @@
 // BR_TEST=1 (local testing) runs one every 4 minutes, starts with a single team, and keeps
 // solo players on their own teams (so two test devices can fight); BR_PAIR=1 pairs them anyway.
 // ======================================================================
+import { badName } from "./names.js";
 const MIN = 60000;
 export function brConfig(env) {
   const minTeams = Number(env && env.BR_MIN_TEAMS);
@@ -30,7 +31,7 @@ const MAP = 320;                               // the royale map is MAP x MAP bl
 function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const accounts = env => env.ACCOUNTS.get(env.ACCOUNTS.idFromName("all"));
-const cleanName = s => String(s || "").replace(/[^\w .'!-]/g, "").trim().slice(0, 16);
+const cleanName = s => { const n = String(s || "").replace(/[^\w .'!-]/g, "").trim().slice(0, 16); return badName(n) ? "Player" : n; };   // no bad words in names
 // The storm: each phase waits, then shrinks the circle to a smaller one inside it. Times are
 // seconds from the start of the match; dps is damage per second outside the circle.
 export function stormPlan(seed, test) {
@@ -239,7 +240,7 @@ export class Royale {
       if (typeof d.token === "string" && d.token) {
         accounts(this.env).fetch("https://internal/internal/who", { method: "POST", body: JSON.stringify({ token: d.token }) }).then(r => r.json()).then(r => {
           const cur = this.att(ws); if (!cur || cur.gone) return;
-          this.setAtt(ws, { ...cur, acc: r.acc || null, disp: r.display || null });
+          this.setAtt(ws, { ...cur, acc: r.acc || null, disp: r.display && !badName(r.display) ? r.display : r.display ? "Player" : null });
           this.send(ws, { t: "you", acc: r.acc || null });
           if (cur.party) this.sendParty(cur.party);
           if (r.acc) this.deliverInvites(ws, r.acc);
@@ -423,6 +424,7 @@ export class Royale {
     const P = m.players.get(a.id); if (!P) return;
     // no hacks in the battle royale: no invisibility, no nukes
     delete d.iv; delete d.nk; delete d.hx;
+    if (typeof d.n === "string" && badName(d.n)) d.n = "Player";
     if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => h && !h.nk);
     P.gone = 0; P.n++;
     m.last.set(a.id, d);

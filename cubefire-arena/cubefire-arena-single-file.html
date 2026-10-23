@@ -2817,8 +2817,23 @@ let hitSeq = 0, shotSeq = 0, deathSeq = 0;
 const hitsOut = [];
 let lastShot = null, dthOut = null;
 
+// Blocked words in names (callsigns, account names, party codes). The lists are ROT13 so the
+// words don't sit in the code as plain text. Names are checked after undoing the usual tricks:
+// numbers and symbols for letters (n1gg@), spaces or dots between letters, stretched letters (fuuuck).
+const rot13 = w => w.replace(/[a-z]/g, c => String.fromCharCode((c.charCodeAt(0) - 84) % 26 + 97));
+const BAD_ANYWHERE = "nffubyr onfgneq ovgpu obbo puvax phag qvpx qvyqb snttbg sntbg spx shpx shx uvgyre wvmm xvxr xvyylbhefrys xxx zbyrfg anmv avtn avtt avttn avttre avte ahgfnpx crqb cravf cbea chffl encvfg ergneq frk fuvg fyhg gvgf gvggl genaal intvan jrgonpx juber".split(" ").map(rot13);          // anywhere in the name
+const BAD_WORD = "nff pbpx pbba phz snt tbbx ubr ubzb xlf arteb avt avtre encr fcvp gvg".split(" ").map(rot13);            // only as a whole word (they're inside ordinary words)
+const LEET = { "0": "o", "1": "i", "!": "i", "|": "i", "3": "e", "4": "a", "@": "a", "5": "s", "$": "s", "7": "t", "+": "t", "8": "b", "9": "g" };
+function badName(s) {
+  const leet = String(s || "").toLowerCase().replace(/[0-9@$!|+]/g, c => LEET[c] || c);
+  const flat = leet.replace(/[^a-z]/g, ""), squash = flat.replace(/(.)\1+/g, "$1");
+  if (BAD_ANYWHERE.some(w => flat.includes(w) || squash.includes(w))) return true;
+  const words = leet.split(/[^a-z]+/).filter(Boolean), sq = words.map(t => t.replace(/(.)\1+/g, "$1"));
+  return BAD_WORD.some(w => words.includes(w) || sq.includes(w) || flat === w || squash === w);
+}
 function cleanName(v) {
-  return String(v == null ? "" : v).replace(/[\u0000-\u001f\u007f-\u009f­​-‏‪-‮⁠-⁯﻿]/g, "").trim().slice(0, 24);
+  const n = String(v == null ? "" : v).replace(/[\u0000-\u001f\u007f-\u009f­​-‏‪-‮⁠-⁯﻿]/g, "").trim().slice(0, 24);
+  return badName(n) ? "Player" : n;                                     // no bad words in names
 }
 const cleanCode = v => String(v || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12);
 function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -2840,7 +2855,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 49;
+const BUILD = 50;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -6011,7 +6026,15 @@ $("#partyMap").value = MAPS[load("cfa.pmap")] ? load("cfa.pmap") : "arena";
 $("#partyMap").addEventListener("change", () => { save("cfa.pmap", $("#partyMap").value); renderPlaySub(); });
 codeIn.addEventListener("input", renderPlaySub);
 for (const [id, m] of [["modeRanked", "ranked"], ["modeParty", "party"], ["modeBots", "bots"], ["modeRoyale", "royale"]]) $("#" + id).addEventListener("click", () => { playMode = m; save("cfa.mode", m); renderPlayMode(); if (m === "party" && !codeIn.value.trim()) codeIn.focus(); });
+// No bad words in your name or party code
+function nameAllowed() {
+  if (badName(nick.value)) { banner("That name isn't allowed. Pick another one"); $("#setSheet").hidden = true; nick.focus(); nick.select(); return false; }
+  if (playMode === "party" && badName(codeIn.value)) { banner("That party code isn't allowed. Pick another one"); codeIn.focus(); return false; }
+  return true;
+}
 $("#bigPlay").addEventListener("click", () => {
+  if (playMode === "royale" && BR.queued) { brQueueToggle(); return; }
+  if (!nameAllowed()) return;
   if (playMode === "royale") { brQueueToggle(); return; }
   if (playMode === "party" && !cleanCode(codeIn.value)) { banner("Type a party code first"); codeIn.focus(); return; }
   $(playMode === "bots" ? "#playBots" : "#playOnline").click();
@@ -6034,6 +6057,7 @@ function renderAcctUI() {
 }
 function openSignIn() { $("#siErr").hidden = true; $("#signin").hidden = false; $("#siName").focus(); }
 async function signInAs(op) {
+  if (op === "signup" && badName($("#siName").value)) { $("#siErr").textContent = "That name isn't allowed. Pick another one"; $("#siErr").hidden = false; return; }
   const btn = op === "login" ? $("#siLogin") : $("#siCreate"); btn.disabled = true; $("#siErr").hidden = true;
   try { await api(op, { name: $("#siName").value, password: $("#siPw").value, rank: rankPts }); $("#siPw").value = ""; $("#signin").hidden = true; banner("Signed in as " + acct.name); }
   catch (e) { $("#siErr").textContent = e.message; $("#siErr").hidden = false; }

@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 49;
+const MIN_BUILD = 50;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -52,6 +52,7 @@ function lobbyName(raw) {
 }
 
 import { Royale } from "./royale.js";
+import { badName } from "./names.js";
 export { Royale };
 const accounts = env => env.ACCOUNTS.get(env.ACCOUNTS.idFromName("all"));
 const royale = env => env.ROYALE.get(env.ROYALE.idFromName("royale"));
@@ -81,6 +82,7 @@ export default {
       if (closedNow(env)) return closingSocket({ t: "blocked", why: closedNow(env) }, 4003, "Closed");
       // the admin's kill switch and bans (by address) are checked before joining a lobby
       const room = lobbyName(url.searchParams.get("room"));
+      if (badName(room.replace(/^[a-z0-9]+-/, ""))) return closingSocket({ t: "kicked", why: "That party code isn't allowed. Pick another one" }, 4003, "Bad code");
       let gate = {};
       try { gate = await (await accounts(env).fetch("https://internal/internal/gate", { method: "POST", body: JSON.stringify({ ip: request.headers.get("CF-Connecting-IP") || "local", room }) })).json(); } catch {}
       if (gate.block) return closingSocket({ t: "blocked", why: gate.block }, 4003, "Blocked");
@@ -418,6 +420,7 @@ export class Lobby {
       try { ws.send(JSON.stringify({ t: "auth", ok })); } catch {}
       return;
     }
+    if (typeof d.n === "string" && badName(d.n)) d.n = "Player";       // no bad words in names: everyone sees "Player"
     const prof = profileOf(d);
     if (prof && a.auth !== prof) {
       try { ws.send(JSON.stringify({ t: "denied" })); } catch {}
@@ -916,6 +919,7 @@ export class Accounts {
       const password = String(body.password || "");
       const name = display.toLowerCase();
       if (!/^[A-Za-z0-9_ .-]{3,16}$/.test(display)) throw new UserError("Names are 3-16 letters, numbers, spaces, _ . or -");
+      if (op === "signup" && badName(display)) throw new UserError("That name isn't allowed. Pick another one");
       if (password.length < 4 || password.length > 64) throw new UserError("Passwords are 4-64 characters");
       const f = this.fails.get(name);
       if (f && f.until > Date.now()) throw new UserError("Too many tries. Wait a minute and try again");
