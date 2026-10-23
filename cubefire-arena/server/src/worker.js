@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 54;
+const MIN_BUILD = 55;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -424,7 +424,7 @@ export class Lobby {
       return;
     }
     // hacks are gone: a game still sending them (invisible, nukes, "using hacks") is an old or changed copy
-    if (d.iv === 1 || d.nk || d.hx === 1 || (Array.isArray(d.hits) && d.hits.some(h => h && h.nk))) {
+    if (!(a.perks || []).length && (d.iv === 1 || d.nk || d.hx === 1 || (Array.isArray(d.hits) && d.hits.some(h => h && h.nk)))) {
       try { ws.send(JSON.stringify({ t: "update" })); ws.close(4001, "Update your game"); } catch {}
       return;
     }
@@ -536,6 +536,7 @@ const ALL_SKINS = [...SKINS.common, ...SKINS.rare, ...SKINS.super, ...SKINS.ultr
 const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200], ["diamondwarden", 1800], ["masterphantom", 2500], ["champion", 3500], ["mythic", 8000], ["legend", 15000]];
 const BR_SKIN = "royalechamp";   // only for battle royale winners
 const PRO_SKIN = "proskin", LEGEND_RP = 15000;   // Pro: the top 3 Legends (their own skin while they stay in the top 3)
+const HACK_ACCOUNTS = { luka: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"] };   // the only accounts with hacks (every mode)
 const BR_TOP_SKIN = "royalelegend";   // the top 3 on the battle royale wins leaderboard (while they stay there)
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["ultra", 0.01], ["super", 0.04], ["rare", 0.25], ["common", 0.7]];
@@ -657,7 +658,8 @@ export class Accounts {
   }
   banned(kind, val) { return !!val && !!this.sql.exec("SELECT 1 FROM bans WHERE kind = ? AND val = ?", kind, String(val)).toArray()[0]; }
   requestsFor(name) { return this.sql.exec("SELECT COUNT(*) AS c FROM friends WHERE b = ? AND status = 'pending'", name).toArray()[0].c; }
-  perksOf() { return []; }   // hacks are permanently gone: nobody has any, whatever the admin page once gave them
+  // Hacks are gone for everyone except the accounts in HACK_ACCOUNTS (whatever the admin page once gave others)
+  perksOf(name) { return HACK_ACCOUNTS[name] ? HACK_ACCOUNTS[name].slice() : []; }
   async internal(op, b) {
     if (op === "gate") {
       let salt = this.setting("ipsalt"); if (!salt) { salt = hex(crypto.getRandomValues(new Uint8Array(16))); this.setSetting("ipsalt", salt); }
@@ -679,7 +681,7 @@ export class Accounts {
     }
     if (op === "who") {                                       // the battle royale hub checks who a game is signed in as
       const t = String(b.token || ""), s = t && this.sql.exec("SELECT name FROM sessions WHERE token = ?", t).toArray()[0], u = s && this.user(s.name);
-      return u ? { acc: u.name, display: u.display, bw: this.data(u).brWins || 0 } : {};
+      return u ? { acc: u.name, display: u.display, bw: this.data(u).brWins || 0, perks: this.perksOf(u.name) } : {};
     }
     if (op === "hacksgone") {                                 // tell everyone once that hacks are gone for good
       if (this.setting("hacksGoneSent") === "1") return { go: false };

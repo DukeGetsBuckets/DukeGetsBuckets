@@ -257,7 +257,7 @@ export class Royale {
       if (typeof d.token === "string" && d.token) {
         accounts(this.env).fetch("https://internal/internal/who", { method: "POST", body: JSON.stringify({ token: d.token }) }).then(r => r.json()).then(r => {
           const cur = this.att(ws); if (!cur || cur.gone) return;
-          this.setAtt(ws, { ...cur, bw: Math.max(0, Math.floor(Number(r.bw) || 0)), acc: r.acc || null, disp: r.display && !badName(r.display) ? r.display : r.display ? "Player" : null });
+          this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [], bw: Math.max(0, Math.floor(Number(r.bw) || 0)), acc: r.acc || null, disp: r.display && !badName(r.display) ? r.display : r.display ? "Player" : null });
           this.send(ws, { t: "you", acc: r.acc || null });
           if (cur.party) this.sendParty(cur.party);
           if (r.acc) this.deliverInvites(ws, r.acc);
@@ -440,7 +440,7 @@ export class Royale {
   relay(m, ws, a, d) {
     const P = m.players.get(a.id); if (!P) return;
     // hacks are gone: a game still sending them is an old or changed copy, so it has to update
-    if (d.iv === 1 || d.nk || d.hx === 1 || (Array.isArray(d.hits) && d.hits.some(h => h && h.nk))) {
+    if (!(a.perks || []).length && (d.iv === 1 || d.nk || d.hx === 1 || (Array.isArray(d.hits) && d.hits.some(h => h && h.nk)))) {
       this.send(ws, { t: "update" }); try { ws.close(4001, "Update your game"); } catch {}
       return;
     }

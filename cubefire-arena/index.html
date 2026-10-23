@@ -2870,7 +2870,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 54;
+const BUILD = 55;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3552,7 +3552,10 @@ const PROFILES = {};
 const PROFILE_ALIAS = {};
 const profileKey = name => { const nm = cleanName(name).toLowerCase(); return PROFILE_ALIAS[nm] || nm; };
 // Hacks the admin gave your signed-in account (the server enforces god mode, invisible and nuke)
-const acctHacks = () => [];   // hacks are gone for good: even an old saved account that lists some gets none
+// Hacks the server gives your account (only a few accounts have any). Only from a fresh answer from the
+// server this session, never from an old saved copy of the account.
+let acctFresh = false;
+const acctHacks = () => { try { return acctFresh && acct && Array.isArray(acct.perks) ? acct.perks.filter(k => PERK_BUTTON[k]) : []; } catch (e) { return []; } };
 const perksFor = who => who === "acct" ? acctHacks() : PROFILES[who] ? PROFILES[who].perks : [];
 const PERK_DEFAULT = { aim: true, god: true, snipe: true, wall: true, inv: false };
 const PERK_BUTTON = { aim: "dkAim", god: "dkGod", snipe: "dkSnipe", wall: "dkWall", inv: "dkInv", tp: "dkTp", nuke: "dkNuke" };
@@ -3599,7 +3602,7 @@ function applyDuke() {
     duke.profile = profile; duke.perks = perks;
     for (const k of Object.keys(PERK_DEFAULT)) duke[k] = duke.perks.includes(k) && !!dkPicks[k];
   }
-  duke.on = !!profile && mode !== "royale";                // no hacks for anyone in the battle royale
+  duke.on = !!profile;
   for (const [k, id] of Object.entries(PERK_BUTTON)) $("#" + id).hidden = !duke.perks.includes(k);
   Object.assign(WEAPONS[SNIPER], duke.on && duke.snipe ? SNIPER_DUKE : SNIPER_NORMAL);
   ammo[SNIPER] = WEAPONS[SNIPER].mag; if (mode !== "royale") buildLoadout();
@@ -4874,6 +4877,7 @@ async function api(op, body) {
   return j;
 }
 function setAcct(a) {
+  acctFresh = true;                                                       // straight from the server
   const hacksBefore = acctHacks().join(), proBefore = acct ? acct.pro || 0 : 0, winsBefore = acct ? acct.brWins || 0 : 0;
   acct = a; save("cfa.acct", JSON.stringify(a));
   if (acctHacks().join() !== hacksBefore || (a.brWins || 0) !== winsBefore) { applyDuke(); if (sock && sock.readyState === 1) sock.send(JSON.stringify({ t: "acct", token: acctToken })); BR.helloKey = ""; }
