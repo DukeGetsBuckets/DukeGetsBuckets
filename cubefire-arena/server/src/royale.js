@@ -21,7 +21,7 @@ export function brConfig(env) {
   const minTeams = Number(env && env.BR_MIN_TEAMS);
   if (env && env.BR_TEST === "1") return { every: 4 * MIN, open: 90000, stop: 45000, resume: 30000, minTeams: minTeams || 1, test: true };
   // one every 20 minutes (:00, :20, :40), and whenever Doug starts one; you can queue for the next one any time
-  return { every: 20 * MIN, open: 20 * MIN, stop: 2 * MIN, resume: MIN, minTeams: minTeams || 5, test: false };
+  return { every: 20 * MIN, open: 20 * MIN, stop: 2 * MIN, resume: MIN, minTeams: minTeams || 2, test: false };
 }
 const MAX_TEAMS = 25, SLOTS = 32;              // team spawn slots on the map (the game page has the same 32)
 const NEAR = 110, FAR_EVERY = 5;               // full-rate updates within NEAR blocks, every 5th one beyond
@@ -137,6 +137,15 @@ export class Royale {
       const until = Number(this.env.CLOSE_AT) ? " until " + new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(Number(this.env.CLOSE_AT))) : "";
       accounts(this.env).fetch("https://internal/internal/pushall", { method: "POST", body: JSON.stringify({ title: "🔥 Cubefire Arena is OPEN!", body: `Play now${until}! Tap to jump in.`, url: "/", tag: "cfa-br", offset: 0 }) }).catch(() => {});
     }
+    if (!this.hacksGoneAsked) {                              // once: tell everyone with notifications on that hacks are gone for good
+      this.hacksGoneAsked = true;
+      try {
+        if ((await (await accounts(this.env).fetch("https://internal/internal/hacksgone", { method: "POST", body: "{}" })).json()).go) {
+          let offset = 0;
+          for (let i = 0; i < 30 && offset != null; i++) offset = (await (await accounts(this.env).fetch("https://internal/internal/pushall", { method: "POST", body: JSON.stringify({ title: "🚫 Hacks are gone for good!", body: "Nobody can use hacks in Cubefire any more. Every match is fair. Come play!", url: "/", tag: "cfa-news", offset }) })).json()).next;
+        }
+      } catch {}
+    }
     if (openAt && now < openAt) return;                      // no reminders before the game opens
     const t = this.times();
     for (const [kind, at] of this.pushPlan()) {
@@ -248,7 +257,7 @@ export class Royale {
       if (typeof d.token === "string" && d.token) {
         accounts(this.env).fetch("https://internal/internal/who", { method: "POST", body: JSON.stringify({ token: d.token }) }).then(r => r.json()).then(r => {
           const cur = this.att(ws); if (!cur || cur.gone) return;
-          this.setAtt(ws, { ...cur, acc: r.acc || null, disp: r.display && !badName(r.display) ? r.display : r.display ? "Player" : null });
+          this.setAtt(ws, { ...cur, bw: Math.max(0, Math.floor(Number(r.bw) || 0)), acc: r.acc || null, disp: r.display && !badName(r.display) ? r.display : r.display ? "Player" : null });
           this.send(ws, { t: "you", acc: r.acc || null });
           if (cur.party) this.sendParty(cur.party);
           if (r.acc) this.deliverInvites(ws, r.acc);
@@ -433,6 +442,7 @@ export class Royale {
     // no hacks in the battle royale: no invisibility, no nukes
     delete d.iv; delete d.nk; delete d.hx;
     if (typeof d.n === "string" && badName(d.n)) d.n = "Player";
+    d.bw = a.bw || 0;                                         // battle royale wins: from their account, not their game
     if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => h && !h.nk);
     P.gone = 0; P.n++;
     m.last.set(a.id, d);

@@ -361,7 +361,7 @@ body.pig #pigTint{display:block}
 .wheelwrap canvas{width:240px;height:240px;display:block}
 .wheelwrap::after{content:"";position:absolute;left:50%;top:-6px;transform:translateX(-50%);border:12px solid transparent;border-top:20px solid var(--ink);filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))}
 .odds{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;font-weight:700}
-.r0{color:#b7c3cf}.r1{color:#4fb0ff}.r2{color:#d17bff}.r3{color:#ffc93c}.r4{color:#ff4f8b;text-shadow:0 0 8px rgba(255,79,139,.6)}.r5{color:#ffd23a;text-shadow:0 0 10px rgba(255,210,58,.7)}.r6{color:#ff5cf0;text-shadow:0 0 10px rgba(255,92,240,.75)}
+.r0{color:#b7c3cf}.r1{color:#4fb0ff}.r2{color:#d17bff}.r3{color:#ffc93c}.r4{color:#ff4f8b;text-shadow:0 0 8px rgba(255,79,139,.6)}.r5{color:#ffd23a;text-shadow:0 0 10px rgba(255,210,58,.7)}.r6{color:#ff5cf0;text-shadow:0 0 10px rgba(255,92,240,.75)}.r7{color:#ffae00;text-shadow:0 0 10px rgba(255,174,0,.8)}
 .prize{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;align-items:center;border:1px solid var(--accent);border-radius:6px;padding:8px 10px;background:rgba(255,182,39,.08)}
 .prize img{width:72px;height:90px;object-fit:contain}
 .prize b{font:400 18px var(--display);display:block}
@@ -440,6 +440,7 @@ body.pig #pigTint{display:block}
 #brCount.mini{padding:5px 16px 7px}
 #brCount.mini b{font-size:clamp(22px,3vw,30px)}
 #brCount.hot{animation:brPulse 1s infinite}
+@media (max-height:720px){#brCount{padding:4px 14px 6px;gap:1px}#brCount b,#brCount.mini b{font-size:26px}#brCount small,#brCount span{font-size:10px}}
 @keyframes brPulse{50%{box-shadow:0 0 56px rgba(255,210,58,.75),0 12px 30px rgba(0,0,0,.45);border-color:#ffd23a}}
 .brparty{display:grid;gap:6px;background:var(--panel);border:1px solid rgba(185,139,255,.6);border-radius:6px;padding:8px}
 .brparty .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -800,6 +801,9 @@ body.pig #pigTint{display:block}
     <div class="rankme" id="rankMe"></div>
     <div class="lb-head"><b>Leaderboard</b><span class="fine" id="lbNote"></span></div>
     <div class="lb" id="leaderboard"></div>
+    <div class="lb-head"><b>👑 Battle royale wins</b><span class="fine" id="brlbNote"></span></div>
+    <p class="fine" style="margin:0">The top 3 wear the Royale Legend skin while they stay in the top 3.</p>
+    <div class="lb" id="brLeaderboard"></div>
     <div class="ranklist" id="rankList"></div>
     <p class="fine">+30 RP for each elimination (+5 for a headshot). A death costs more the higher your rank: Bronze −2, Silver −5, Gold −9, Platinum −12, Diamond −15, Master −18, Champion −22, Mythic −25, Legend −28. Winning a round gives +100 RP, or +300 RP when 4 or more players are in it, and second place gets a third of that (+33 or +100 RP). Only online rounds count. Every rank but Legend has three levels: III, II, then I.</p>
     <div class="btns"><button class="btn primary" type="button" id="ranksClose">Close</button></div>
@@ -1986,7 +1990,7 @@ const skinFor = (name, color) => color === 6 ? "default" : SKINS[String(name || 
 // Skins from the skin wheel. rarity: 0 common, 1 rare, 2 super rare, 4 ultra (1%). Colors for each
 // part of the body; glow: emissive color (super rares glow); gun: tint for your own gun;
 // extra(add, head, body) adds details; anim(av, t) animates the skin for everyone.
-const RARITY = [{ name: "Common", color: "#b7c3cf" }, { name: "Rare", color: "#4fb0ff" }, { name: "Super rare", color: "#d17bff" }, { name: "Rank reward", color: "#ffc93c" }, { name: "Ultra 1%", color: "#ff4f8b" }, { name: "Royale Champion", color: "#ffd23a" }, { name: "Pro", color: "#ff5cf0" }];
+const RARITY = [{ name: "Common", color: "#b7c3cf" }, { name: "Rare", color: "#4fb0ff" }, { name: "Super rare", color: "#d17bff" }, { name: "Rank reward", color: "#ffc93c" }, { name: "Ultra 1%", color: "#ff4f8b" }, { name: "Royale Champion", color: "#ffd23a" }, { name: "Pro", color: "#ff5cf0" }, { name: "Royale Legend", color: "#ffae00" }];
 const SKIN_DEFS = {
   camo: { name: "Jungle Camo", rarity: 0, legs: 0x3b4526, body: 0x56683a, helmet: 0x4a5a30,
     extra(add) { for (const [x, y, w, h, c] of [[-0.16, 1.18, 0.16, 0.12, 0x2f3b20], [0.12, 0.96, 0.2, 0.1, 0x6f7f45], [0.15, 1.24, 0.12, 0.1, 0x2f3b20], [-0.1, 0.9, 0.14, 0.08, 0x6f7f45]]) add(w, h, 0.02, c, x, y, -0.18); } },
@@ -2261,6 +2265,9 @@ const MORE_SKINS = [
   ["infernodemon", "Inferno Demon", 4, 0x3a0606, 0x140202, 0x5a0a0a, "horns+wings+dots", 0xff3a1a, 0xff9a3a, { head: 0x5a0a0a, visor: 0xffd23a, glow: 0x300000, aura: 0xff3a1a }],
   ["hologram", "Hologram", 4, 0x5ff0ff, 0x2aa8c8, 0x8ff6ff, "vstripes+visor2+antenna", 0xffffff, 0x2bf3ff, { glow: 0x0a5a6a, aura: 0x5ff0ff,
     anim(av, t) { av.bodyMat.color.setHSL(0.52, 0.9, 0.62 + 0.12 * Math.sin(t * 9)); } }],
+  // only for the top 3 on the battle royale wins leaderboard, while they stay in the top 3
+  ["royalelegend", "Royale Legend", 7, 0x1a1208, 0x0a0704, 0xffc21a, "crown+wings+halo+bands", 0xffd23a, 0xff3a1a, { head: 0x2a1a08, visor: 0xff3a1a, glow: 0x3a2000, aura: 0xffae00,
+    anim(av, t) { av.bodyMat.color.setHSL(0.09 + 0.02 * Math.sin(t * 2), 0.9, 0.08 + 0.04 * Math.sin(t * 4)); } }],
   // only for the top 3 Legends (Pro), while they stay in the top 3
   ["proskin", "Pro", 6, 0x17121f, 0x0b0912, 0x231a33, "crest+pads+visor2+bands", 0xff5cf0, 0x5ff0ff, { head: 0x231a33, visor: 0x5ff0ff, glow: 0x2a0830, aura: 0xff5cf0,
     anim(av, t) { av.helmetMat.color.setHSL(0.86 + 0.04 * Math.sin(t * 2.5), 0.9, 0.22 + 0.06 * Math.sin(t * 5)); } }],
@@ -2831,7 +2838,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 51;
+const BUILD = 52;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3046,7 +3053,9 @@ function onPeer(p) {
   r.rk = clamp(Math.floor(num(s.rk) || 0), 0, 99999);
   r.w = clamp(Math.floor(num(s.w) || 0), 0, WEAPONS.length - 1);
   r.sp = s.sp === 1;
-  r.hx = s.hx === 1;                                                       // using hacks (the server marks anyone given hacks)
+  r.hx = s.hx === 1;
+  r.ks = clamp(Math.floor(num(s.ks) || 0), 0, 999);                        // kill streak
+  r.bw = clamp(Math.floor(num(s.bw) || 0), 0, 99999);                      // battle royale wins (the server fills this in)                                                       // using hacks (the server marks anyone given hacks)
   r.ac = typeof s.ac === "string" ? cleanName(s.ac) : null;               // their account (for the crown)
   if (mode === "royale" && BR.m) brPeer(r, s);
   const pos = vec(s.p);
@@ -3091,7 +3100,9 @@ function onPeer(p) {
       let killer = "The arena";
       if (dth.by === myPeer && myPeer) {
         killer = myName; kills++;
-        if (rankedNow()) addRank(rpGain(RP.kill + (r.lastHitByMe && r.lastHitByMe.hs ? RP.head : 0)));
+        const bonus = streakBonus(streak + 1);                                // this kill's place in your streak
+        if (rankedNow()) addRank(rpGain(RP.kill + (r.lastHitByMe && r.lastHitByMe.hs ? RP.head : 0)) + bonus);
+        if (streak + 1 >= 3) setTimeout(() => banner("🔥 " + (streak) + "-kill streak!" + (rankedNow() && bonus ? " +" + (rankedLobby() ? bonus : Math.round(bonus / 2)) + " bonus RP" : "")), 900);
         showElim(r.name, r.lastHitByMe); killSound();
         flashHit(true); publish(true);
       } else if (typeof dth.by === "string" && remotes.has(dth.by)) killer = remotes.get(dth.by).name;
@@ -3140,7 +3151,7 @@ function publish(force, target) {
     n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0, afk: playing && !royale && iAmAfk() ? 1 : 0, ac: acct ? acct.name : null, hb: Math.floor(now()),
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
-    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : mySkin(), hx: playing && duke.on ? 1 : 0, k: playing ? kills : 0, d: playing ? deaths : 0, rk: rankPts, pg: pingMs, pm: playing && partyCode ? $("#partyMap").value : null, sp: playing && spectating ? 1 : 0,
+    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : mySkin(), hx: playing && duke.on ? 1 : 0, ks: playing && alive ? streak : 0, k: playing ? kills : 0, d: playing ? deaths : 0, rk: rankPts, pg: pingMs, pm: playing && partyCode ? $("#partyMap").value : null, sp: playing && spectating ? 1 : 0,
     sh: playing ? lastShot : null, gr: playing ? lastNade : null, nk: playing ? lastNuke : null, md: playing ? lastMud : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
   if (royale) { Object.assign(P, brState()); brSend(P); return; }          // the battle royale runs on its own server
@@ -3437,7 +3448,7 @@ function showRanks() {
     mid.append(b, sm, rw); row.append(dia, mid, em); list.appendChild(row);
   }
   $("#ranks").hidden = false;
-  loadLeaderboard();
+  loadLeaderboard(); loadBrLeaderboard();
 }
 // Leaderboard: the highest-ranked accounts (ranks are saved on accounts)
 let lbAt = 0, lbRows = null;
@@ -3456,6 +3467,19 @@ async function loadLeaderboard() {
     row.append(n, who, rk, pts); return row;
   }));
   if (!lbRows.length) note.textContent = "Nobody yet. Play online rounds to get on it";
+}
+// Most battle royale wins
+async function loadBrLeaderboard() {
+  const box = $("#brLeaderboard"), note = $("#brlbNote");
+  let rows; try { rows = (await api("brtop")).top || []; } catch (e) { note.textContent = "Couldn't load it"; return; }
+  note.textContent = rows.length ? "Top " + rows.length : "Nobody has won one yet";
+  box.replaceChildren(...rows.map(r => {
+    const row = document.createElement("div"), n = document.createElement("i"), who = document.createElement("span"), w = document.createElement("b"), tag = document.createElement("em");
+    row.className = "lbrow" + (acct && acct.name.toLowerCase() === r.name.toLowerCase() ? " me" : "");
+    n.textContent = "#" + r.place; who.textContent = r.name; w.textContent = r.wins + (r.wins === 1 ? " win" : " wins"); w.style.color = "#ffd23a";
+    tag.textContent = r.place <= 3 ? "Royale Legend" : ""; if (r.place <= 3) { tag.style.color = "#ffae00"; tag.style.textShadow = "0 0 8px #ffae00"; }
+    row.append(n, who, w, tag); return row;
+  }));
 }
 $("#ranksClose").addEventListener("click", () => { $("#ranks").hidden = true; });
 $("#ranks").addEventListener("click", e => { if (e.target.id === "ranks") $("#ranks").hidden = true; });
@@ -4450,6 +4474,8 @@ function banner(text) {
 }
 // Bottom bar naming who you just eliminated, how, and your current streak
 let streak = 0, elimT = 0;
+// Kill streak bonus: from the 3rd elimination in a row without dying, +10 RP more each kill (up to +60)
+const streakBonus = n => n >= 3 ? Math.min(60, (n - 2) * 10) : 0;
 function showElim(name, how) {
   streak++;
   const el = $("#elim"), h = $("#elimHow");
@@ -4787,9 +4813,9 @@ async function api(op, body) {
   return j;
 }
 function setAcct(a) {
-  const hacksBefore = acctHacks().join(), proBefore = acct ? acct.pro || 0 : 0;
+  const hacksBefore = acctHacks().join(), proBefore = acct ? acct.pro || 0 : 0, winsBefore = acct ? acct.brWins || 0 : 0;
   acct = a; save("cfa.acct", JSON.stringify(a));
-  if (acctHacks().join() !== hacksBefore) { applyDuke(); if (sock && sock.readyState === 1) sock.send(JSON.stringify({ t: "acct", token: acctToken })); }
+  if (acctHacks().join() !== hacksBefore || (a.brWins || 0) !== winsBefore) { applyDuke(); if (sock && sock.readyState === 1) sock.send(JSON.stringify({ t: "acct", token: acctToken })); BR.helloKey = ""; }
   if (typeof a.rank === "number" && a.rank !== rankPts) { rankPts = a.rank; save("cfa.rank", rankPts); renderRank(); }
   applyGunFinish(); renderLocker(); publish(true); renderAcctUI();
   if ((a.pro || 0) !== proBefore) {
@@ -4941,11 +4967,11 @@ function renderLocker() {
   const grid = $("#skinGrid"); grid.replaceChildren();
   const none = el("button", { type: "button", className: "skin none" + (!id ? " on" : ""), textContent: "No skin" });
   none.addEventListener("click", () => equipSkin(null)); grid.appendChild(none);
-  for (const rar of [6, 5, 4, 3, 2, 1, 0]) for (const sid of SKIN_IDS.filter(k => SKIN_DEFS[k].rarity === rar)) {
+  for (const rar of [7, 6, 5, 4, 3, 2, 1, 0]) for (const sid of SKIN_IDS.filter(k => SKIN_DEFS[k].rarity === rar)) {
     const owned = !!acct && acct.owned.includes(sid), D = SKIN_DEFS[sid];
-    const tagTxt = D.rarity === 3 ? (owned ? "Rank reward" : "Reach " + rankOf(D.rank).label.split(" ")[0]) : D.rarity === 5 ? (owned ? "Battle royale winner" : "Win a battle royale") : D.rarity === 6 ? (owned ? "Top 3 Legend" : "Be a top 3 Legend") : RARITY[D.rarity].name;
+    const tagTxt = D.rarity === 3 ? (owned ? "Rank reward" : "Reach " + rankOf(D.rank).label.split(" ")[0]) : D.rarity === 5 ? (owned ? "Battle royale winner" : "Win a battle royale") : D.rarity === 6 ? (owned ? "Top 3 Legend" : "Be a top 3 Legend") : D.rarity === 7 ? (owned ? "Top 3 battle royale winner" : "Top 3 in battle royale wins") : RARITY[D.rarity].name;
     const b = el("button", { type: "button", className: "skin" + (owned ? "" : " locked") + (sid === id ? " on" : "") }, [thumbImg(sid), el("span", { textContent: D.name }), el("small", { className: "r" + D.rarity, textContent: tagTxt })]);
-    b.dataset.skin = sid; b.title = owned ? "Wear " + D.name : D.rarity === 6 ? "Be one of the top 3 Legends to wear it" : D.rarity === 5 ? "Win a battle royale to unlock" : D.rarity === 3 ? "Reach " + rankOf(D.rank).label.split(" ")[0] + " to unlock" : "Win it on the wheel";
+    b.dataset.skin = sid; b.title = owned ? "Wear " + D.name : D.rarity === 7 ? "Be in the top 3 for battle royale wins to wear it" : D.rarity === 6 ? "Be one of the top 3 Legends to wear it" : D.rarity === 5 ? "Win a battle royale to unlock" : D.rarity === 3 ? "Reach " + rankOf(D.rank).label.split(" ")[0] + " to unlock" : "Win it on the wheel";
     b.addEventListener("click", () => { if (owned) equipSkin(sid); });
     grid.appendChild(b);
   }
@@ -5292,6 +5318,8 @@ function brSetCrown(c) {
 function brIsChamp(name) { if (!BR.crown || !name) return false; const n = String(name).toLowerCase(); return BR.crown.names.some(x => x.toLowerCase() === n); }
 const myChampName = () => acct ? acct.name : cleanName(nick.value) || myName;
 function myPro() { try { return (acct && acct.pro) || proPlace(acct ? acct.name : "") || 0; } catch (e) { return 0; } }   // your place among the top 3 Legends (0: not Pro)
+// Hacks are permanently gone: say so once on each device
+if (load("cfa.hacksGone") !== "1") { save("cfa.hacksGone", "1"); setTimeout(() => brToast("Hacks are gone for good", "Nobody can use hacks in Cubefire any more. Every match is fair now!", 8), 2500); }
 // Who the top 3 Legends are, for everyone's name tags and icons
 async function loadPros() {
   try { const j = await api("pros"); const was = myPro(); PROS = Array.isArray(j.pros) ? j.pros.slice(0, 3) : []; proKey++; renderRank(); renderPlate(); if (acct && myPro() !== was) api("me").catch(() => {}); } catch (e) {}
@@ -5896,12 +5924,14 @@ function animPro(av, t) {
   u.glow.material.opacity = 0.6 + 0.3 * Math.sin(t * 4); av.pro.scale.setScalar((u.base || 1) * (1 + 0.06 * Math.sin(t * 3)));
 }
 function animCrown(av, t) { if (av.crown && av.crown.visible) { av.crown.rotation.y = t * 1.3; av.crown.userData.glow.material.opacity = 0.65 + 0.25 * Math.sin(t * 3); } }
+// Above a player's name tag, bottom to top: crown, Pro icon, kill streak, duo marker.
+// Each sits on the one below it, so several never overlap. Battle royale wins are on their back.
 function brDecorate(r, t) {
-  const av = r.av;
-  if (av.crownKey !== BR.crownKey) { av.crownKey = BR.crownKey; setCrown(av, brIsChamp(r.ac || r.name)); }
-  const crowned = !!(av.crown && av.crown.visible);
-  if (av.proKey !== proKey + "|" + crowned) { av.proKey = proKey + "|" + crowned; setPro(av, !!proPlace(r.ac || r.name), TAG_Y + (crowned ? 1.35 : 0.65)); }
-  animCrown(av, t); animPro(av, t);
+  const av = r.av, who = r.ac || r.name;
+  if (av.crownKey !== BR.crownKey) { av.crownKey = BR.crownKey; setCrown(av, brIsChamp(who)); }
+  if (av.proKey !== proKey) { av.proKey = proKey; setPro(av, !!proPlace(who), 0); }
+  setStreak(av, r.alive && r.bs !== "out" ? r.ks || 0 : 0);
+  setBackWins(av, r.bw || 0);
   const mate = brMate(r);
   if (mate && !av.mark) {
     const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d");
@@ -5909,7 +5939,48 @@ function brDecorate(r, t) {
     av.mark = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
     av.mark.scale.set(0.55, 0.55, 1); av.mark.renderOrder = 9; av.g.add(av.mark);
   }
-  if (av.mark) { av.mark.visible = mate; av.mark.position.y = TAG_Y + 0.5 + (av.crown && av.crown.visible ? 0.65 : 0) + (av.pro && av.pro.visible ? 0.8 : 0); av.mark.material.color.set(r.bs === "down" ? 0xff4f5e : 0xffffff); }
+  if (av.mark) { av.mark.visible = mate; av.mark.material.color.set(r.bs === "down" ? 0xff4f5e : 0xffffff); }
+  stackHead(av, TAG_Y + 0.38);
+  animCrown(av, t); animPro(av, t); animStreak(av, t);
+}
+// Lay the head icons out upward from y (the top of the name tag), each with its own height
+function stackHead(av, y) {
+  for (const [o, h] of [[av.crown, 0.62], [av.pro, 0.95], [av.streak, 0.5], [av.mark, 0.55]]) {
+    if (!o || !o.visible) continue;
+    o.position.y = y + (o === av.crown ? 0.12 : h / 2); y += h + 0.08;
+  }
+}
+// Kill streak: 3+ eliminations without dying shows a flame and the count over your head
+function setStreak(av, n) {
+  const on = n >= 3;
+  if (on && av.streakN !== n) {
+    if (!av.streak) { av.streak = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false })); av.streak.scale.set(1.3, 0.5, 1); av.g.add(av.streak); }
+    const c = document.createElement("canvas"); c.width = 256; c.height = 96; const g = c.getContext("2d");
+    const grd = g.createLinearGradient(0, 0, 256, 0); grd.addColorStop(0, "#ff3a1a"); grd.addColorStop(1, "#ffb627");
+    g.fillStyle = "rgba(20,8,4,.75)"; g.beginPath(); g.roundRect ? g.roundRect(4, 8, 248, 80, 40) : g.rect(4, 8, 248, 80); g.fill();
+    g.lineWidth = 6; g.strokeStyle = grd; g.stroke();
+    g.font = '700 50px "Chakra Petch", system-ui, sans-serif'; g.textAlign = "center"; g.textBaseline = "middle";
+    g.shadowColor = "#ff6a1a"; g.shadowBlur = 16; g.fillStyle = "#ffd23a"; g.fillText("🔥 " + n, 128, 50);
+    if (av.streak.material.map) av.streak.material.map.dispose();
+    av.streak.material.map = new THREE.CanvasTexture(c); av.streak.material.needsUpdate = true; av.streakN = n;
+  }
+  if (av.streak) av.streak.visible = on;
+}
+function animStreak(av, t) { if (av.streak && av.streak.visible) { const k = 1 + 0.07 * Math.sin(t * 6); av.streak.scale.set(1.3 * k, 0.5 * k, 1); } }
+// Battle royale wins, in gold on the player's back
+function setBackWins(av, n) {
+  if (av.skin === "pig") return;
+  if (n > 0 && av.backN !== n) {
+    if (!av.back) { av.back = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.42), new THREE.MeshBasicMaterial({ transparent: true })); av.back.position.set(0, 1.08, 0.176); av.g.add(av.back); }
+    const c = document.createElement("canvas"); c.width = 128; c.height = 108; const g = c.getContext("2d");
+    g.textAlign = "center"; g.textBaseline = "middle";
+    const gold = g.createLinearGradient(0, 10, 0, 80); gold.addColorStop(0, "#fff3a0"); gold.addColorStop(0.5, "#ffd23a"); gold.addColorStop(1, "#c98a00");
+    g.font = '400 ' + (n > 99 ? 48 : 64) + 'px Bungee, Impact, sans-serif'; g.lineWidth = 8; g.strokeStyle = "rgba(40,24,0,.85)"; g.strokeText(String(n), 64, 46); g.fillStyle = gold; g.fillText(String(n), 64, 46);
+    g.font = '700 18px "Chakra Petch", system-ui, sans-serif'; g.lineWidth = 4; g.strokeText(n === 1 ? "WIN" : "WINS", 64, 94); g.fillStyle = "#ffd23a"; g.fillText(n === 1 ? "WIN" : "WINS", 64, 94);
+    if (av.back.material.map) av.back.material.map.dispose();
+    av.back.material.map = new THREE.CanvasTexture(c); av.back.material.needsUpdate = true; av.backN = n;
+  }
+  if (av.back) av.back.visible = n > 0;
 }
 // ======================================================================
 // Lobby: your character on a glowing stage, tabs on top, mode switch and a big Play button
@@ -5971,6 +6042,7 @@ function updateHero(dt, t) {
   const iAmPro = myPro();
   if (k.av.proKey !== proKey + "|" + iAmPro + "|" + champ) { k.av.proKey = proKey + "|" + iAmPro + "|" + champ; setPro(k.av, !!iAmPro, duo ? TAG_Y + (champ ? 1.35 : 0.65) : champ ? 2.5 : 2.17); if (k.av.pro) k.av.pro.userData.base = duo ? 1 : champ ? 0.55 : 0.68; }
   animPro(k.av, t);
+  setBackWins(k.av, acct ? acct.brWins || 0 : 0);
   const mk = mate ? [mate.skin, mate.color, mate.name, mate.rk, proKey].join("|") : "";
   if (mk !== k.mateKey) {
     if (k.mate) disposeAvatar(k.mate); k.mate = null; k.mateKey = mk;

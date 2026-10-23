@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 51;
+const MIN_BUILD = 52;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -412,7 +412,7 @@ export class Lobby {
     if (d.t === "ping") { try { ws.send(JSON.stringify({ t: "pong", c: d.c })); } catch {} return; }   // the ping display
     if (d.t === "acct") {                                        // hacks the admin gave this account
       accounts(this.env).fetch("https://internal/internal/perks", { method: "POST", body: JSON.stringify({ token: String(d.token || "") }) })
-        .then(r => r.json()).then(r => { const cur = this.att(ws); if (cur) this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [] }); }).catch(() => {});
+        .then(r => r.json()).then(r => { const cur = this.att(ws); if (cur) this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [], bw: Math.max(0, Math.floor(Number(r.bw) || 0)) }); }).catch(() => {});
       return;
     }
     if (d.t === "auth") {
@@ -424,6 +424,7 @@ export class Lobby {
       return;
     }
     if (typeof d.n === "string" && badName(d.n)) d.n = "Player";       // no bad words in names: everyone sees "Player"
+    d.bw = a.bw || 0;                                                  // battle royale wins: from their account, not their game
     const prof = profileOf(d);
     if (prof && a.auth !== prof) {
       try { ws.send(JSON.stringify({ t: "denied" })); } catch {}
@@ -530,6 +531,7 @@ const ALL_SKINS = [...SKINS.common, ...SKINS.rare, ...SKINS.super, ...SKINS.ultr
 const RANK_SKINS = [["silvervet", 300], ["goldelite", 700], ["platguard", 1200], ["diamondwarden", 1800], ["masterphantom", 2500], ["champion", 3500], ["mythic", 8000], ["legend", 15000]];
 const BR_SKIN = "royalechamp";   // only for battle royale winners
 const PRO_SKIN = "proskin", LEGEND_RP = 15000;   // Pro: the top 3 Legends (their own skin while they stay in the top 3)
+const BR_TOP_SKIN = "royalelegend";   // the top 3 on the battle royale wins leaderboard (while they stay there)
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["ultra", 0.01], ["super", 0.04], ["rare", 0.25], ["common", 0.7]];
 // Rare spins (won by winning a round with more than 8 players): 5% ultra, 60% super rare, 35% common
@@ -634,6 +636,7 @@ export class Accounts {
     if (path.startsWith("/internal/")) return Response.json(await this.internal(path.slice(10), body));
     // an old copy of the page doesn't know the newest skins: have it reload first
     if (!op.startsWith("admin-") && (Number(body.v) || 0) < MIN_BUILD) return Response.json({ error: "This copy of the game is out of date. Refresh the page to get the new one.", update: true }, { status: 426 });
+    body._ip = request.headers.get("CF-Connecting-IP") || "local";   // set by Cloudflare (a sent _ip is replaced)
     try { return Response.json(await this.handle(op, body)); }
     catch (e) { return Response.json({ error: e instanceof UserError ? e.message : "Something went wrong" }, { status: e instanceof UserError ? 400 : 500 }); }
   }
@@ -649,7 +652,7 @@ export class Accounts {
   }
   banned(kind, val) { return !!val && !!this.sql.exec("SELECT 1 FROM bans WHERE kind = ? AND val = ?", kind, String(val)).toArray()[0]; }
   requestsFor(name) { return this.sql.exec("SELECT COUNT(*) AS c FROM friends WHERE b = ? AND status = 'pending'", name).toArray()[0].c; }
-  perksOf(name) { const r = this.sql.exec("SELECT list FROM perks WHERE name = ?", name).toArray()[0]; try { return r ? JSON.parse(r.list) : []; } catch { return []; } }
+  perksOf() { return []; }   // hacks are permanently gone: nobody has any, whatever the admin page once gave them
   async internal(op, b) {
     if (op === "gate") {
       let salt = this.setting("ipsalt"); if (!salt) { salt = hex(crypto.getRandomValues(new Uint8Array(16))); this.setSetting("ipsalt", salt); }
@@ -671,7 +674,11 @@ export class Accounts {
     }
     if (op === "who") {                                       // the battle royale hub checks who a game is signed in as
       const t = String(b.token || ""), s = t && this.sql.exec("SELECT name FROM sessions WHERE token = ?", t).toArray()[0], u = s && this.user(s.name);
-      return u ? { acc: u.name, display: u.display } : {};
+      return u ? { acc: u.name, display: u.display, bw: this.data(u).brWins || 0 } : {};
+    }
+    if (op === "hacksgone") {                                 // tell everyone once that hacks are gone for good
+      if (this.setting("hacksGoneSent") === "1") return { go: false };
+      this.setSetting("hacksGoneSent", "1"); return { go: true };   // the battle royale sends it, 40 at a time
     }
     if (op === "pushall") {                                   // battle royale reminders: everyone with notifications on, 40 at a time
       const jwk = this.vapid(), offset = Math.max(0, Math.floor(Number(b.offset) || 0)), skip = new Set((Array.isArray(b.skip) ? b.skip : []).map(String));
@@ -699,12 +706,14 @@ export class Accounts {
     }
     if (op === "brwin") {                                     // battle royale winners: the Royale Champion skin and the crown
       for (const n of (Array.isArray(b.accts) ? b.accts : []).slice(0, 2)) { const u = this.user(String(n)); if (u) { const d = this.data(u); d.brWins = (d.brWins || 0) + 1; this.saveData(u.name, d); } }
+      this.brTopCache = null;
       this.setSetting("crown", JSON.stringify({ accts: (b.accts || []).slice(0, 2), names: (b.names || []).slice(0, 2).map(x => String(x).slice(0, 24)), at: Date.now() }));
       return { ok: true };
     }
     if (op === "perks") {
       const t = String(b.token || ""), s = t && this.sql.exec("SELECT name FROM sessions WHERE token = ?", t).toArray()[0];
-      return { perks: s ? this.perksOf(s.name) : [] };
+      const u = s && this.user(s.name);
+      return { perks: s ? this.perksOf(s.name) : [], bw: u ? this.data(u).brWins || 0 : 0 };
     }
     return { error: "Unknown" };
   }
@@ -810,12 +819,22 @@ export class Accounts {
     this.prosCache = { at: Date.now(), list };
     return list;
   }
+  // Most battle royale wins (not banned); the top 3 wear the Royale Legend skin
+  brTop(n = 20) {
+    if (!this.brTopCache || Date.now() - this.brTopCache.at > 15000) {
+      const rows = this.sql.exec("SELECT name, display, CAST(json_extract(data, '$.brWins') AS INTEGER) AS wins FROM users WHERE CAST(json_extract(data, '$.brWins') AS INTEGER) > 0 ORDER BY wins DESC, created ASC LIMIT 40").toArray();
+      this.brTopCache = { at: Date.now(), list: rows.filter(r => !this.banned("name", r.name)).slice(0, 20).map((r, i) => ({ acc: r.name, name: r.display, wins: r.wins, place: i + 1 })) };
+    }
+    return this.brTopCache.list.slice(0, n);
+  }
+  brPlace(name) { const p = this.brTop(3).find(x => x.acc === name); return p ? p.place : 0; }
   proPlace(name) { const p = this.pros().find(x => x.acc === name); return p ? p.place : 0; }
   view(u, d) {
-    const pro = this.proPlace(u.name);
-    if (OWNER_ACCOUNTS[u.name]) return { name: u.display, pro, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k), BR_SKIN, PRO_SKIN], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false, rareSpins: 999, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
-    const owned = [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0)), ...(d.brWins ? [BR_SKIN] : []), ...(pro ? [PRO_SKIN] : [])];
-    return { name: u.display, pro, tickets: d.tickets || 0, owned, equipped: d.equipped === PRO_SKIN && !pro ? null : d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), rareSpins: d.rareSpins || 0, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
+    const pro = this.proPlace(u.name), brTop = this.brPlace(u.name), brWins = d.brWins || 0;
+    if (OWNER_ACCOUNTS[u.name]) return { name: u.display, pro, brTop, brWins, tickets: 999, unlimited: true, owned: [...ALL_SKINS, ...RANK_SKINS.map(([k]) => k), BR_SKIN, PRO_SKIN, BR_TOP_SKIN], equipped: d.equipped || null, rank: d.rank || 0, bank: 0, daily: false, rareSpins: 999, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
+    const owned = [...(d.owned || []), ...rankSkins(Math.max(d.best || 0, d.rank || 0)), ...(d.brWins ? [BR_SKIN] : []), ...(pro ? [PRO_SKIN] : []), ...(brTop ? [BR_TOP_SKIN] : [])];
+    const lost = (d.equipped === PRO_SKIN && !pro) || (d.equipped === BR_TOP_SKIN && !brTop);
+    return { name: u.display, pro, brTop, brWins, tickets: d.tickets || 0, owned, equipped: lost ? null : d.equipped || null, rank: d.rank || 0, bank: d.bank || 0, daily: d.lastDaily !== today(), rareSpins: d.rareSpins || 0, perks: this.perksOf(u.name), requests: this.requestsFor(u.name) };
   }
   async session(name) {
     const token = hex(crypto.getRandomValues(new Uint8Array(24)));
@@ -967,6 +986,7 @@ export class Accounts {
       this.fails.delete(name);
       return { token: await this.session(name), account: this.view(u, this.data(u)) };
     }
+    if (op === "brtop") return { top: this.brTop(20).map(({ name, wins, place }) => ({ name, wins, place })) };   // most battle royale wins
     if (op === "pros") return { pros: this.pros().map(({ name, rank, place }) => ({ name, rank, place })) };   // the top 3 Legends
     if (op === "crown") { let c = null; try { c = JSON.parse(this.setting("crown") || "null"); } catch {} return { crown: c }; }   // the last battle royale winners
     if (op === "top") {                                    // leaderboard: the 20 highest-ranked accounts
