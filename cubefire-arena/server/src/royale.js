@@ -439,8 +439,11 @@ export class Royale {
   // ---- during the match
   relay(m, ws, a, d) {
     const P = m.players.get(a.id); if (!P) return;
-    // no hacks in the battle royale: no invisibility, no nukes
-    delete d.iv; delete d.nk; delete d.hx;
+    // hacks are gone: a game still sending them is an old or changed copy, so it has to update
+    if (d.iv === 1 || d.nk || d.hx === 1 || (Array.isArray(d.hits) && d.hits.some(h => h && h.nk))) {
+      this.send(ws, { t: "update" }); try { ws.close(4001, "Update your game"); } catch {}
+      return;
+    }
     if (typeof d.n === "string" && badName(d.n)) d.n = "Player";
     d.bw = a.bw || 0;                                         // battle royale wins: from their account, not their game
     if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => h && !h.nk);

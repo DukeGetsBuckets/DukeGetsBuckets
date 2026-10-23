@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 52;
+const MIN_BUILD = 53;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -421,6 +421,11 @@ export class Lobby {
       const ok = !!secret && typeof d.key === "string" && d.key === secret;
       this.setAtt(ws, { ...a, auth: ok ? who : false });
       try { ws.send(JSON.stringify({ t: "auth", ok })); } catch {}
+      return;
+    }
+    // hacks are gone: a game still sending them (invisible, nukes, "using hacks") is an old or changed copy
+    if (d.iv === 1 || d.nk || d.hx === 1 || (Array.isArray(d.hits) && d.hits.some(h => h && h.nk))) {
+      try { ws.send(JSON.stringify({ t: "update" })); ws.close(4001, "Update your game"); } catch {}
       return;
     }
     if (typeof d.n === "string" && badName(d.n)) d.n = "Player";       // no bad words in names: everyone sees "Player"

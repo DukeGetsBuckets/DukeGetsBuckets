@@ -2838,7 +2838,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 52;
+const BUILD = 53;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3491,7 +3491,7 @@ const PROFILES = {};
 const PROFILE_ALIAS = {};
 const profileKey = name => { const nm = cleanName(name).toLowerCase(); return PROFILE_ALIAS[nm] || nm; };
 // Hacks the admin gave your signed-in account (the server enforces god mode, invisible and nuke)
-const acctHacks = () => { try { return acct && Array.isArray(acct.perks) ? acct.perks.filter(k => PERK_BUTTON[k]) : []; } catch (e) { return []; } };   // try: asked before the account loads at startup
+const acctHacks = () => [];   // hacks are gone for good: even an old saved account that lists some gets none
 const perksFor = who => who === "acct" ? acctHacks() : PROFILES[who] ? PROFILES[who].perks : [];
 const PERK_DEFAULT = { aim: true, god: true, snipe: true, wall: true, inv: false };
 const PERK_BUTTON = { aim: "dkAim", god: "dkGod", snipe: "dkSnipe", wall: "dkWall", inv: "dkInv", tp: "dkTp", nuke: "dkNuke" };
@@ -5234,6 +5234,7 @@ setInterval(() => { if (BR.sock && BR.sock.readyState === 1) { brSend({ t: "ping
 setInterval(() => { renderBrLobby(); renderBrSoon(); }, 500);
 function brMsg(m) {
   if (m.t === "welcome") BR.id = String(m.id || "");
+  else if (m.t === "update") { mustRefresh = true; autoReload(); }       // this copy is out of date
   else if (m.t === "you") {                                            // who the server says you're signed in as
     BR.acc = m.acc || null;
     if (BR.acc && brJoinWant) { brSend({ t: "join", to: brJoinWant }); brJoinWant = ""; }
