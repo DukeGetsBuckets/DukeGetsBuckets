@@ -18,8 +18,10 @@ to run on Cloudflare Workers.
 
 ## Lenient answers
 
-Every category has 100–140 accepted answers, and each answer can have aliases
-(`"Dog|puppy|pup|doggy|hound"`). On top of that, the matcher in
+Categories are deliberately narrow (*"Name a Marvel villain"*, *"Name a piece of
+furniture found in a living room"*): most people can name 5–8. Each one lists every
+real answer up to 140, so experts still get rewarded, and each answer can have
+aliases (`"Sofa|couch|settee"`). On top of that, the matcher in
 [`src/match.js`](src/match.js) forgives:
 
 - capital letters, punctuation, accents and extra spaces
@@ -39,7 +41,7 @@ Answers are checked on the server, so players can't see the answer lists.
 | `src/match.js` | Lenient answer matching |
 | `questions/part-*.json` | The 100 categories and their answers |
 | `public/` | The browser client (HTML, CSS, JS), served as static assets |
-| `scripts/validate.mjs` | Checks every category has 100–140 answers with no duplicates |
+| `scripts/validate.mjs` | Checks every category has 40–140 answers with no duplicates |
 | `test/` | Unit tests for the rules and the matcher |
 
 ## Commands
