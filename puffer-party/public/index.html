@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Puffer Party</title>
+  <meta name="description" content="Name something in the category and pass the puffer before it pops. A multiplayer word party game.">
+  <meta name="theme-color" content="#063a5b">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bubbles" aria-hidden="true"></div>
+
+  <!-- Home -->
+  <main id="home" class="screen">
+    <div class="card home-card">
+      <div class="logo">
+        <svg class="mini-puffer" viewBox="-60 -60 120 120" aria-hidden="true"><use href="#puffer-art"/></svg>
+        <h1>Puffer Party</h1>
+        <p class="tagline">Name it. Pass it. Don't let it pop on you.</p>
+      </div>
+      <label class="field">
+        <span>Your name</span>
+        <input id="name-input" maxlength="16" autocomplete="nickname" placeholder="e.g. Duke" spellcheck="false">
+      </label>
+      <button id="create-btn" class="btn primary big">Create a room</button>
+      <div class="divider"><span>or join friends</span></div>
+      <form id="join-form" class="join-row">
+        <input id="code-input" maxlength="4" placeholder="CODE" autocomplete="off" spellcheck="false" aria-label="Room code">
+        <button class="btn">Join</button>
+      </form>
+      <p id="home-error" class="error" role="alert"></p>
+      <details class="rules">
+        <summary>How to play</summary>
+        <ol>
+          <li>Everyone gets the same category, like <em>“Name an animal.”</em></li>
+          <li>When the puffer points at you, you have <strong>10 seconds</strong> to type an answer nobody has said yet. A good answer passes the puffer on.</li>
+          <li>Run out of time and you lose a life ❤️.</li>
+          <li>The puffer keeps swelling. There's no timer, so watch it grow. When it <strong>pops</strong>, whoever's holding it gets the rest of their time for one last answer. Miss it and you lose a life.</li>
+          <li>Then a new round starts with a new category. Last one with lives left wins.</li>
+        </ol>
+        <p class="hint">Spelling doesn't have to be perfect, and close answers count: “puppy” works for dog.</p>
+      </details>
+    </div>
+  </main>
+
+  <!-- Lobby -->
+  <main id="lobby" class="screen" hidden>
+    <div class="card lobby-card">
+      <p class="eyebrow">Room code</p>
+      <div class="code-row">
+        <span id="room-code" class="room-code">----</span>
+        <button id="copy-btn" class="btn small">Copy invite link</button>
+      </div>
+      <h2>Players <span id="player-count" class="muted"></span></h2>
+      <ul id="lobby-players" class="lobby-players"></ul>
+      <div id="host-controls" class="host-controls">
+        <label class="field inline">
+          <span>Lives</span>
+          <select id="lives-select">
+            <option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option>
+          </select>
+        </label>
+        <button id="start-btn" class="btn primary big">Start game</button>
+      </div>
+      <p id="wait-host" class="muted center" hidden>Waiting for the host to start…</p>
+      <button id="leave-btn" class="btn ghost small">Leave room</button>
+    </div>
+  </main>
+
+  <!-- Game -->
+  <main id="game" class="screen" hidden>
+    <header class="game-top">
+      <div class="round-tag" id="round-tag">Round 1</div>
+      <h2 class="prompt" id="prompt">Name an animal</h2>
+      <button id="mute-btn" class="icon-btn" aria-label="Mute sounds" title="Sound on/off">🔊</button>
+    </header>
+
+    <section class="arena" id="arena">
+      <div class="seats" id="seats"></div>
+      <div class="pointer" id="pointer" aria-hidden="true"></div>
+      <div class="puffer-wrap" id="puffer-wrap">
+        <svg class="puffer" id="puffer" viewBox="-60 -60 120 120" aria-hidden="true"><use href="#puffer-art"/></svg>
+        <div class="burst" id="burst" aria-hidden="true"></div>
+      </div>
+      <div class="center-text" id="center-text" aria-live="polite"></div>
+    </section>
+
+    <section class="controls">
+      <div class="turn-line" id="turn-line" aria-live="polite"></div>
+      <form id="answer-form" class="answer-row">
+        <input id="answer-input" maxlength="60" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Wait for your turn…" disabled aria-label="Your answer">
+        <button id="answer-btn" class="btn primary" disabled>Send</button>
+      </form>
+      <div class="feedback" id="feedback" aria-live="assertive"></div>
+    </section>
+
+    <section class="used">
+      <h3>Said this round <span id="used-count" class="muted"></span></h3>
+      <ul id="used-list" class="chips"></ul>
+    </section>
+  </main>
+
+  <!-- Game over -->
+  <main id="over" class="screen" hidden>
+    <div class="card over-card">
+      <svg class="mini-puffer" viewBox="-60 -60 120 120" aria-hidden="true"><use href="#puffer-art"/></svg>
+      <h1 id="winner-title">Winner!</h1>
+      <ol id="standings" class="standings"></ol>
+      <button id="again-btn" class="btn primary big">Back to lobby</button>
+      <p id="wait-again" class="muted center" hidden>Waiting for the host…</p>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <!-- Shared puffer artwork -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <radialGradient id="puff-body" cx="38%" cy="32%" r="75%">
+        <stop offset="0%" stop-color="var(--puff-light)"/>
+        <stop offset="60%" stop-color="var(--puff-mid)"/>
+        <stop offset="100%" stop-color="var(--puff-dark)"/>
+      </radialGradient>
+      <radialGradient id="puff-belly" cx="50%" cy="30%" r="70%">
+        <stop offset="0%" stop-color="#fffbe8"/>
+        <stop offset="100%" stop-color="#ffe9a8"/>
+      </radialGradient>
+      <g id="puffer-art">
+        <g class="spikes" stroke="var(--puff-dark)" stroke-width="3" stroke-linecap="round" style="transform: scale(var(--spike, 0.85)); transition: transform 0.5s ease-out">
+          <line x1="0" y1="-38" x2="0" y2="-52"/>
+          <line x1="19" y1="-33" x2="26" y2="-45"/>
+          <line x1="33" y1="-19" x2="45" y2="-26"/>
+          <line x1="38" y1="0" x2="52" y2="0"/>
+          <line x1="33" y1="19" x2="45" y2="26"/>
+          <line x1="19" y1="33" x2="26" y2="45"/>
+          <line x1="0" y1="38" x2="0" y2="52"/>
+          <line x1="-19" y1="33" x2="-26" y2="45"/>
+          <line x1="-33" y1="19" x2="-45" y2="26"/>
+          <line x1="-38" y1="0" x2="-52" y2="0"/>
+          <line x1="-33" y1="-19" x2="-45" y2="-26"/>
+          <line x1="-19" y1="-33" x2="-26" y2="-45"/>
+        </g>
+        <path d="M36 -6 Q56 -20 54 0 Q56 20 36 6 Z" fill="var(--puff-mid)" stroke="var(--puff-dark)" stroke-width="2"/>
+        <circle r="40" fill="url(#puff-body)" stroke="var(--puff-dark)" stroke-width="2.5"/>
+        <ellipse cx="-4" cy="16" rx="26" ry="18" fill="url(#puff-belly)" opacity=".95"/>
+        <g fill="var(--puff-dark)" opacity=".55">
+          <circle cx="-18" cy="-20" r="3"/><circle cx="6" cy="-28" r="2.6"/><circle cx="20" cy="-14" r="2.4"/><circle cx="-28" cy="-4" r="2.2"/>
+        </g>
+        <path d="M-6 -2 Q-22 8 -10 20" fill="none" stroke="var(--puff-dark)" stroke-width="2" opacity=".5"/>
+        <g class="eye">
+          <circle cx="-14" cy="-8" r="9" fill="#fff" stroke="#123" stroke-width="1.5"/>
+          <circle cx="-16" cy="-8" r="4.5" fill="#123"/>
+          <circle cx="-17.5" cy="-10" r="1.6" fill="#fff"/>
+        </g>
+        <g class="eye">
+          <circle cx="12" cy="-10" r="8" fill="#fff" stroke="#123" stroke-width="1.5"/>
+          <circle cx="10" cy="-10" r="4" fill="#123"/>
+          <circle cx="8.6" cy="-11.8" r="1.4" fill="#fff"/>
+        </g>
+        <ellipse class="mouth" cx="-30" cy="8" rx="5" ry="4" fill="#c2410c" stroke="#123" stroke-width="1.5"/>
+        <path d="M-2 30 Q4 40 12 30" fill="var(--puff-mid)" stroke="var(--puff-dark)" stroke-width="2"/>
+      </g>
+    </defs>
+  </svg>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
