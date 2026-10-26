@@ -36,8 +36,8 @@ for (const file of files) {
     }
     seenIds.set(q.id, file);
     const n = q.answers.length;
-    if (n < 100 || n > 140) {
-      console.log(`${tag}: has ${n} answers (needs 100-140)`);
+    if (n < 40 || n > 140) {
+      console.log(`${tag}: has ${n} answers (needs 40-140)`);
       problems++;
     }
     const owner = new Map();

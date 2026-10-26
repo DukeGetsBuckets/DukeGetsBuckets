@@ -3,7 +3,7 @@
 
 const $ = (id) => document.getElementById(id);
 const screens = ["home", "lobby", "game", "over"];
-const COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6", "#0ea5e9", "#6366f1", "#a855f7", "#ec4899", "#84cc16", "#06b6d4", "#f43f5e"];
+const COLORS = ["#0891b2", "#7c3aed", "#e11d48", "#059669", "#d97706", "#4f46e5", "#db2777", "#0d9488", "#dc2626", "#65a30d", "#2563eb", "#9333ea"];
 
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -58,6 +58,28 @@ function avatar(p) {
 
 function pts(n) {
   return `${n} ${n === 1 ? "pt" : "pts"}`;
+}
+
+function youTag() {
+  const el = document.createElement("span");
+  el.className = "you";
+  el.textContent = " (you)";
+  return el;
+}
+
+function renderLives(box, p) {
+  if (!p.alive) {
+    box.innerHTML = '<span class="out-badge">OUT</span>';
+    return;
+  }
+  const total = Math.max(state.settings.lives, p.lives);
+  box.replaceChildren(
+    ...Array.from({ length: total }, (_, i) => {
+      const pip = document.createElement("i");
+      if (i >= p.lives) pip.className = "lost";
+      return pip;
+    }),
+  );
 }
 
 function nameOf(id) {
@@ -168,7 +190,8 @@ function renderLobby() {
   list.replaceChildren(
     ...state.players.map((p) => {
       const li = document.createElement("li");
-      li.append(avatar(p), document.createTextNode(p.name + (p.id === me ? " (you)" : "")));
+      li.append(avatar(p), document.createTextNode(p.name));
+      if (p.id === me) li.append(youTag());
       if (p.id === state.hostId) {
         const tag = document.createElement("span");
         tag.className = "tag";
@@ -179,7 +202,7 @@ function renderLobby() {
     }),
   );
   const n = state.players.length;
-  $("player-count").textContent = `(${n}/12)`;
+  $("player-count").textContent = `${n} / 12`;
   const host = state.hostId === me;
   $("host-controls").hidden = !host;
   $("wait-host").hidden = host;
@@ -223,14 +246,14 @@ function renderGame(prev) {
   $("answer-btn").disabled = !mine;
   row.classList.toggle("myturn", mine);
   if (mine) {
-    input.placeholder = s.phase === "lastChance" ? "LAST CHANCE! Type fast!" : "Your turn! Type an answer…";
+    input.placeholder = s.phase === "lastChance" ? "Final answer" : "Type your answer";
     if (!wasMine || s.currentId !== lastCurrent) {
       input.value = "";
       input.focus();
       sound("turn");
     }
   } else {
-    input.placeholder = live ? `${nameOf(s.currentId)} is answering…` : "Next round coming up…";
+    input.placeholder = live ? `${nameOf(s.currentId)} is answering` : "Next round starting";
     if (wasMine) input.value = "";
   }
 
@@ -241,7 +264,7 @@ function renderGame(prev) {
   }
 
   if (newRound && s.players.find((p) => p.id === me)?.spectator) {
-    feedback("You joined mid-game, so you're watching. You'll play next game!");
+    feedback("You joined mid-game and are spectating. You'll be in the next game.");
   }
   pointAt(live ? s.currentId : null);
 }
@@ -279,8 +302,10 @@ function renderSeats() {
     el.style.left = `${pos.x}%`;
     el.style.top = `${pos.y}%`;
     el.dataset.angle = pos.angle;
-    el.querySelector(".name").textContent = p.name + (p.id === me ? " (you)" : "");
-    el.querySelector(".lives").textContent = p.alive ? "❤️".repeat(p.lives) : "💀 out";
+    const name = el.querySelector(".name");
+    name.textContent = p.name;
+    if (p.id === me) name.append(youTag());
+    renderLives(el.querySelector(".lives"), p);
     el.querySelector(".score").textContent = pts(p.score);
     el.classList.toggle("current", p.id === state.currentId && p.alive);
     el.classList.toggle("out", !p.alive);
@@ -291,7 +316,7 @@ function renderSeats() {
 
 function renderUsed(prev) {
   const before = new Set((prev?.round === state.round ? prev.used : []).map((u) => u.name));
-  $("used-count").textContent = `(${state.used.length})`;
+  $("used-count").textContent = String(state.used.length);
   $("used-list").replaceChildren(
     ...state.used
       .slice()
@@ -407,9 +432,9 @@ function burst() {
 
 function onAccepted(msg) {
   const fixed = msg.text.trim().toLowerCase() !== msg.name.toLowerCase();
-  setBubble(msg.id, `✓ ${msg.name}`, "good", 1600);
+  setBubble(msg.id, msg.name, "good", 1600);
   if (msg.id === me) {
-    feedback(fixed ? `✓ “${msg.text}” counts as ${msg.name}!` : `✓ ${msg.name}!`, "good");
+    feedback(fixed ? `“${msg.text}” accepted as ${msg.name}` : `${msg.name} accepted`, "good");
     $("answer-input").value = "";
   } else {
     feedback(`${nameOf(msg.id)}: ${msg.name}`, "good");
@@ -418,9 +443,8 @@ function onAccepted(msg) {
 }
 
 function onMiss(msg) {
-  const why = msg.reason === "taken" ? `${msg.name} was already said` : "not on the list";
   if (msg.id === me) {
-    feedback(`✗ “${msg.text}”: ${why}. Try again!`, "bad");
+    feedback(msg.reason === "taken" ? `${msg.name} has already been used` : `“${msg.text}” isn't a valid answer`, "bad");
     const row = $("answer-form");
     row.classList.remove("wrong");
     void row.offsetWidth;
@@ -428,21 +452,21 @@ function onMiss(msg) {
     $("answer-input").select();
     sound("bad");
   } else {
-    setBubble(msg.id, `✗ ${msg.text}`, "bad", 1200);
+    setBubble(msg.id, msg.text, "bad", 1200);
   }
 }
 
 function onPop(msg) {
   burst();
   sound("pop");
-  const who = msg.id === me ? "YOU" : nameOf(msg.id);
-  centerText(`POP!<small>${escapeHtml(who)} ${msg.id === me ? "have" : "has"} one last chance!</small>`);
+  const who = msg.id === me ? "You have" : `${nameOf(msg.id)} has`;
+  centerText(`Pop<small>${escapeHtml(who)} one final answer</small>`);
 }
 
 function onSaved(msg) {
-  setBubble(msg.id, `✓ ${msg.name}`, "good", 2500);
-  centerText(`SAVED!<small>${escapeHtml(nameOf(msg.id))} answered ${escapeHtml(msg.name)} just in time</small>`);
-  if (msg.id === me) feedback(`Clutch! ${msg.name} saved you (+3)`, "good");
+  setBubble(msg.id, msg.name, "good", 2500);
+  centerText(`Saved<small>${escapeHtml(nameOf(msg.id))} answered ${escapeHtml(msg.name)} in time</small>`);
+  if (msg.id === me) feedback(`${msg.name} saved you. +3 points`, "good");
   sound("good");
 }
 
@@ -455,10 +479,10 @@ function onHit(msg) {
   }
   const who = nameOf(msg.id);
   if (msg.reason === "popped") {
-    centerText(`${escapeHtml(who)}<small>${msg.out ? "is OUT! 💀" : "got puffed! −1 ❤️"}</small>`);
+    centerText(`${escapeHtml(who)}<small>${msg.out ? "is eliminated" : "loses a life"}</small>`);
   } else {
-    setBubble(msg.id, msg.out ? "💀 out!" : "⏰ −1 ❤️", "bad", 1500);
-    if (msg.id === me) feedback(msg.out ? "Time's up. You're out!" : "Time's up! You lost a life.", "bad");
+    setBubble(msg.id, msg.out ? "Eliminated" : "Time's up", "bad", 1500);
+    if (msg.id === me) feedback(msg.out ? "Time's up. You've been eliminated." : "Time's up. You lost a life.", "bad");
   }
   sound("hit");
 }
@@ -475,7 +499,7 @@ function frame() {
   const line = $("turn-line");
   const live = state.phase === "turn" || state.phase === "lastChance";
   if (!live) {
-    if (state.phase === "roundEnd") line.textContent = "Next round coming up…";
+    if (state.phase === "roundEnd") line.textContent = "Next round starting";
     line.classList.remove("urgent");
     return;
   }
@@ -487,7 +511,8 @@ function frame() {
     ring.style.setProperty("--ring", left < 3000 ? "var(--bad)" : "var(--accent)");
   }
   const mine = state.currentId === me;
-  const label = state.phase === "lastChance" ? "💥 Last chance" : mine ? "Your turn" : `${escapeHtml(nameOf(state.currentId))}'s turn`;
+  const who = mine ? "Your turn" : `${escapeHtml(nameOf(state.currentId))}'s turn`;
+  const label = state.phase === "lastChance" ? `<span class="last">Final answer</span> ${who}` : who;
   line.innerHTML = `${label} <span class="secs">${secs}</span>`;
   line.classList.toggle("urgent", left < 3000);
   if (mine && secs <= 3 && secs > 0 && secs !== lastBeep) {
@@ -548,7 +573,7 @@ function noiseBurst() {
 }
 
 function syncMute() {
-  $("mute-btn").textContent = muted ? "🔇" : "🔊";
+  $("mute-btn").classList.toggle("muted", muted);
 }
 
 // ---- game over --------------------------------------------------------------
@@ -559,10 +584,10 @@ function renderOver() {
   players.sort((a, b) => (b.alive - a.alive) || (b.out - a.out) || (b.score - a.score));
   const winner = state.players.find((p) => p.id === state.winnerId);
   $("winner-title").textContent = state.solo
-    ? `You scored ${players[0]?.score ?? 0} points!`
+    ? `You scored ${pts(players[0]?.score ?? 0)}`
     : winner
-      ? `${winner.id === me ? "You win" : `${winner.name} wins`}! 🏆`
-      : "Game over!";
+      ? winner.id === me ? "You win" : `${winner.name} wins`
+      : "Game over";
   $("standings").replaceChildren(
     ...players.map((p, i) => {
       const li = document.createElement("li");
@@ -572,7 +597,9 @@ function renderOver() {
       const score = document.createElement("span");
       score.className = "pts";
       score.textContent = pts(p.score);
-      li.append(rank, avatar(p), document.createTextNode(p.name + (p.id === me ? " (you)" : "")), score);
+      li.append(rank, avatar(p), document.createTextNode(p.name));
+      if (p.id === me) li.append(youTag());
+      li.append(score);
       return li;
     }),
   );
@@ -588,7 +615,7 @@ function needName() {
   const input = $("name-input");
   const name = input.value.trim();
   if (!name) {
-    $("home-error").textContent = "Pick a name first!";
+    $("home-error").textContent = "Enter a display name to continue.";
     input.focus();
     return true;
   }
@@ -627,7 +654,7 @@ $("copy-btn").addEventListener("click", async () => {
   const link = `${location.origin}/?room=${code}`;
   try {
     await navigator.clipboard.writeText(link);
-    toast("Invite link copied!");
+    toast("Invite link copied");
   } catch {
     toast(link);
   }
@@ -663,21 +690,6 @@ $("mute-btn").addEventListener("click", () => {
   store.set("pp-muted", muted ? "1" : "0");
   syncMute();
 });
-
-// Ambient bubbles.
-{
-  const box = document.querySelector(".bubbles");
-  for (let i = 0; i < 18; i++) {
-    const b = document.createElement("span");
-    const size = 6 + Math.random() * 22;
-    b.style.width = b.style.height = `${size}px`;
-    b.style.left = `${Math.random() * 100}%`;
-    b.style.animationDuration = `${9 + Math.random() * 14}s`;
-    b.style.animationDelay = `${-Math.random() * 20}s`;
-    b.style.setProperty("--drift", `${(Math.random() - 0.5) * 80}px`);
-    box.append(b);
-  }
-}
 
 // Boot.
 {
