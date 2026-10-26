@@ -2884,7 +2884,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 57;
+const BUILD = 58;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -5481,6 +5481,7 @@ function renderBrLobby() {
   if (P) {
     let top, time, sub, hot = false;
     if (P.ph === "match") { top = "Battle royale live"; time = P.I.match ? plural(P.I.match.alive, "team") + " left" : "Live"; sub = "Next one in " + mmss(Math.ceil(P.toStart)); }
+    else if (P.ph === "queue" && P.I.joinable) { top = "Battle royale"; time = "LIVE"; sub = "It just started · tap Queue to jump in now"; hot = true; }
     else if (P.ph === "queue") { top = "Next battle royale in"; time = mmss(Math.ceil(P.toStart)); sub = `${plural(P.I.teams, "team")} queued · ${P.I.minTeams} needed` + (P.I.live ? ` · ${P.I.live} live now` : ""); hot = P.toStart < 60; }
     else { top = "Next battle royale in"; time = mmss(Math.ceil(P.toStart)); sub = "Queue opens in " + mmss(Math.ceil(P.toOpen)); }
     if (BR.queued) sub = "You're queued · " + sub;
@@ -5530,6 +5531,7 @@ function renderBrPlay() {
   else if (BR.queued) { b = "Cancel"; sub = "Queued · starts in " + mmss(Math.ceil(P.toStart)); }
   else if (P.ph === "match") { sub = "Running now · next queue opens in " + mmss(Math.ceil(P.toOpen)); off = true; }
   else if (P.ph !== "queue") { sub = "Queue opens in " + mmss(Math.ceil(P.toOpen)); off = true; }
+  else if (P.I.joinable) { b = "Jump in"; sub = "A battle royale just started · tap to jump in now!"; }
   else sub = (mate ? "Duo with " + mate.name : "Solo · random partner") + " · starts in " + mmss(Math.ceil(P.toStart));
   bp.classList.toggle("on", BR.queued); bp.classList.toggle("off", off);
   bp.firstChild.textContent = b; $("#playSub").textContent = sub;

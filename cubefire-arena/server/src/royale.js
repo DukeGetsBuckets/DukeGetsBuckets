@@ -26,6 +26,8 @@ export function brConfig(env) {
 const MAX_TEAMS = 25, SLOTS = 32;              // team spawn slots on the map (the game page has the same 32)
 const NEAR = 110, FAR_EVERY = 5;               // full-rate updates within NEAR blocks, every 5th one beyond
 const GONE_MS = 15000, MATCH_MAX = 25 * MIN;   // a player gone this long is out; a match never runs longer
+const LATE_MS = 100000;                          // a battle royale this new still takes players who queue (before the storm forms)
+const SEEN_MS = 60000;                           // a queued game heard from this recently is put in at the start
 const MAP = 320;                               // the royale map is MAP x MAP blocks
 
 function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -59,6 +61,7 @@ export class Royale {
     this.start = 0;               // the next battle royale's start time
     this.cancelledAt = 0;         // start time of the last one cancelled for too few teams
     this.infoT = null;
+    this.departed = new Map();    // player id -> {party, queued, ...} kept 10 minutes after their connection drops
     this.invites = new Map();     // account -> Map(inviter id -> {from, name, at}): invites wait here until answered
     this.pushedAt = new Map();    // "from>to" -> when we last sent that invite as a notification
     this.pushed = "";             // the last notification sent ("start:kind"), so each goes out once
@@ -107,7 +110,7 @@ export class Royale {
     const t = this.times(), q = this.queueCount();
     let live = 0; for (const m of this.matches.values()) live += m.players.size;
     return { t: "brinfo", now: Date.now(), ...t, ph: this.phase(), teams: q.teams, players: q.players, minTeams: this.cfg.minTeams, maxTeams: MAX_TEAMS, test: this.cfg.test,
-      closeAt: Number(this.env.CLOSE_AT) || 0, closedMsg: this.env.CLOSED_MSG || "", match: null, live: this.matches.size, livePlayers: live, cancelled: this.cancelledAt && this.cancelledAt === this.lastStart ? true : false };
+      joinable: !!this.joinable(), closeAt: Number(this.env.CLOSE_AT) || 0, closedMsg: this.env.CLOSED_MSG || "", match: null, live: this.matches.size, livePlayers: live, cancelled: this.cancelledAt && this.cancelledAt === this.lastStart ? true : false };
   }
   broadcastInfo(now) {
     if (now) { clearTimeout(this.infoT); this.infoT = null; const out = JSON.stringify(this.info()); for (const h of this.hubs()) this.send(h.ws, out); return; }
@@ -215,6 +218,9 @@ export class Royale {
     const id = want.length >= 8 ? want : crypto.randomUUID().replace(/-/g, "").slice(0, 10);
     const pair = new WebSocketPair(), [client, server] = Object.values(pair);
     let carry = {};
+    const dep = this.departed.get(id) || await this.ctx.storage.get("dep:" + id).catch(() => null);
+    if (dep && Date.now() - dep.at < 10 * MIN) { const { at, ...rest } = dep; carry = rest; }   // came back after the connection dropped
+    this.departed.delete(id); this.ctx.storage.delete("dep:" + id).catch(() => {});
     for (const ws of this.ctx.getWebSockets()) {             // the same game reconnecting takes over its old place
       const o = this.att(ws);
       if (o && o.id === id && !o.replaced) { carry = { party: o.party, queued: o.queued, inMatch: o.inMatch, team: o.team, acc: o.acc, disp: o.disp, name: o.name, skin: o.skin, color: o.color }; this.setAtt(ws, { ...o, replaced: true }); try { ws.close(4005, "Reconnected"); } catch {} }
@@ -239,7 +245,12 @@ export class Royale {
     const a = this.att(ws); if (!a || a.replaced || a.gone) return;
     this.setAtt(ws, { ...a, gone: true });
     if (this.wsById.get(a.id) === ws) this.wsById.delete(a.id);
-    if (a.party) this.leaveParty(ws, a, true);
+    // a dropped connection (an iPad going to sleep, a Wi-Fi blip) keeps your duo and your place in the
+    // queue: the game reconnects with the same id and picks them back up
+    const keep = { party: a.party, queued: a.queued, inMatch: a.inMatch, team: a.team, acc: a.acc, disp: a.disp, name: a.name, skin: a.skin, color: a.color, perks: a.perks, bw: a.bw, at: Date.now() };
+    this.departed.set(a.id, keep); this.ctx.storage.put("dep:" + a.id, keep).catch(() => {});
+    for (const [k, v] of this.departed) if (Date.now() - v.at > 10 * MIN) { this.departed.delete(k); this.ctx.storage.delete("dep:" + k).catch(() => {}); }
+    if (a.party) this.sendParty(a.party);
     const lm = this.matchOf(a); if (lm) { const P = lm.players.get(a.id); if (P) P.gone = Date.now(); }
     this.broadcastInfo();
   }
@@ -380,19 +391,42 @@ export class Royale {
   }
   // ---- the queue
   queue(ws, a, on) {
-    if (on && this.phase() !== "queue") return this.send(ws, { t: "queue", on: false, msg: "The queue isn't open yet" });
     const group = a.party ? this.members(a.party) : [{ ws, a }];
     if (on && group.some(h => this.matchOf(h.a))) return this.send(ws, { t: "queue", on: false, msg: "Your duo is still in a battle royale. Queue when it's over" });
+    if (on && this.joinRunning(group)) return;              // one just started: you're in it now
+    if (on && this.phase() !== "queue") return this.send(ws, { t: "queue", on: false, msg: "The queue isn't open yet" });
     for (const h of group) { this.setAtt(h.ws, { ...h.a, queued: on }); this.send(h.ws, { t: "queue", on }); }
     if (a.party) this.sendParty(a.party);
     this.broadcastInfo();
+  }
+  // The newest battle royale, if it's young enough to still take players
+  joinable() {
+    const now = Date.now(); let best = null;
+    for (const m of this.matches.values()) if (now - m.at < LATE_MS && m.teams.size < MAX_TEAMS && (!best || m.at > best.at)) best = m;
+    return best;
+  }
+  // Put a duo (or a solo player) into a battle royale that's already started, on a free spawn slot
+  joinRunning(group) {
+    const m = this.joinable(); if (!m) return false;
+    const used = new Set([...m.teams.values()].map(T => T.slot)), slot = [...Array(SLOTS).keys()].find(i => !used.has(i));
+    if (slot == null) return false;
+    let n = m.teams.size + 1; while (m.teams.has("T" + n)) n++;
+    const tid = "T" + n, list = group.slice(0, 2);
+    m.teams.set(tid, { ids: list.map(h => h.a.id), slot, out: false, place: 0 });
+    for (const h of list) {
+      m.players.set(h.a.id, { team: tid, bs: "up", gone: 0, n: 0, name: h.a.disp || h.a.name || "Player", acc: h.a.acc || null });
+      this.setAtt(h.ws, { ...this.att(h.ws), inMatch: m.id, team: tid, queued: false });
+    }
+    for (const h of list) this.send(h.ws, this.startMsg(m, h.a.id));
+    this.broadcastInfo(true);
+    return true;
   }
 
   // ---- starting (or cancelling) a match
   launch(force) {
     const now = Date.now(); this.lastStart = this.start;
     // everyone queued, and everyone playing ranked right now: they're pulled in (with a random partner if they have no duo)
-    const q = this.hubs().filter(h => (h.a.queued || h.a.in === "ranked") && !this.matchOf(h.a) && now - (this.seen.get(h.a.id) || 0) < 20000);
+    const q = this.hubs().filter(h => (h.a.queued || h.a.in === "ranked") && !this.matchOf(h.a) && now - (this.seen.get(h.a.id) || 0) < SEEN_MS);
     const parties = new Map(), solos = [];
     for (const h of q) { if (h.a.party) { if (!parties.has(h.a.party)) parties.set(h.a.party, []); parties.get(h.a.party).push(h); } else solos.push(h); }
     const teams = [];
