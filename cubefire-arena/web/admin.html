@@ -121,6 +121,12 @@ tr:hover td{background:rgba(243,239,228,.03)}
     <div class="tablewrap" id="dayTableWrap" hidden><table id="dayTable"></table></div>
   </section>
 
+  <section class="card" id="badCard">
+    <div class="card-head"><h2>Bad names</h2><span class="muted" id="badNote"></span></div>
+    <p class="muted" style="margin:0 0 8px">Accounts whose name has a slur or bad word in it (the same check the game uses). Other players already see them as "Player"; ban them here.</p>
+    <div class="tablewrap" style="max-height:420px;overflow-y:auto"><table id="badUsers"></table></div>
+  </section>
+
   <section class="card">
     <div class="card-head"><h2>Users</h2><input id="search" placeholder="Search names" size="18"><span class="muted" id="userCount"></span></div>
     <div class="tablewrap" style="max-height:620px;overflow-y:auto"><table id="users"></table></div>
@@ -311,7 +317,25 @@ $("#killBtn").addEventListener("click", async () => {
 
 // ---- users
 const COLS = [["display", "Name"], ["rank", "Rank", 1], ["best", "Best", 1], ["skins", "Skins", 1], ["tickets", "Spins", 1], ["created", "Joined"], ["seen", "Last seen"], ["perks", "Hacks"], ["", ""]];
+function renderBad() {
+  const bad = users.filter(u => u.bad).sort((a, b) => (b.seen || 0) - (a.seen || 0));
+  $("#badNote").textContent = bad.length ? bad.length + " account" + (bad.length === 1 ? "" : "s") + " · " + bad.filter(u => !u.banned).length + " not banned" : "None. Nice!";
+  const rows = [el("tr", {}, ["Name", "Rank", "Created", "Last seen", ""].map(h => el("th", { textContent: h })))];
+  for (const u of bad) {
+    const R = rankOf(u.rank);
+    const act = u.banned ? el("div", { className: "actions" }, [el("span", { className: "chip ban", textContent: "Banned" }), btn("Unban", "small", async () => { try { await api("admin-unban", { kind: "name", val: u.name }); toast("Unbanned"); load(); } catch (e) { toast(e.message); } })])
+      : el("div", { className: "actions" }, [btn("Ban", "danger small", async () => { if (!confirm("Ban " + u.display + "?")) return; try { await api("admin-ban", { name: u.display, reason: "Bad name" }); toast("Banned " + u.display); load(); } catch (e) { toast(e.message); } })]);
+    rows.push(el("tr", {}, [el("td", { textContent: u.display }), el("td", { className: "num", innerHTML: `<span style="color:${R[2]}">${R[0]}</span> ${u.rank}` }), el("td", { textContent: new Date(u.created).toLocaleDateString() }), el("td", { textContent: ago(u.seen) }), el("td", {}, [act])]));
+  }
+  if (bad.length > 1 && bad.some(u => !u.banned)) rows.push(el("tr", {}, [el("td", { colSpan: 5 }, [btn("Ban all " + bad.filter(u => !u.banned).length + " of them", "danger small", async () => {
+    const todo = bad.filter(u => !u.banned); if (!confirm("Ban all " + todo.length + " accounts with bad names?")) return;
+    for (const u of todo) { try { await api("admin-ban", { name: u.display, reason: "Bad name" }); } catch (e) {} }
+    toast("Banned " + todo.length); load();
+  })])]));
+  $("#badUsers").replaceChildren(...rows);
+}
 function renderUsers() {
+  renderBad();
   const q = $("#search").value.trim().toLowerCase();
   const list = users.filter(u => !q || u.name.includes(q)).sort((a, b) => {
     const x = a[sortKey], y = b[sortKey];

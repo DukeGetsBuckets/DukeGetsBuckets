@@ -776,7 +776,7 @@ export class Accounts {
     if (op === "admin-users") {
       const bannedNames = new Set(this.sql.exec("SELECT val FROM bans WHERE kind = 'name'").toArray().map(r => r.val));
       const perkRows = new Map(this.sql.exec("SELECT name, list FROM perks").toArray().map(r => [r.name, r.list]));
-      return { users: users().map(u => ({ name: u.name, display: u.display, rank: u.d.rank || 0, best: u.d.best || 0, skins: (u.d.owned || []).length, tickets: OWNER_ACCOUNTS[u.name] ? "∞" : u.d.tickets || 0, created: u.created, seen: u.d.seen || 0, banned: bannedNames.has(u.name), perks: JSON.parse(perkRows.get(u.name) || "[]") })) };
+      return { users: users().map(u => ({ name: u.name, display: u.display, bad: badName(u.display), rank: u.d.rank || 0, best: u.d.best || 0, skins: (u.d.owned || []).length, tickets: OWNER_ACCOUNTS[u.name] ? "∞" : u.d.tickets || 0, created: u.created, seen: u.d.seen || 0, banned: bannedNames.has(u.name), perks: JSON.parse(perkRows.get(u.name) || "[]") })) };
     }
     const name = String(b.name || "").trim().toLowerCase();
     if (op === "admin-ban") {
