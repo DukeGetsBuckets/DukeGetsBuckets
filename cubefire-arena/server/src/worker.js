@@ -539,7 +539,7 @@ const PRO_SKIN = "proskin", LEGEND_RP = 15000;   // Pro: the top 3 Legends (thei
 // One-time gifts (given the next time the account opens the game) and skins only one account has
 const GIFTS = { gavin: { id: "gavin-12500rp", rp: 12500, skin: "trump" } };
 const CUSTOM_SKINS = { gavin: ["trump"] };
-const HACK_ACCOUNTS = { luka: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"] };   // the only accounts with hacks (every mode)
+const HACK_ACCOUNTS = { doug: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"] };   // the only accounts with hacks (every mode)
 const BR_TOP_SKIN = "royalelegend";   // the top 3 on the battle royale wins leaderboard (while they stay there)
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["ultra", 0.01], ["super", 0.04], ["rare", 0.25], ["common", 0.7]];
