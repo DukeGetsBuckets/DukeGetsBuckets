@@ -2884,7 +2884,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 56;
+const BUILD = 57;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3942,7 +3942,7 @@ function fire() {
       const b = tg.r; b.hp -= dm;
       if (b.hp <= 0 && b.alive) {
         b.alive = false; b.d++; b.respawnAt = now() + 3; kills++; killedAny = true;
-        addFeed(myName, b.name, true); showElim(b.name, { w: cur, hs: v.head }); killSound();
+        addFeed(myName, b.name, true); showElim(b.name, { w: cur, hs: v.head }, true); killSound();
       }
     }
   }
@@ -4160,7 +4160,7 @@ function explode(n) {
       const b = tg.r; b.hp -= dm;
       if (b.hp <= 0 && b.alive) {
         b.alive = false; b.d++; b.respawnAt = now() + 3; kills++; killedAny = true;
-        addFeed(myName, b.name, true); showElim(b.name, { w: NADE_W }); killSound();
+        addFeed(myName, b.name, true); showElim(b.name, { w: NADE_W }, true); killSound();
       }
     }
   }
@@ -4248,7 +4248,7 @@ function ballHit(m, tg) {
     tg.r.lastHitByMe = { w: wi, hs: head };
   } else {
     const b = tg.r; b.hp -= dm;
-    if (b.hp <= 0 && b.alive) { b.alive = false; b.d++; b.respawnAt = now() + 3; kills++; killed = true; addFeed(myName, b.name, true); showElim(b.name, m.paint ? { w: wi, hs: head } : null); killSound(); }
+    if (b.hp <= 0 && b.alive) { b.alive = false; b.d++; b.respawnAt = now() + 3; kills++; killed = true; addFeed(myName, b.name, true); showElim(b.name, m.paint ? { w: wi, hs: head } : null, true); killSound(); }
   }
   if (m.paint) { spark(m.pos.clone(), m.color, 0.2); blip(head ? 1500 : 950, 0.05, 0.09); }
   flashHit(killed); publish(true);
@@ -4554,15 +4554,15 @@ function banner(text) {
 let streak = 0, elimT = 0;
 // Kill streak bonus: from the 3rd elimination in a row without dying, +10 RP more each kill (up to +60)
 const streakBonus = n => n >= 3 ? Math.min(60, (n - 2) * 10) : 0;
-function showElim(name, how) {
-  streak++;
+function showElim(name, how, bot) {
+  if (!bot) streak++;                                                      // bots never count toward your kill streak
   const el = $("#elim"), h = $("#elimHow");
   $("#elimWho").textContent = name;
   const w = how && how.w === NADE_W ? "Grenade" : how && how.w != null && WEAPONS[how.w] ? WEAPONS[how.w].name : "";
   h.replaceChildren();
   const parts = [w, how && how.hs ? "Headshot" : ""].filter(Boolean).join(" · ");
   if (parts) h.append(parts);
-  if (streak >= 2) { const b = document.createElement("b"); b.textContent = (parts ? " · " : "") + streak + " streak"; h.appendChild(b); }
+  if (streak >= 2 && !bot) { const b = document.createElement("b"); b.textContent = (parts ? " · " : "") + streak + " streak"; h.appendChild(b); }
   el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
   clearTimeout(elimT); elimT = setTimeout(() => el.classList.remove("show"), 2600);
 }
@@ -4817,7 +4817,7 @@ function startGame(m) {
   myName = cleanName(nick.value) || myName;
   partyCode = playMode === "party" ? cleanCode(codeIn.value) : "";   // Ranked always joins ranked, even with a code typed
   save("cfa.name", myName); save("cfa.color", myColor); if (canParty()) save("cfa.code", partyCode);
-  mode = m; kills = 0; lastKills = 0; deaths = 0; hitsOut.length = 0; dthOut = null; lastShot = null; spectating = false; joinPending = false;
+  mode = m; kills = 0; lastKills = 0; deaths = 0; streak = 0; hitsOut.length = 0; dthOut = null; lastShot = null; spectating = false; joinPending = false;
   if (myName.toLowerCase() === "mason" && myColor !== PIG_EXIT_COLOR) { enablePig(); renderSlots(); renderClassPick(); }
   guns[W_ID.paint].userData.ballMat.color.set(PAL[myColor]);              // paint in your armor color
   lockMason();
