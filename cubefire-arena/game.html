@@ -2312,6 +2312,27 @@ SKIN_DEFS.trump = { name: "Donald Trump", rarity: 8, legs: 0x1b2847, body: 0x1f2
     add(0.2, 0.2, 0.02, 0xffd23a, 0, 1.06, 0.18, null, { glow: 0xffb000, pulse: true });                     // gold emblem on the back
   },
   anim(av, t) { const k = 0.55 + 0.45 * Math.sin(t * 3); for (const m of av.pulse || []) m.emissiveIntensity = k; } };
+SKIN_DEFS.zeus = { name: "Zeus", rarity: 8, legs: 0xd9dee8, body: 0xf3f5fb, arms: 0xf3f5fb, head: 0xe2b98e, helmet: 0xf3f5fb, visor: 0x6fdcff, visorGlow: 0x6fdcff, gun: 0x6fdcff, aura: 0x8fe8ff,
+  extra(add, head) {
+    add(0.42, 0.2, 0.06, 0xf3f5fb, 0, 0.05, -0.245, head);                                                  // a white beard
+    add(0.3, 0.1, 0.05, 0xf3f5fb, 0, -0.06, -0.24, head);
+    add(0.52, 0.06, 0.52, 0xffd23a, 0, 0.5, 0, head, { glow: 0xb88a00, pulse: true });                       // gold laurel crown
+    for (const x of [-0.2, -0.07, 0.07, 0.2]) add(0.08, 0.08, 0.04, 0x5fbf4a, x, 0.55, -0.25, head);         // laurel leaves
+    add(0.12, 0.66, 0.02, 0xffd23a, 0.12, 1.06, -0.18, null, { glow: 0xb88a00, pulse: true });               // gold sash
+    add(0.64, 0.05, 0.36, 0xffd23a, 0, 0.79, 0, null, { glow: 0xb88a00, pulse: true });                      // gold belt
+    PART.bolt(add, head, 0x6fdcff, 0x6fdcff, { glow: 0x6fdcff, pulse: true });                                // lightning bolt on the chest
+    add(0.56, 0.82, 0.05, 0x2448c8, 0, 0.96, 0.21, null, { glow: 0x10247a });                                // royal blue cape
+    add(0.06, 0.36, 0.02, 0x6fdcff, 0, 1.0, 0.24, null, { glow: 0x6fdcff, pulse: true }).rotation.z = 0.4;   // a bolt down the cape
+  },
+  // lightning: a soft electric glow, and every so often a bright white flash that runs over the whole body
+  anim(av, t) {
+    const strike = Math.sin(t * 9.3) > 0.985 || Math.sin(t * 5.1 + 2) > 0.992 || (Math.sin(t * 9.3) > 0.97 && Math.sin(t * 61) > 0);
+    const glow = 0.45 + 0.25 * Math.sin(t * 2.4) + (strike ? 2.2 : 0);
+    for (const m of av.pulse || []) m.emissiveIntensity = glow;
+    for (const m of [av.bodyMat, av.armsMat, av.helmetMat]) if (m) { if (!m.emissive) continue; m.emissive.setHex(0x9fe8ff); m.emissiveIntensity = strike ? 0.85 : 0.04 + 0.03 * Math.sin(t * 3); }
+    if (!av.zeusAura) av.zeusAura = av.g.children.find(o => o.isSprite && o.material && o.material.map === auraTex) || null;
+    if (av.zeusAura) { av.zeusAura.material.opacity = strike ? 1 : 0.55 + 0.2 * Math.sin(t * 4); av.zeusAura.material.color.setHex(strike ? 0xffffff : 0x8fe8ff); }
+  } };
 const RANK_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity === 3);
 const WHEEL_SKINS = Object.keys(SKIN_DEFS).filter(k => SKIN_DEFS[k].rarity !== 3 && SKIN_DEFS[k].rarity < 5);
 const SKIN_IDS = Object.keys(SKIN_DEFS);
@@ -2869,7 +2890,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 58;
+const BUILD = 59;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3634,6 +3655,8 @@ const espMat = new THREE.LineBasicMaterial({ color: 0xffe14a, depthTest: false, 
 const espBoxes = [];
 function updateEsp() {
   const list = state === "play" && duke.on && duke.wall ? enemies() : [];
+  const subtle = !duke.perks.includes("aim");                              // walls on their own: faint outlines, easy to miss
+  espMat.color.setHex(subtle ? 0xdfe6ee : 0xffe14a); espMat.opacity = subtle ? 0.22 : 1;
   while (espBoxes.length < list.length) { const l = new THREE.LineSegments(espGeo, espMat); l.renderOrder = 999; scene.add(l); espBoxes.push(l); }
   espBoxes.forEach((l, i) => {
     const tg = list[i]; l.visible = !!tg;

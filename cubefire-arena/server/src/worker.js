@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 58;
+const MIN_BUILD = 59;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -538,8 +538,8 @@ const BR_SKIN = "royalechamp";   // only for battle royale winners
 const PRO_SKIN = "proskin", LEGEND_RP = 15000;   // Pro: the top 3 Legends (their own skin while they stay in the top 3)
 // One-time gifts (given the next time the account opens the game) and skins only one account has
 const GIFTS = { gavin: { id: "gavin-12500rp", rp: 12500, skin: "trump" } };
-const CUSTOM_SKINS = { gavin: ["trump"] };
-const HACK_ACCOUNTS = { doug: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"] };   // the only accounts with hacks (every mode)
+const CUSTOM_SKINS = { gavin: ["trump", "zeus"] };
+const HACK_ACCOUNTS = { doug: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], gavin: ["wall"] };   // the only accounts with hacks (every mode)
 const BR_TOP_SKIN = "royalelegend";   // the top 3 on the battle royale wins leaderboard (while they stay there)
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["ultra", 0.01], ["super", 0.04], ["rare", 0.25], ["common", 0.7]];
