@@ -5522,6 +5522,7 @@ setInterval(() => { renderBrLobby(); renderBrSoon(); }, 500);
 function brMsg(m) {
   if (m.t === "welcome") BR.id = String(m.id || "");
   else if (m.t === "update") { mustRefresh = true; autoReload(); }       // this copy is out of date
+  else if (m.t === "blocked") { mustRefresh = true; if (state === "play") leaveMatch(); $("#blockedWhy").textContent = String(m.why || "The game is closed right now."); $("#blocked").hidden = false; }
   else if (m.t === "you") {                                            // who the server says you're signed in as
     BR.acc = m.acc || null;
     if (BR.acc && brJoinWant) { brSend({ t: "join", to: brJoinWant }); brJoinWant = ""; }

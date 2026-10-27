@@ -367,6 +367,7 @@ export class Royale {
       if (typeof d.token === "string" && d.token) {
         accounts(this.env).fetch("https://internal/internal/who", { method: "POST", body: JSON.stringify({ token: d.token }) }).then(r => r.json()).then(r => {
           const cur = this.att(ws); if (!cur || cur.gone) return;
+          if (r.banned) { this.send(ws, { t: "blocked", why: "You're banned from Cubefire Arena." }); try { ws.close(4003, "Banned"); } catch {} this.leave(ws); return; }   // a banned account
           this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [], perksKnown: true, bw: Math.max(0, Math.floor(Number(r.bw) || 0)), acc: r.acc || null, disp: r.display && !badName(r.display) ? r.display : r.display ? "Player" : null });
           this.send(ws, { t: "you", acc: r.acc || null });
           if (cur.party) this.sendParty(cur.party);

@@ -426,7 +426,11 @@ export class Lobby {
     if (d.t === "ping") { try { ws.send(JSON.stringify({ t: "pong", c: d.c })); } catch {} return; }   // the ping display
     if (d.t === "acct") {                                        // hacks the admin gave this account
       accounts(this.env).fetch("https://internal/internal/perks", { method: "POST", body: JSON.stringify({ token: String(d.token || "") }) })
-        .then(r => r.json()).then(r => { const cur = this.att(ws); if (cur) this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [], perksKnown: true, bw: Math.max(0, Math.floor(Number(r.bw) || 0)) }); }).catch(() => {});
+        .then(r => r.json()).then(r => {
+          const cur = this.att(ws); if (!cur) return;
+          if (r.banned) { try { ws.send(JSON.stringify({ t: "blocked", why: "You're banned from Cubefire Arena." })); ws.close(4003, "Banned"); } catch {} this.leave(ws); return; }   // a banned account
+          this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [], perksKnown: true, bw: Math.max(0, Math.floor(Number(r.bw) || 0)) });
+        }).catch(() => {});
       return;
     }
     if (d.t === "auth") {
@@ -493,7 +497,7 @@ export class Lobby {
       if (pl) {
         this.stat(a.room, { plays: 1, who: String(d.n || "").trim().toLowerCase().slice(0, 24) });
         // banned names (or addresses) are turned away
-        accounts(this.env).fetch("https://internal/internal/check", { method: "POST", body: JSON.stringify({ name: d.n, ipKey: a.ipk }) })
+        accounts(this.env).fetch("https://internal/internal/check", { method: "POST", body: JSON.stringify({ name: d.n, acc: d.ac, ipKey: a.ipk }) })
           .then(r => r.json()).then(r => { if (r.banned) { try { ws.send(JSON.stringify({ t: "blocked", why: r.banned })); ws.close(4003, "Banned"); } catch {} this.leave(ws); } }).catch(() => {});
       } else this.stat(a.room, {});
     }
@@ -662,6 +666,11 @@ export class Accounts {
     if (!body || typeof body !== "object") body = {};
     // UNBAN_ALL (a deploy setting): clears every ban, once for each new value
     if (this.env && this.env.UNBAN_ALL && this.setting("unbannedAll") !== String(this.env.UNBAN_ALL)) { this.sql.exec("DELETE FROM bans"); this.setSetting("unbannedAll", String(this.env.UNBAN_ALL)); }
+    // BAN_ONCE (a deploy setting, "name,name|anything"): bans those accounts once for each new value (the admin page can unban them)
+    if (this.env && this.env.BAN_ONCE && this.setting("bannedOnce") !== String(this.env.BAN_ONCE)) {
+      for (const n of String(this.env.BAN_ONCE).split("|")[0].split(",").map(x => x.trim().toLowerCase()).filter(Boolean)) this.sql.exec("INSERT OR REPLACE INTO bans VALUES ('name', ?, ?, ?, ?)", n, n, "Banned by the owner", Date.now());
+      this.setSetting("bannedOnce", String(this.env.BAN_ONCE));
+    }
     if (path.startsWith("/internal/")) return Response.json(await this.internal(path.slice(10), body));
     // an old copy of the page doesn't know the newest skins: have it reload first
     if (!op.startsWith("admin-") && (Number(body.v) || 0) < MIN_BUILD) return Response.json({ error: "This copy of the game is out of date. Refresh the page to get the new one.", update: true }, { status: 426 });
@@ -701,12 +710,12 @@ export class Accounts {
       return { ok: true };
     }
     if (op === "check") {
-      const n = String(b.name || "").trim().toLowerCase();
-      return { banned: this.banned("name", n) ? "You're banned from Cubefire Arena." : null };
+      const n = String(b.name || "").trim().toLowerCase(), acc = String(b.acc || "").trim().toLowerCase();
+      return { banned: this.banned("name", n) || this.banned("name", acc) ? "You're banned from Cubefire Arena." : null };
     }
     if (op === "who") {                                       // the battle royale hub checks who a game is signed in as
       const t = String(b.token || ""), s = t && this.sql.exec("SELECT name FROM sessions WHERE token = ?", t).toArray()[0], u = s && this.user(s.name);
-      return u ? { acc: u.name, display: u.display, bw: this.data(u).brWins || 0, perks: this.perksOf(u.name) } : {};
+      return u ? { acc: u.name, display: u.display, bw: this.data(u).brWins || 0, perks: this.perksOf(u.name), banned: this.banned("name", u.name) } : {};
     }
     if (op === "hacksgone") {                                 // tell everyone once that hacks are gone for good
       if (this.setting("hacksGoneSent") === "1") return { go: false };
@@ -745,7 +754,7 @@ export class Accounts {
     if (op === "perks") {
       const t = String(b.token || ""), s = t && this.sql.exec("SELECT name FROM sessions WHERE token = ?", t).toArray()[0];
       const u = s && this.user(s.name);
-      return { perks: s ? this.perksOf(s.name) : [], bw: u ? this.data(u).brWins || 0 : 0 };
+      return { perks: s ? this.perksOf(s.name) : [], bw: u ? this.data(u).brWins || 0 : 0, banned: !!(s && this.banned("name", s.name)) };
     }
     return { error: "Unknown" };
   }
