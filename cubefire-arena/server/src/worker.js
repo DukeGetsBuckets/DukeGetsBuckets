@@ -562,7 +562,7 @@ const PRO_SKIN = "proskin", LEGEND_RP = 15000;   // Pro: the top 3 Legends (thei
 const GIFTS = { gavin: { id: "gavin-12500rp", rp: 12500, skin: "trump" } };
 const ALL_SKIN_ACCOUNTS = { nobuckets: true };   // these accounts own every skin in the game, custom ones included
 const CUSTOM_SKINS = { gavin: ["trump", "zeus"], doug: ["curry", "trump", "zeus", "spiderman", "flash", "azura", "cabana"], adi: ["spiderman", "flash"], luka: ["azura"], sawyer: ["trump"], nobuckets: ["curry", "cabana"] };
-const HACK_ACCOUNTS = { doug: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], gavin: ["wall"], luka: ["snipeaa"] };   // snipeaa: the sniper gets the rifle's aim assist   // the only accounts with hacks (every mode)
+const HACK_ACCOUNTS = { doug: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], gavin: ["wall"], luka: ["snipeaa"], nobuckets: ["wall"] };   // snipeaa: the sniper gets the rifle's aim assist   // the only accounts with hacks (every mode)
 const BR_TOP_SKIN = "royalelegend";   // the top 3 on the battle royale wins leaderboard (while they stay there)
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["ultra", 0.01], ["super", 0.04], ["rare", 0.25], ["common", 0.7]];
