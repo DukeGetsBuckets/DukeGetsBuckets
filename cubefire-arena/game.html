@@ -1968,8 +1968,10 @@ const PAL = ["#ff5d5d", "#ffb627", "#5fd17a", "#43b7ff", "#b57bff", "#ff7ac8", "
 // magnet (extra hitbox width in blocks).
 // Online matches are capped at Normal so everyone plays on the same footing.
 const assistNow = () => ASSIST[mode !== "bots" ? 1 : assistLevel];
-// A weapon's aim assist. snipeaa (given to an account): the sniper gets the assault rifle's aim assist, a gentle pull, not a lock
-const aaOf = w => w.id === "sniper" && hasPerk("snipeaa") ? WEAPONS[W_ID.rifle].aa : w.aa;
+// A weapon's aim assist. snipeaa (given to an account): the sniper gets the assault rifle's aim assist, a gentle pull, not a lock (not in the battle royale)
+const aaOf = w => w.id === "sniper" && hasPerk("snipeaa") && mode !== "royale" ? WEAPONS[W_ID.rifle].aa : w.aa;
+// Hacks that only work outside the battle royale (there you're a normal player)
+const RANKED_ONLY = ["snipeaa"], brClean = () => mode === "royale" && duke.perks.every(k => RANKED_ONLY.includes(k));
 const ASSIST = [
   null,
   { cone: 0.15, slow: 0.5, pull: 8, track: 0.85, snap: 0.75, magnet: 0.3 },
@@ -3086,7 +3088,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 65;
+const BUILD = 66;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3402,7 +3404,7 @@ function publish(force, target) {
     n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0, afk: playing && !royale && iAmAfk() ? 1 : 0, ac: acct ? acct.name : null, hb: Math.floor(now()),
     p: playing ? [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)] : null,
     r: playing ? [r3(yaw), r3(pitch)] : null,
-    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : mySkin(), hx: playing && duke.on ? 1 : 0, ks: playing && alive ? streak : 0, k: playing ? kills : 0, d: playing ? deaths : 0, rk: rankPts, pg: pingMs, pm: playing && partyCode ? $("#partyMap").value : null, sp: playing && spectating ? 1 : 0,
+    al: alive ? 1 : 0, hp: Math.round(hp), w: cur, cr: crouch ? 1 : 0, iv: playing && duke.on && duke.inv ? 1 : 0, sk: pigMode ? "pig" : mySkin(), hx: playing && duke.on && !brClean() ? 1 : 0, ks: playing && alive ? streak : 0, k: playing ? kills : 0, d: playing ? deaths : 0, rk: rankPts, pg: pingMs, pm: playing && partyCode ? $("#partyMap").value : null, sp: playing && spectating ? 1 : 0,
     sh: playing ? lastShot : null, gr: playing ? lastNade : null, nk: playing ? lastNuke : null, md: playing ? lastMud : null, hits: playing && hitsOut.length ? hitsOut.slice() : null, dth: playing ? dthOut : null,
   };
   if (royale) { Object.assign(P, brState()); brSend(P); return; }          // the battle royale runs on its own server

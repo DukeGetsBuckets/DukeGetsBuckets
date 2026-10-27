@@ -31,6 +31,7 @@ const AWAY_MS = 20000, STORM_AWAY_MS = 20000;   // a player we haven't heard fro
 const LATE_MS = 100000;                          // a battle royale this new still takes players who queue (before the storm forms)
 const SEEN_MS = 60000;
 const SPLIT_AT = 80, FINAL_AT = 20;             // more than 80 players: two halves; when 20 are left between them, they meet in one final
+const RANKED_ONLY = ["snipeaa"];                 // hacks that don't work in the battle royale: an account with only these is a normal player here
 const DROP_MS = 30000;                           // a connection we haven't heard from in 30 s is dead (games ping every few seconds): it's closed
 const SILENT_MS = 2 * MIN;                         // in a match, a game that sends nothing this long is out (a game that's playing sends many times a second)                           // a queued game heard from this recently is put in at the start
 const MAP = 448;                               // the royale map is MAP x MAP blocks
@@ -375,7 +376,7 @@ export class Royale {
         accounts(this.env).fetch("https://internal/internal/who", { method: "POST", body: JSON.stringify({ token: d.token }) }).then(r => r.json()).then(r => {
           const cur = this.att(ws); if (!cur || cur.gone) return;
           if (r.banned) { this.send(ws, { t: "blocked", why: "You're banned from Cubefire Arena." }); try { ws.close(4003, "Banned"); } catch {} this.leave(ws); return; }   // a banned account
-          this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [], perksKnown: true, bw: Math.max(0, Math.floor(Number(r.bw) || 0)), acc: r.acc || null, disp: r.display && !badName(r.display) ? r.display : r.display ? "Player" : null });
+          this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks.filter(k => !RANKED_ONLY.includes(k)) : [], perksKnown: true, bw: Math.max(0, Math.floor(Number(r.bw) || 0)), acc: r.acc || null, disp: r.display && !badName(r.display) ? r.display : r.display ? "Player" : null });
           this.send(ws, { t: "you", acc: r.acc || null });
           if (cur.party) this.sendParty(cur.party);
           if (r.acc) this.deliverInvites(ws, r.acc);
