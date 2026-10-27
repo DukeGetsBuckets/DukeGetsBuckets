@@ -11,7 +11,7 @@
 //     Everyone playing ranked at a start time is put in too ({t: "where", in: "ranked"} from their game)
 //   - the match itself: player states are relayed (near players every update, far ones less
 //     often), loot is claimed first come first served, and the last team with someone standing wins
-// It only starts with at least 5 teams (else the queued stay queued for the next) and holds up to 25 duos.
+// It only starts with at least 2 teams (else the queued stay queued for the next) and holds up to 50 players.
 // BR_TEST=1 (local testing) runs one every 4 minutes, starts with a single team, and keeps
 // solo players on their own teams (so two test devices can fight); BR_PAIR=1 pairs them anyway.
 // ======================================================================
@@ -23,13 +23,14 @@ export function brConfig(env) {
   // one every 20 minutes (:00, :20, :40), and whenever Doug starts one; you can queue for the next one any time
   return { every: 20 * MIN, open: 20 * MIN, stop: 2 * MIN, resume: MIN, minTeams: minTeams || 2, test: false };
 }
-const MAX_TEAMS = 25, SLOTS = 32;              // team spawn slots on the map (the game page has the same 32)
+const MAX_PLAYERS = 50, SLOTS = 50;            // up to 50 players; team spawn slots on the map (the game page has the same 50)
 const NEAR = 110, FAR_EVERY = 5;               // full-rate updates within NEAR blocks, every 5th one beyond
+const HIDDEN = 185, HIDDEN_EVERY = 15;         // past the fog (nobody can see them): one update a second, for the map
 const GONE_MS = 15000, MATCH_MAX = 25 * MIN;   // a player gone this long is out; a match never runs longer
 const LATE_MS = 100000;                          // a battle royale this new still takes players who queue (before the storm forms)
 const SEEN_MS = 60000;
 const SILENT_MS = 45000;                         // in a match, a game that sends nothing this long is out (a game that's playing sends many times a second)                           // a queued game heard from this recently is put in at the start
-const MAP = 320;                               // the royale map is MAP x MAP blocks
+const MAP = 448;                               // the royale map is MAP x MAP blocks
 
 function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -39,8 +40,8 @@ const cleanName = s => { const n = String(s || "").replace(/[^\w .'!-]/g, "").tr
 // seconds from the start of the match; dps is damage per second outside the circle.
 export function stormPlan(seed, test) {
   const r = rng(seed), k = test ? 0.35 : 1;
-  const steps = [[90, 60, 150, 1], [60, 50, 95, 2], [50, 40, 55, 4], [40, 35, 28, 6], [30, 30, 12, 8], [20, 30, 0, 10]];
-  let x = MAP / 2, z = MAP / 2, rad = 230, t = 0;
+  const steps = [[100, 70, 210, 1], [70, 60, 130, 2], [55, 50, 75, 4], [45, 40, 38, 6], [35, 35, 16, 8], [25, 30, 0, 10]];
+  let x = MAP / 2, z = MAP / 2, rad = 320, t = 0;
   const out = [];
   for (const [wait, shrink, nr, dps] of steps) {
     const room = Math.max(0, rad - nr) * (out.length ? 1 : 0.55), a = r() * Math.PI * 2, d = Math.sqrt(r()) * room;
@@ -56,6 +57,8 @@ export class Royale {
   constructor(ctx, env) {
     this.ctx = ctx; this.env = env; this.cfg = brConfig(env);
     this.atts = new Map();        // socket -> attachment (cached)
+    this.outq = new Map();        // socket -> player updates waiting to go out together
+    this.flushT = null;
     this.wsById = new Map();      // player id -> their socket
     this.seen = new Map();        // player id -> last message time
     this.matches = new Map();     // match id -> the match (several can run at once)
@@ -81,7 +84,18 @@ export class Royale {
     if (!ws) { for (const s of this.ctx.getWebSockets()) { const a = this.att(s); if (a && a.id === id && !a.replaced && !a.gone) { ws = s; this.wsById.set(id, s); break; } } }
     const a = ws && this.att(ws); return a && !a.replaced && !a.gone ? { ws, a } : null;
   }
-  send(ws, m) { try { ws.send(typeof m === "string" ? m : JSON.stringify(m)); } catch {} }
+  send(ws, m) { if (this.outq.has(ws)) this.flushOne(ws); try { ws.send(typeof m === "string" ? m : JSON.stringify(m)); } catch {} }
+  // Player updates during a match go out in batches (one message every ~50 ms with everything since
+  // the last one) instead of one message per update: with 50 players that's thousands fewer a second.
+  // Anything else sent to that player first sends what's waiting, so the order stays the same.
+  sendSoon(ws, out) {
+    const q = this.outq.get(ws); if (q) q.push(out); else this.outq.set(ws, [out]);
+    if (!this.flushT) this.flushT = setTimeout(() => { this.flushT = null; for (const w of [...this.outq.keys()]) this.flushOne(w); }, 50);
+  }
+  flushOne(ws) {
+    const q = this.outq.get(ws); this.outq.delete(ws); if (!q || !q.length) return;
+    try { ws.send(q.length === 1 ? q[0] : '{"t":"sb","l":[' + q.join(",") + "]}"); } catch {}
+  }
 
   // ---- schedule
   nextSlot(after) {
@@ -111,7 +125,7 @@ export class Royale {
   info() {
     const t = this.times(), q = this.queueCount();
     let live = 0; for (const m of this.matches.values()) live += m.players.size;
-    return { t: "brinfo", now: Date.now(), ...t, ph: this.phase(), teams: q.teams, players: q.players, minTeams: this.cfg.minTeams, maxTeams: MAX_TEAMS, test: this.cfg.test,
+    return { t: "brinfo", now: Date.now(), ...t, ph: this.phase(), teams: q.teams, players: q.players, minTeams: this.cfg.minTeams, maxPlayers: MAX_PLAYERS, test: this.cfg.test,
       joinable: !!this.joinable(), closeAt: Number(this.env.CLOSE_AT) || 0, closedMsg: this.env.CLOSED_MSG || "", match: null, live: this.matches.size, livePlayers: live, cancelled: this.cancelledAt && this.cancelledAt === this.lastStart ? true : false };
   }
   broadcastInfo(now) {
@@ -405,7 +419,7 @@ export class Royale {
   // The newest battle royale, if it's young enough to still take players
   joinable() {
     const now = Date.now(); let best = null;
-    for (const m of this.matches.values()) if (now - m.at < LATE_MS && m.teams.size < MAX_TEAMS && (!best || m.at > best.at)) best = m;
+    for (const m of this.matches.values()) if (now - m.at < LATE_MS && m.players.size < MAX_PLAYERS && (!best || m.at > best.at)) best = m;
     return best;
   }
   // Your duo got in without you (your iPad was asleep at the start): join them, on their team
@@ -423,7 +437,7 @@ export class Royale {
   }
   // Put a duo (or a solo player) into a battle royale that's already started, on a free spawn slot
   joinRunning(group) {
-    const m = this.joinable(); if (!m) return false;
+    const m = this.joinable(); if (!m || m.players.size + Math.min(2, group.length) > MAX_PLAYERS) return false;
     const used = new Set([...m.teams.values()].map(T => T.slot)), slot = [...Array(SLOTS).keys()].find(i => !used.has(i));
     if (slot == null) return false;
     let n = m.teams.size + 1; while (m.teams.has("T" + n)) n++;
@@ -470,8 +484,9 @@ export class Royale {
       return;
     }
     for (const h of q) this.setAtt(h.ws, { ...this.att(h.ws), queued: false });
-    const playing = teams.slice(0, MAX_TEAMS);
-    for (const t of teams.slice(MAX_TEAMS)) for (const h of t) this.send(h.ws, { t: "queue", on: false, msg: "The battle royale is full (25 teams). Try the next one!" });
+    const playing = [], full = []; let count = 0;                        // up to 50 players (and as many teams as there are spawn slots)
+    for (const t of teams) { if (count + t.length <= MAX_PLAYERS && playing.length < SLOTS) { playing.push(t); count += t.length; } else full.push(t); }
+    for (const t of full) for (const h of t) this.send(h.ws, { t: "queue", on: false, msg: `The battle royale is full (${MAX_PLAYERS} players). Try the next one!` });
     const seed = Math.floor(r() * 2147483646) + 1, slots = Array.from({ length: SLOTS }, (_, i) => i);
     for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
     const m = { id: "M" + now, last: new Map(), at: now, seed, storm: stormPlan(seed, this.cfg.test), teams: new Map(), players: new Map(), taken: new Set(), deadline: now + MATCH_MAX };
@@ -511,14 +526,15 @@ export class Royale {
     if (changed) { P.bs = bs; this.checkTeams(m); if (!this.matches.has(m.id)) return; }
     const out = JSON.stringify({ t: "st", id: a.id, d }), me = this.viewPos(m, a.id);
     // far players get every few updates, but a knock or elimination reaches everyone (the kill feed)
-    const far = changed || P.n % FAR_EVERY === 0;
+    const far = changed || P.n % FAR_EVERY === 0, hidden = changed || P.n % HIDDEN_EVERY === 0;
     const hitT = new Set(Array.isArray(d.hits) ? d.hits.map(h => h && String(h.t)) : []);
     if (d.dth && typeof d.dth.by === "string") hitT.add(d.dth.by);
     for (const [qid, Q] of m.players) {
       if (qid === a.id) continue;
       const h = this.byId(qid); if (!h) continue;
       const p = this.viewPos(m, qid);
-      if (Q.team === P.team || far || hitT.has(qid) || !me || !p || Math.hypot(me[0] - p[0], me[2] - p[2]) < NEAR) this.send(h.ws, out);
+      const dist = me && p ? Math.hypot(me[0] - p[0], me[2] - p[2]) : 0;
+      if (Q.team === P.team || hitT.has(qid) || !me || !p || dist < NEAR || (dist < HIDDEN ? far : hidden)) this.sendSoon(h.ws, out);
     }
   }
   viewPos(m, id) {
