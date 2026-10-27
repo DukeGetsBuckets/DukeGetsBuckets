@@ -19,7 +19,7 @@ const MAX_PLAYERS = 400;  // sockets per lobby, including people still in the me
 // Ranked: one lobby where players are split by rank into groups ("lobbies") of at most
 // GROUP_SIZE, each with its own fights; up to RANKED_MAX playing at once. Each group has a fixed
 // id (L1, L2, ...) and a name by its average rank, from Pro down to Worst Possible.
-const GROUP_SIZE = 6, MAX_GROUPS = 10, RANKED_MAX = GROUP_SIZE * MAX_GROUPS;
+const GROUP_SIZE = 6, MAX_GROUPS = 25, RANKED_MAX = GROUP_SIZE * MAX_GROUPS;   // up to 150 playing ranked at once
 const SWAP_GAP = 150;
 const GHOST_MS = 10000, DROP_MS = 60000;   // silent this long: not counted as playing / disconnected   // between rounds, a player this many RP above someone in the lobby above swaps with them
 const TIERS = ["pro", "elite", "normal", "trash", "worst"];   // best to worst
@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 63;
+const MIN_BUILD = 64;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -120,6 +120,8 @@ export class Lobby {
     this.atts = new Map();     // socket -> attachment, so busy lobbies don't decode it on every message
     this.seen = new Map();     // player id -> when we last heard from them
     this.groups = null;        // ranked group -> sockets in it (rebuilt after the lobby wakes up)
+    this.outq = new Map();     // socket -> player updates waiting to go out together
+    this.flushT = null;
   }
 
   // No trading kills. Each game decides its own hits, so when two players shoot each other
@@ -199,6 +201,18 @@ export class Lobby {
   sweep() {
     const now = Date.now(); if (now < (this.sweepAt || 0)) return; this.sweepAt = now + 5000;
     for (const ws of this.ctx.getWebSockets()) { const a = this.att(ws); if (a && !a.replaced && now - (this.seen.get(a.id) || now) > DROP_MS) { try { ws.close(4006, "Timed out"); } catch {} this.leave(ws); } }
+  }
+  // Player updates go out in batches (one message every ~50 ms with everything since the last one)
+  // instead of one message each: far less work with lots of players. Anything else that could
+  // depend on them (someone leaving) sends what's waiting first.
+  sendSoon(ws, out) {
+    const q = this.outq.get(ws); if (q) q.push(out); else this.outq.set(ws, [out]);
+    if (!this.flushT) this.flushT = setTimeout(() => this.flushAll(), 50);
+  }
+  flushAll() {
+    clearTimeout(this.flushT); this.flushT = null;
+    for (const [ws, q] of this.outq) { try { ws.send(q.length === 1 ? q[0] : '{"t":"sb","l":[' + q.join(",") + "]}"); } catch {} }
+    this.outq.clear();
   }
   rankOf(id) { const d = this.last.get(id); return Math.max(0, Number(d && d.rk) || 0); }
   sendGroup(ws, a) {
@@ -453,7 +467,7 @@ export class Lobby {
     const out = JSON.stringify({ t: "st", id: a.id, d });
     for (const other of a.ranked ? (a.g ? this.groupSocks(a.g) : []) : this.ctx.getWebSockets()) {   // ranked: only your group
       if (other === ws) continue;
-      try { other.send(out); } catch {}
+      this.sendSoon(other, out);
     }
     if (!!a.pl !== pl) {                                                                // joined or left a match
       const old = a.g;
@@ -492,6 +506,7 @@ export class Lobby {
     if (!a) return;
     if (a.replaced) { this.forget(ws); return; }                     // the same player reconnected: not a real leave
     if (a.gone) return;                                                  // (a timed-out socket can close twice)
+    this.flushAll(); this.outq.delete(ws);
     this.atts.set(ws, { ...a, gone: true }); try { ws.serializeAttachment({ ...a, gone: true }); } catch {}
     this.last.delete(a.id); this.ps.delete(a.id);
     const out = JSON.stringify({ t: "leave", id: a.id });
@@ -505,6 +520,7 @@ export class Lobby {
     if (a.pl) this.stat(a.room, {});
   }
   tellGroup(g, except, out) {
+    this.flushAll();
     for (const ws of this.ctx.getWebSockets()) {
       if (ws === except) continue;
       const a = this.att(ws); if (g && (!a || a.g !== g)) continue;

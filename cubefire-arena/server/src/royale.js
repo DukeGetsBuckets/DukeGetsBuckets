@@ -23,13 +23,14 @@ export function brConfig(env) {
   // one every 20 minutes (:00, :20, :40), and whenever Doug starts one; you can queue for the next one any time
   return { every: 20 * MIN, open: 20 * MIN, stop: 2 * MIN, resume: MIN, minTeams: minTeams || 2, test: false };
 }
-const MAX_PLAYERS = 50, SLOTS = 50;            // up to 50 players; team spawn slots on the map (the game page has the same 50)
+const MAX_PLAYERS = 150, SLOTS = 80;           // up to 150 players; team spawn slots on the map (the game page has the same 80)
 const NEAR = 110, FAR_EVERY = 5;               // full-rate updates within NEAR blocks, every 5th one beyond
 const HIDDEN = 220, HIDDEN_EVERY = 15;         // past the fog (nobody can see them): one update a second, for the map
 const GONE_MS = 2 * MIN, MATCH_MAX = 25 * MIN;  // a player gone (or frozen) this long is out; a match never runs longer
 const AWAY_MS = 20000, STORM_AWAY_MS = 20000;   // a player we haven't heard from in 20 s who is left out in the storm for 20 s is out
 const LATE_MS = 100000;                          // a battle royale this new still takes players who queue (before the storm forms)
 const SEEN_MS = 60000;
+const DROP_MS = 30000;                           // a connection we haven't heard from in 30 s is dead (games ping every few seconds): it's closed
 const SILENT_MS = 2 * MIN;                         // in a match, a game that sends nothing this long is out (a game that's playing sends many times a second)                           // a queued game heard from this recently is put in at the start
 const MAP = 448;                               // the royale map is MAP x MAP blocks
 
@@ -98,6 +99,17 @@ export class Royale {
         this.matches.set(m.id, m);
       }
     });
+  }
+  // Close connections that went quiet without saying goodbye (an iPad that went to sleep, the app swiped
+  // away): otherwise they pile up and every message goes out to all of them. A player who was in a match
+  // keeps their place and gets back in when their game reconnects.
+  dropSilent() {
+    const now = Date.now();
+    for (const ws of this.ctx.getWebSockets()) {
+      const a = this.att(ws); if (!a) continue;
+      if (a.replaced || a.gone) { try { ws.close(4006, "Closed"); } catch {} continue; }
+      if (now - (this.seen.get(a.id) || this.wokeAt) > DROP_MS) { try { ws.close(4006, "Timed out"); } catch {} this.leave(ws); }
+    }
   }
   saveMatch(force) {
     const m = [...this.matches.values()][0], now = Date.now();
@@ -232,6 +244,7 @@ export class Royale {
     if (this.start && now >= this.start - 200 && this.lastStart !== this.start) this.launch();
     for (const m of [...this.matches.values()]) { this.sweepMatch(m); if (this.matches.has(m.id) && now > m.deadline) this.endMatch(m, null); }
     this.saveMatch(false);
+    this.dropSilent();
     this.broadcastInfo(true);
     this.schedule();
     await this.sendPushes(now);

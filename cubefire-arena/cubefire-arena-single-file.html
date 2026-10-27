@@ -1619,7 +1619,7 @@ function buildRoyale() {
   for (let i = 0; i < 160; i++) { const p = plan.place(r, 1, 1); if (p) fillBox(p.x0, 1, p.z0, p.x0, ri(r, 1, 2), p.z0, T.HAY); }
   for (const [x, z] of pads) padAt(x, z);
 }
-// Team spawn slots (50, as many as the server hands out): spread as far apart as possible
+// Team spawn slots (80, as many as the server hands out): spread as far apart as possible
 const brSlots = [];
 function computeBrSlots() {
   brSlots.length = 0;
@@ -1627,7 +1627,7 @@ function computeBrSlots() {
   if (!pool.length) return;
   brSlots.push(pool[Math.floor(pool.length / 2)]);
   const dmin = pool.map(s => s.distanceTo(brSlots[0]));
-  while (brSlots.length < 50) {
+  while (brSlots.length < 80) {
     let best = 0; for (let i = 1; i < pool.length; i++) if (dmin[i] > dmin[best]) best = i;
     brSlots.push(pool[best]);
     for (let i = 0; i < pool.length; i++) dmin[i] = Math.min(dmin[i], pool[i].distanceTo(pool[best]));
@@ -3082,7 +3082,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 63;
+const BUILD = 64;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3154,6 +3154,9 @@ function connectServer(name) {
       renderStatus();
     } else if (m.t === "st" && m.id) {
       onPeer({ peer: String(m.id), presence: m.d && typeof m.d === "object" ? m.d : {}, kind: "viewer", sameTab: false });
+      renderStatus();
+    } else if (m.t === "sb" && Array.isArray(m.l)) {                         // a batch of player updates
+      for (const x of m.l.slice(0, 400)) if (x && x.t === "st" && x.id) onPeer({ peer: String(x.id), presence: x.d && typeof x.d === "object" ? x.d : {}, kind: "viewer", sameTab: false });
       renderStatus();
     } else if (m.t === "leave" && m.id) removeRemote(String(m.id));
     else if (m.t === "pong" && num(m.c) !== null) { const rtt = performance.now() - m.c; pingMs = Math.round(pingMs == null ? rtt : pingMs * 0.6 + rtt * 0.4); }
@@ -3389,7 +3392,7 @@ let lastPub = 0;
 const r2 = v => Math.round(v * 100) / 100, r3 = v => Math.round(v * 1000) / 1000;
 function publish(force, target) {
   if (netKind === "none") return;
-  const t = now(); if (!force && t - lastPub < (netKind === "ws" ? 0.066 : 0.05)) return; if (!target) lastPub = t;
+  const t = now(); if (!force && t - lastPub < (mode === "royale" ? 0.1 : netKind === "ws" ? 0.066 : 0.05)) return; if (!target) lastPub = t;   // battle royale: 10 a second (up to 150 players)
   const playing = state === "play" && netMode(), royale = playing && mode === "royale" && BR.m;
   const P = {
     n: myName, c: myColor, m: mapId, pl: playing ? 1 : 0, afk: playing && !royale && iAmAfk() ? 1 : 0, ac: acct ? acct.name : null, hb: Math.floor(now()),
@@ -5512,7 +5515,7 @@ function brWhere() {
   const w = state !== "play" ? "menu" : mode === "royale" ? "royale" : mode === "bots" ? "bots" : partyCode ? "party" : document.hidden || now() - lastInputT > 180 ? "menu" : "ranked";   // gone 3+ minutes: left out
   if (w !== BR.where) { BR.where = w; brSend({ t: "where", in: w }); }
 }
-setInterval(() => { if (BR.sock && BR.sock.readyState === 1) { brSend({ t: "ping", c: performance.now() }); brHello(); brWhere(); } }, 2000);
+setInterval(() => { if (BR.sock && BR.sock.readyState === 1) { brSend({ t: "ping", c: performance.now() }); brHello(); brWhere(); } }, 4000);
 setInterval(() => { renderBrLobby(); renderBrSoon(); }, 500);
 function brMsg(m) {
   if (m.t === "welcome") BR.id = String(m.id || "");
