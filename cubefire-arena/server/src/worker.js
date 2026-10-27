@@ -684,12 +684,12 @@ export class Accounts {
   async internal(op, b) {
     if (op === "gate") {
       // REOPEN (a deploy setting): turns the admin's kill switch off once for each new value, so a deploy can reopen the game
-      if (this.env && this.env.REOPEN && this.setting("reopened") !== String(this.env.REOPEN)) { this.setSetting("kill", "0"); this.setSetting("reopened", String(this.env.REOPEN)); }
+      if (this.env && this.env.REOPEN && this.setting("reopened") !== String(this.env.REOPEN)) { this.setSetting("kill", "0"); this.sql.exec("DELETE FROM bans WHERE kind = 'ip'"); this.setSetting("reopened", String(this.env.REOPEN)); }
       let salt = this.setting("ipsalt"); if (!salt) { salt = hex(crypto.getRandomValues(new Uint8Array(16))); this.setSetting("ipsalt", salt); }
       const ipKey = hex(await crypto.subtle.digest("SHA-256", enc.encode(salt + String(b.ip || "")))).slice(0, 32);   // addresses are kept only as a salted hash
       const killed = this.setting("kill") === "1";
       if (!killed && b.room !== "probe" && b.room !== "royale") this.bump("visits");
-      return { ipKey, block: killed ? this.setting("killmsg") || "The game is closed right now. Check back soon." : this.banned("ip", ipKey) ? "You're banned from Cubefire Arena." : null };
+      return { ipKey, block: killed ? this.setting("killmsg") || "The game is closed right now. Check back soon." : null };   // no bans by address: a whole school shares one
     }
     if (op === "stat") {
       if (b.room) { if (b.n > 0) this.rooms.set(String(b.room), { n: b.n, at: Date.now() }); else this.rooms.delete(String(b.room)); }
@@ -700,7 +700,7 @@ export class Accounts {
     }
     if (op === "check") {
       const n = String(b.name || "").trim().toLowerCase();
-      return { banned: this.banned("name", n) || this.banned("ip", b.ipKey) ? "You're banned from Cubefire Arena." : null };
+      return { banned: this.banned("name", n) ? "You're banned from Cubefire Arena." : null };
     }
     if (op === "who") {                                       // the battle royale hub checks who a game is signed in as
       const t = String(b.token || ""), s = t && this.sql.exec("SELECT name FROM sessions WHERE token = ?", t).toArray()[0], u = s && this.user(s.name);
@@ -801,11 +801,10 @@ export class Accounts {
     const name = String(b.name || "").trim().toLowerCase();
     if (op === "admin-ban") {
       const reason = String(b.reason || "").slice(0, 120);
-      if (b.room && b.id) {                                       // a player online: ban their name and address, then remove them
+      if (b.room && b.id) {                                       // a player online: ban their name (never their address: everyone at a school shares one), then remove them
         const info = await this.lobbyCall(String(b.room), "/act", { act: "info", id: b.id });
         const n = String(info.name || "").trim().toLowerCase();
         if (n) this.sql.exec("INSERT OR REPLACE INTO bans VALUES ('name', ?, ?, ?, ?)", n, info.name, reason, Date.now());
-        if (info.ipKey) this.sql.exec("INSERT OR REPLACE INTO bans VALUES ('ip', ?, ?, ?, ?)", info.ipKey, (info.name || "?") + "'s device", reason, Date.now());
         await this.lobbyCall(String(b.room), "/act", { act: "kick", id: b.id, msg: "You're banned from Cubefire Arena." }).catch(() => {});
       } else if (name) this.sql.exec("INSERT OR REPLACE INTO bans VALUES ('name', ?, ?, ?, ?)", name, String(b.name).trim(), reason, Date.now());
       else throw new UserError("Who should be banned?");

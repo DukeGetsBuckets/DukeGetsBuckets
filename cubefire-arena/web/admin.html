@@ -221,7 +221,7 @@ function renderOnline() {
     const acts = el("div", { className: "actions" });
     if (p.pl) acts.append(btn("Kill", "danger small", () => act("admin-kill", p, "Killed " + p.name)));
     acts.append(btn("Kick", "small", () => act("admin-kick", p, "Kicked " + p.name)),
-      btn("Ban", "danger small", () => { if (confirm("Ban " + p.name + "? They and their device can't play until you unban them.")) act("admin-ban", { ...p, reason: "Banned from the dashboard" }, "Banned " + p.name); }));
+      btn("Ban", "danger small", () => { if (confirm("Ban " + p.name + "? Their account can't play until you unban it.")) act("admin-ban", { ...p, reason: "Banned from the dashboard" }, "Banned " + p.name); }));
     const R = rankOf(p.rk);
     return el("tr", {}, [el("td", { textContent: p.name }), el("td", { textContent: where }), el("td", { textContent: status }),
       el("td", { className: "num", innerHTML: `<span style="color:${R[2]}">${R[0]}</span> ${p.rk}` }), el("td", { textContent: p.pl ? p.k + " / " + p.d : "—" }),
