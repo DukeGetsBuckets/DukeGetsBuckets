@@ -660,6 +660,8 @@ export class Accounts {
     let body = {};
     try { body = await request.json(); } catch {}
     if (!body || typeof body !== "object") body = {};
+    // UNBAN_ALL (a deploy setting): clears every ban, once for each new value
+    if (this.env && this.env.UNBAN_ALL && this.setting("unbannedAll") !== String(this.env.UNBAN_ALL)) { this.sql.exec("DELETE FROM bans"); this.setSetting("unbannedAll", String(this.env.UNBAN_ALL)); }
     if (path.startsWith("/internal/")) return Response.json(await this.internal(path.slice(10), body));
     // an old copy of the page doesn't know the newest skins: have it reload first
     if (!op.startsWith("admin-") && (Number(body.v) || 0) < MIN_BUILD) return Response.json({ error: "This copy of the game is out of date. Refresh the page to get the new one.", update: true }, { status: 426 });
