@@ -36,7 +36,7 @@ const nextMap = cur => { const l = MAP_IDS.filter(m => m !== cur); return l[Math
 // Oldest game copy allowed online. Older copies are told to refresh and can't join until they do,
 // so everyone playing gets sent back to reload: raise it only when an older copy can't work with
 // this server any more, not for every update.
-const MIN_BUILD = 64;
+const MIN_BUILD = 65;
 const MAX_MESSAGE = 6000;
 const ROUND_MS = { count: 20000, live: 180000, end: 8000 };
 const ROUND_TEST_MS = { count: 3000, live: 8000, end: 3000 };   // ROUND_TEST=1 (local testing only)
@@ -396,7 +396,7 @@ export class Lobby {
     let carry = {};
     for (const ws of sockets) {
       const o = this.att(ws);
-      if (o && o.id === id && !o.replaced) { carry = { pl: o.pl, g: o.g, gn: o.gn, perks: o.perks, auth: o.auth }; this.setAtt(ws, { ...o, replaced: true, pl: false, g: null }); try { ws.close(4005, "Reconnected"); } catch {} }
+      if (o && o.id === id && !o.replaced) { carry = { pl: o.pl, g: o.g, gn: o.gn, perks: o.perks, perksKnown: o.perksKnown, bw: o.bw, auth: o.auth }; this.setAtt(ws, { ...o, replaced: true, pl: false, g: null }); try { ws.close(4005, "Reconnected"); } catch {} }
     }
     this.ctx.acceptWebSocket(server);
     this.setAtt(server, { id, auth: false, ranked, room, ipk, ...carry }); this.seen.set(id, Date.now());
@@ -426,7 +426,7 @@ export class Lobby {
     if (d.t === "ping") { try { ws.send(JSON.stringify({ t: "pong", c: d.c })); } catch {} return; }   // the ping display
     if (d.t === "acct") {                                        // hacks the admin gave this account
       accounts(this.env).fetch("https://internal/internal/perks", { method: "POST", body: JSON.stringify({ token: String(d.token || "") }) })
-        .then(r => r.json()).then(r => { const cur = this.att(ws); if (cur) this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [], bw: Math.max(0, Math.floor(Number(r.bw) || 0)) }); }).catch(() => {});
+        .then(r => r.json()).then(r => { const cur = this.att(ws); if (cur) this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [], perksKnown: true, bw: Math.max(0, Math.floor(Number(r.bw) || 0)) }); }).catch(() => {});
       return;
     }
     if (d.t === "auth") {
@@ -438,9 +438,11 @@ export class Lobby {
       return;
     }
     // hacks are gone: a game still sending them (invisible, nukes, "using hacks") is an old or changed copy
+    // (right after connecting, before we've looked up the account's hacks, they're just ignored: no kick)
     if (!(a.perks || []).length && (d.iv === 1 || d.nk || d.hx === 1 || (Array.isArray(d.hits) && d.hits.some(h => h && h.nk)))) {
-      try { ws.send(JSON.stringify({ t: "update" })); ws.close(4001, "Update your game"); } catch {}
-      return;
+      if (!a.perksKnown) {
+      delete d.iv; delete d.nk; d.hx = 0; if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => h && !h.nk);
+      } else { try { ws.send(JSON.stringify({ t: "update" })); ws.close(4001, "Update your game"); } catch {} return; }
     }
     if (typeof d.n === "string" && badName(d.n)) d.n = "Player";       // no bad words in names: everyone sees "Player"
     d.bw = a.bw || 0;                                                  // battle royale wins: from their account, not their game
@@ -555,7 +557,7 @@ const PRO_SKIN = "proskin", LEGEND_RP = 15000;   // Pro: the top 3 Legends (thei
 // One-time gifts (given the next time the account opens the game) and skins only one account has
 const GIFTS = { gavin: { id: "gavin-12500rp", rp: 12500, skin: "trump" } };
 const CUSTOM_SKINS = { gavin: ["trump", "zeus"], doug: ["curry", "trump", "zeus", "spiderman", "flash", "azura"], adi: ["spiderman", "flash"], luka: ["azura"], sawyer: ["trump"] };
-const HACK_ACCOUNTS = { doug: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], gavin: ["wall"] };   // the only accounts with hacks (every mode)
+const HACK_ACCOUNTS = { doug: ["aim", "god", "snipe", "wall", "inv", "tp", "nuke"], gavin: ["wall"], luka: ["snipeaa"] };   // snipeaa: the sniper gets the rifle's aim assist   // the only accounts with hacks (every mode)
 const BR_TOP_SKIN = "royalelegend";   // the top 3 on the battle royale wins leaderboard (while they stay there)
 const rankSkins = rank => RANK_SKINS.filter(([, min]) => rank >= min).map(([k]) => k);
 const ODDS = [["ultra", 0.01], ["super", 0.04], ["rare", 0.25], ["common", 0.7]];
@@ -681,6 +683,8 @@ export class Accounts {
   perksOf(name) { return HACK_ACCOUNTS[name] ? HACK_ACCOUNTS[name].slice() : []; }
   async internal(op, b) {
     if (op === "gate") {
+      // REOPEN (a deploy setting): turns the admin's kill switch off once for each new value, so a deploy can reopen the game
+      if (this.env && this.env.REOPEN && this.setting("reopened") !== String(this.env.REOPEN)) { this.setSetting("kill", "0"); this.setSetting("reopened", String(this.env.REOPEN)); }
       let salt = this.setting("ipsalt"); if (!salt) { salt = hex(crypto.getRandomValues(new Uint8Array(16))); this.setSetting("ipsalt", salt); }
       const ipKey = hex(await crypto.subtle.digest("SHA-256", enc.encode(salt + String(b.ip || "")))).slice(0, 32);   // addresses are kept only as a salted hash
       const killed = this.setting("kill") === "1";

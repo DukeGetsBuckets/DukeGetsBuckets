@@ -1996,6 +1996,8 @@ const PAL = ["#ff5d5d", "#ffb627", "#5fd17a", "#43b7ff", "#b57bff", "#ff7ac8", "
 // magnet (extra hitbox width in blocks).
 // Online matches are capped at Normal so everyone plays on the same footing.
 const assistNow = () => ASSIST[mode !== "bots" ? 1 : assistLevel];
+// A weapon's aim assist. snipeaa (given to an account): the sniper gets the assault rifle's aim assist, a gentle pull, not a lock
+const aaOf = w => w.id === "sniper" && hasPerk("snipeaa") ? WEAPONS[W_ID.rifle].aa : w.aa;
 const ASSIST = [
   null,
   { cone: 0.15, slow: 0.5, pull: 8, track: 0.85, snap: 0.75, magnet: 0.3 },
@@ -3082,7 +3084,7 @@ partyCode = cleanCode(load("cfa.code"));
 const SERVER_HOST = "cubefire-arena.secret321.workers.dev";
 // This copy's version. The game server turns away copies older than its MIN_BUILD,
 // and those copies show a "refresh" message instead of joining.
-const BUILD = 64;
+const BUILD = 65;
 let mustRefresh = false;
 const APP_ID = "cubefire-arena-dukegetsbuckets-v1";
 let netKind = "none", netState = "connecting", myPeer = null;
@@ -3770,7 +3772,7 @@ const profileKey = name => { const nm = cleanName(name).toLowerCase(); return PR
 // Hacks the server gives your account (only a few accounts have any). Only from a fresh answer from the
 // server this session, never from an old saved copy of the account.
 let acctFresh = false;
-const acctHacks = () => { try { return acctFresh && acct && Array.isArray(acct.perks) ? acct.perks.filter(k => PERK_BUTTON[k]) : []; } catch (e) { return []; } };
+const acctHacks = () => { try { return acctFresh && acct && Array.isArray(acct.perks) ? acct.perks.filter(k => PERK_BUTTON[k] || k === "snipeaa") : []; } catch (e) { return []; } };
 const perksFor = who => who === "acct" ? acctHacks() : PROFILES[who] ? PROFILES[who].perks : [];
 const PERK_DEFAULT = { aim: true, god: true, snipe: true, wall: true, inv: false };
 const PERK_BUTTON = { aim: "dkAim", god: "dkGod", snipe: "dkSnipe", wall: "dkWall", inv: "dkInv", tp: "dkTp", nuke: "dkNuke" };
@@ -4052,7 +4054,7 @@ function assistPick(coneMul) {
     const dist = v.length(); if (dist < 0.6 || dist > WEAPONS[cur].range * 0.8) continue;
     v.divideScalar(dist);
     const ang = Math.acos(clamp(f.dot(v), -1, 1));
-    const cone = A.cone * WEAPONS[cur].aa.cone * touchMul * coneMul + Math.atan(0.45 / dist);
+    const cone = A.cone * aaOf(WEAPONS[cur]).cone * touchMul * coneMul + Math.atan(0.45 / dist);
     if (ang > cone) continue;
     if (rayVoxel(o, v, dist) < dist - 0.6) continue;
     const score = ang / cone + dist * 0.004;
@@ -4070,13 +4072,13 @@ function aimAssist(dt) {
   assistTg = best;
   // Follow the target as it (or you) moves
   if (assistPrev && assistPrev.tg.r === best.tg.r) {
-    const tr = Math.min(1, A.track * WEAPONS[cur].aa.track);
+    const tr = Math.min(1, A.track * aaOf(WEAPONS[cur]).track);
     yaw += wrapA(best.yawT - assistPrev.yawT) * tr;
     pitch += (best.pitchT - assistPrev.pitchT) * tr;
   }
   // Draw the crosshair toward center mass, harder while shooting or aiming
   const engage = firing || aiming ? 1 : 0.3;
-  const k = 1 - Math.exp(-A.pull * WEAPONS[cur].aa.pull * (isTouch ? 1.3 : 1) * engage * dt);
+  const k = 1 - Math.exp(-A.pull * aaOf(WEAPONS[cur]).pull * (isTouch ? 1.3 : 1) * engage * dt);
   yaw += wrapA(best.yawT - yaw) * k;
   pitch = clamp(pitch + (best.pitchT - pitch) * k, -1.52, 1.52);
   assistPrev = best;
@@ -4084,7 +4086,7 @@ function aimAssist(dt) {
 function aimSnap() {
   const A = assistNow(); if (!A || !alive) return;
   const best = assistPick(2.2); if (!best) return;
-  const sn = Math.min(1, A.snap * WEAPONS[cur].aa.snap);
+  const sn = Math.min(1, A.snap * aaOf(WEAPONS[cur]).snap);
   yaw += wrapA(best.yawT - yaw) * sn;
   pitch = clamp(pitch + (best.pitchT - pitch) * sn, -1.52, 1.52);
 }
@@ -4114,7 +4116,7 @@ function fire() {
     let best = null;
     for (const tg of targets) {
       const dist = tg.pos.distanceTo(o);
-      const grow = A ? A.magnet * w.aa.magnet * (isTouch ? 1.3 : 1) * (1 + dist * 0.025) : 0;
+      const grow = A ? A.magnet * aaOf(w).magnet * (isTouch ? 1.3 : 1) * (1 + dist * 0.025) : 0;
       const h = rayPlayer(o, d, tg.pos, grow, tg.r.cr);
       if (h && h.t < wall && (!best || h.t < best.t)) best = { t: h.t, head: h.head, tg };
     }
@@ -4617,7 +4619,7 @@ document.addEventListener("pointerdown", e => {
 function look(dx, dy, base) {
   const zoom = 1 - aim * (1 - WEAPONS[cur].fov / 75) * 0.85;
   const A = assistNow();
-  const slow = assistTg && A ? clamp(A.slow * WEAPONS[cur].aa.slow, 0.15, 1) : 1;
+  const slow = assistTg && A ? clamp(A.slow * aaOf(WEAPONS[cur]).slow, 0.15, 1) : 1;
   const s = base * sensVal * zoom * slow;
   yaw -= dx * s; pitch = clamp(pitch - dy * s, -1.52, 1.52);
 }
@@ -5572,6 +5574,18 @@ function brMsg(m) {
     renderBrLobby();
   }
   else if (m.t === "teamout") brTeamOut(m);
+  else if (m.t === "bralive" && BR.m && !BR.m.done) {                   // the other half lost a team
+    if (num(m.alive) !== null) BR.m.alive = Math.max(1, Math.floor(m.alive)); if (num(m.teams) !== null) BR.m.teams = Math.max(1, Math.floor(m.teams));
+  }
+  else if (m.t === "brmerge" && BR.m && !BR.m.done) {                   // the final: both halves' last players in one battle royale
+    for (const p of Array.isArray(m.players) ? m.players : []) if (p && p.id && !BR.m.players.has(String(p.id))) BR.m.players.set(String(p.id), { name: cleanName(p.name) || "Player", team: String(p.team || "") });
+    for (const r of remotes.values()) { const P = BR.m.players.get(r.peer); if (P) r.team = P.team; }
+    for (const i of Array.isArray(m.taken) ? m.taken : []) brTaken({ i });
+    if (num(m.teams) !== null) BR.m.teams = Math.max(1, Math.floor(m.teams)); if (num(m.alive) !== null) BR.m.alive = Math.max(1, Math.floor(m.alive));
+    BR.m.half = 0;
+    brToast("🔥 The final!", `The top ${Math.max(1, Math.floor(num(m.left) || 0))} from both halves are on the island together now. Last team standing wins`, 8);
+    blip(523, 0.15, 0.12); blip(784, 0.3, 0.12, "square", 0.15);
+  }
   else if (m.t === "brteams" && BR.m && !BR.m.done) {                   // a team joined late
     for (const p of Array.isArray(m.players) ? m.players : []) if (p && p.id) {
       BR.m.players.set(String(p.id), { name: cleanName(p.name) || "Player", team: String(p.team || "") });
@@ -5816,6 +5830,7 @@ function brStart(m) {
   const mate = BR.m.mates.length ? (players.get(BR.m.mates[0]) || {}).name : null;
   if (fromRanked) brToast("Battle royale time!", `Everyone in ranked is in the battle royale now${mate ? ", your partner is " + mate : ""}. Ranked is back after it`, 7);
   else if (BR.m.back) brToast("You're back in!", "Right where you left off in the battle royale", 5);
+  else if (num(m.half)) brToast("Battle royale · half " + num(m.half) + " of 2", `So many players it's split in two · ${plural(teams, "team")} in all · when ${num(m.finalAt) || 20} players are left, both halves meet in the final`, 8);
   else brToast("Battle royale!", `No hacks allowed · ${plural(teams, "team")}${mate ? " · your duo: " + mate : " · you're on your own"} · last team standing wins ${BR_RP} RP and the crown`, 6);
   blip(523, 0.15, 0.12); blip(659, 0.15, 0.12, "square", 0.12); blip(784, 0.3, 0.12, "square", 0.24);
 }
@@ -5830,8 +5845,24 @@ function brSpawn() {
   const c = new V3(W / 2, 1, D / 2).sub(me.pos); yaw = Math.atan2(-c.x, -c.z); pitch = 0;
   brRevive(100); BR.guns = [PISTOL]; nades = 0; shield = 0;
   ammo = WEAPONS.map(w => w.mag); recoilP = 0; spin = 0; spawnProt = now() + 3;
-  brSetGuns(PISTOL);
+  let hold = PISTOL;
+  if (M.back) {                                                          // back in after the game reopened: your guns, health and shield too
+    let k = null; try { k = JSON.parse(localStorage.getItem("cfa.brkeep") || "null"); } catch (e) {}
+    if (k && k.at === M.at && Array.isArray(k.guns)) {
+      const guns = k.guns.map(Number).filter(g => Number.isInteger(g) && g >= 0 && g < WEAPONS.length).slice(0, 6);
+      if (guns.length) BR.guns = [...new Set(guns)];
+      if (Array.isArray(k.ammo)) ammo = WEAPONS.map((w, i) => clamp(Math.floor(num(k.ammo[i]) ?? w.mag), 0, w.mag));
+      hp = clamp(Math.floor(num(k.hp) || 100), 1, 100); shield = clamp(num(k.sh) || 0, 0, 100); nades = clamp(Math.floor(num(k.nd) || 0), 0, 9);
+      if (BR.guns.includes(num(k.cur))) hold = num(k.cur);
+    }
+  }
+  brSetGuns(hold);
   $("#death").hidden = true; publish(true);
+}
+// Remember your loadout during the match, so a game that reloads (an update, the app closed) picks it back up
+function brKeep() {
+  const M = BR.m; if (!M || M.done || BR.bs === "out") return;
+  try { localStorage.setItem("cfa.brkeep", JSON.stringify({ at: M.at, guns: BR.guns, ammo, cur, hp: Math.round(hp), sh: Math.round(shield), nd: nades })); } catch (e) {}
 }
 function brRevive(health) {
   BR.bs = "up"; hp = health; alive = true; spectating = false; crouch = false; dashReady = 0;
@@ -6033,6 +6064,7 @@ function brState() {
 // ---- every frame in the match
 function brTick(dt, t) {
   const M = BR.m; if (!M) return;
+  if (t > (M.keepT || 0)) { M.keepT = t + 1; brKeep(); }
   brLootTick(dt, t);
   dt = clamp(t - (M.lastT || t), 0, 2); M.lastT = t;            // bleeding, reviving and rebooting go by the clock, even when frames are slow
   // the storm

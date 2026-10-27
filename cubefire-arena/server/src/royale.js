@@ -30,6 +30,7 @@ const GONE_MS = 2 * MIN, MATCH_MAX = 25 * MIN;  // a player gone (or frozen) thi
 const AWAY_MS = 20000, STORM_AWAY_MS = 20000;   // a player we haven't heard from in 20 s who is left out in the storm for 20 s is out
 const LATE_MS = 100000;                          // a battle royale this new still takes players who queue (before the storm forms)
 const SEEN_MS = 60000;
+const SPLIT_AT = 80, FINAL_AT = 20;             // more than 80 players: two halves; when 20 are left between them, they meet in one final
 const DROP_MS = 30000;                           // a connection we haven't heard from in 30 s is dead (games ping every few seconds): it's closed
 const SILENT_MS = 2 * MIN;                         // in a match, a game that sends nothing this long is out (a game that's playing sends many times a second)                           // a queued game heard from this recently is put in at the start
 const MAP = 448;                               // the royale map is MAP x MAP blocks
@@ -78,6 +79,7 @@ export class Royale {
     this.matches = new Map();     // match id -> the match (only one runs at a time)
     this.afterMatch = false;      // a start came while a match was still going: the next one starts a minute after it ends
     this.savedAt = 0;
+    this.splitAt = Number(env && env.BR_SPLIT) || SPLIT_AT; this.finalAt = Number(env && env.BR_FINAL) || FINAL_AT;   // (smaller for local tests)
     this.start = 0;               // the next battle royale's start time
     this.cancelledAt = 0;         // start time of the last one cancelled for too few teams
     this.infoT = null;
@@ -92,8 +94,9 @@ export class Royale {
       if (this.start && (this.start % this.cfg.every !== (this.cfg.offset || 0) % this.cfg.every || this.start - Date.now() > this.cfg.every) && !(await ctx.storage.get("custom"))) this.start = 0;
       this.afterMatch = !!(await ctx.storage.get("afterMatch"));
       // the match carries on after this object restarts (an update to the server): everyone has 2 minutes to reconnect
-      const sm = await ctx.storage.get("match"), now = Date.now();
-      if (sm && now < sm.deadline) {
+      const one = await ctx.storage.get("match"), list = (await ctx.storage.get("matches")) || (one ? [one] : []), now = Date.now();
+      for (const sm of list) {
+        if (!(now < sm.deadline)) continue;
         const m = { ...sm, last: new Map(sm.players.filter(([, P]) => P.p).map(([id, P]) => [id, { p: P.p }])), teams: new Map(sm.teams), players: new Map(sm.players), taken: new Set(sm.taken) };
         for (const P of m.players.values()) { P.gone = now; P.lastAt = now; P.n = 0; P.stormAt = 0; }
         this.matches.set(m.id, m);
@@ -112,12 +115,41 @@ export class Royale {
     }
   }
   saveMatch(force) {
-    const m = [...this.matches.values()][0], now = Date.now();
-    if (!m) { this.ctx.storage.delete("match").catch(() => {}); return; }
+    const now = Date.now();
+    if (!this.matches.size) { this.ctx.storage.delete("matches").catch(() => {}); this.ctx.storage.delete("match").catch(() => {}); return; }
     if (!force && now - this.savedAt < 5000) return;
     this.savedAt = now;
-    const players = [...m.players].map(([id, P]) => [id, { team: P.team, bs: P.bs, name: P.name, acc: P.acc, gone: 0, n: 0, p: (m.last.get(id) || {}).p || null }]);
-    this.ctx.storage.put("match", { id: m.id, at: m.at, seed: m.seed, storm: m.storm, deadline: m.deadline, teams: [...m.teams], players, taken: [...m.taken] }).catch(() => {});
+    const list = [...this.matches.values()].map(m => ({ id: m.id, at: m.at, seed: m.seed, storm: m.storm, deadline: m.deadline, pair: m.pair || null, half: m.half || 0, teams: [...m.teams], taken: [...m.taken],
+      players: [...m.players].map(([id, P]) => [id, { team: P.team, bs: P.bs, name: P.name, acc: P.acc, gone: 0, n: 0, p: (m.last.get(id) || {}).p || null }]) }));
+    this.ctx.storage.put("matches", list).catch(() => {}); this.ctx.storage.delete("match").catch(() => {});
+  }
+  // A big battle royale runs as two halves on the same island (same storm, same loot): these count both
+  pairOf(m) { return m.pair ? this.matches.get(m.pair) || null : null; }
+  totals(m) {
+    const all = [m, this.pairOf(m)].filter(Boolean);
+    return { teams: all.reduce((s, x) => s + x.teams.size, 0), alive: all.reduce((s, x) => s + [...x.teams.values()].filter(T => !T.out).length, 0),
+      left: all.reduce((s, x) => s + [...x.players.values()].filter(P => P.bs !== "out").length, 0) };
+  }
+  // The final: once 20 players are left between the two halves (or one half is down to its last team),
+  // everyone still in goes into one match, right where they are
+  maybeMerge(m) {
+    const o = this.pairOf(m); if (!o) { m.pair = null; return false; }
+    const t = this.totals(m), aliveIn = x => [...x.teams.values()].filter(T => !T.out).length;
+    if (t.left > this.finalAt && aliveIn(m) > 1 && aliveIn(o) > 1) return false;
+    const A = (m.half || 0) <= (o.half || 0) ? m : o, B = A === m ? o : m;
+    for (const [tid, T] of B.teams) A.teams.set(tid, T);
+    for (const [id, P] of B.players) A.players.set(id, P);
+    for (const [id, d] of B.last) A.last.set(id, d);
+    for (const i of B.taken) A.taken.add(i);
+    A.pair = null; A.half = 0; A.final = true;
+    this.matches.delete(B.id);
+    for (const id of B.players.keys()) { const h = this.byId(id); if (h && h.a.inMatch === B.id) this.setAtt(h.ws, { ...this.att(h.ws), inMatch: A.id }); }
+    const n = this.totals(A);
+    const msg = JSON.stringify({ t: "brmerge", teams: n.teams, alive: n.alive, left: n.left, taken: [...A.taken], players: [...A.players].map(([pid, q]) => ({ id: pid, name: q.name, team: q.team })) });
+    for (const id of A.players.keys()) { const h = this.byId(id); if (h) this.send(h.ws, msg); }
+    this.saveMatch(true);
+    this.checkTeams(A);
+    return true;
   }
   att(ws) { let a = this.atts.get(ws); if (a === undefined) { a = ws.deserializeAttachment() || null; this.atts.set(ws, a); } return a; }
   setAtt(ws, a) { this.atts.set(ws, a); try { ws.serializeAttachment(a); } catch {} }
@@ -168,8 +200,9 @@ export class Royale {
   info() {
     const t = this.times(), q = this.queueCount();
     let live = 0; for (const m of this.matches.values()) live += m.players.size;
+    const events = new Set([...this.matches.values()].map(m => m.at)).size;           // two halves are one battle royale
     return { t: "brinfo", now: Date.now(), ...t, ph: this.phase(), teams: q.teams, players: q.players, minTeams: this.cfg.minTeams, maxPlayers: MAX_PLAYERS, test: this.cfg.test,
-      joinable: !!this.joinable(), closeAt: Number(this.env.CLOSE_AT) || 0, closedMsg: this.env.CLOSED_MSG || "", match: null, afterMatch: this.afterMatch && this.matches.size > 0, live: this.matches.size, livePlayers: live, cancelled: this.cancelledAt && this.cancelledAt === this.lastStart ? true : false };
+      joinable: !!this.joinable(), closeAt: Number(this.env.CLOSE_AT) || 0, closedMsg: this.env.CLOSED_MSG || "", match: null, afterMatch: this.afterMatch && this.matches.size > 0, live: events, livePlayers: live, cancelled: this.cancelledAt && this.cancelledAt === this.lastStart ? true : false };
   }
   broadcastInfo(now) {
     if (now) { clearTimeout(this.infoT); this.infoT = null; const out = JSON.stringify(this.info()); for (const h of this.hubs()) this.send(h.ws, out); return; }
@@ -197,7 +230,11 @@ export class Royale {
     if (openAt && now >= openAt && now - openAt < 3 * MIN && !this.env.CLOSED && (await this.ctx.storage.get("openPushed")) !== openAt) {
       await this.ctx.storage.put("openPushed", openAt);
       const until = Number(this.env.CLOSE_AT) ? " until " + new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(Number(this.env.CLOSE_AT))) : "";
-      accounts(this.env).fetch("https://internal/internal/pushall", { method: "POST", body: JSON.stringify({ title: "🔥 Cubefire Arena is OPEN!", body: `Play now${until}! Tap to jump in.`, url: "/", tag: "cfa-br", offset: 0 }) }).catch(() => {});
+      let offset = 0;                                        // everyone, a page of subscribers at a time
+      for (let i = 0; i < 30 && offset != null; i++) {
+        try { offset = (await (await accounts(this.env).fetch("https://internal/internal/pushall", { method: "POST", body: JSON.stringify({ title: String(this.env.OPEN_TITLE || "🔥 Cubefire Arena is OPEN!"), body: String(this.env.OPEN_BODY || `Play now${until}! Tap to jump in.`), url: "/", tag: "cfa-br", offset }) })).json()).next; }
+        catch { break; }
+      }
     }
     if (!this.hacksGoneAsked) {                              // once: tell everyone with notifications on that hacks are gone for good
       this.hacksGoneAsked = true;
@@ -284,7 +321,7 @@ export class Royale {
     this.departed.delete(id); this.ctx.storage.delete("dep:" + id).catch(() => {});
     for (const ws of this.ctx.getWebSockets()) {             // the same game reconnecting takes over its old place
       const o = this.att(ws);
-      if (o && o.id === id && !o.replaced) { carry = { party: o.party, queued: o.queued, inMatch: o.inMatch, team: o.team, acc: o.acc, disp: o.disp, name: o.name, skin: o.skin, color: o.color }; this.setAtt(ws, { ...o, replaced: true }); try { ws.close(4005, "Reconnected"); } catch {} }
+      if (o && o.id === id && !o.replaced) { carry = { party: o.party, queued: o.queued, inMatch: o.inMatch, team: o.team, acc: o.acc, disp: o.disp, name: o.name, skin: o.skin, color: o.color, perks: o.perks, perksKnown: o.perksKnown, bw: o.bw }; this.setAtt(ws, { ...o, replaced: true }); try { ws.close(4005, "Reconnected"); } catch {} }
     }
     if (!this.matchOf(carry)) for (const m of this.matches.values()) if (m.players.has(id)) { carry.inMatch = m.id; carry.team = m.players.get(id).team; carry.queued = false; }   // you're still in the battle royale
     this.ctx.acceptWebSocket(server);
@@ -309,7 +346,7 @@ export class Royale {
     if (this.wsById.get(a.id) === ws) this.wsById.delete(a.id);
     // a dropped connection (an iPad going to sleep, a Wi-Fi blip) keeps your duo and your place in the
     // queue: the game reconnects with the same id and picks them back up
-    const keep = { party: a.party, queued: a.queued, inMatch: a.inMatch, team: a.team, acc: a.acc, disp: a.disp, name: a.name, skin: a.skin, color: a.color, perks: a.perks, bw: a.bw, at: Date.now() };
+    const keep = { party: a.party, queued: a.queued, inMatch: a.inMatch, team: a.team, acc: a.acc, disp: a.disp, name: a.name, skin: a.skin, color: a.color, perks: a.perks, perksKnown: a.perksKnown, bw: a.bw, at: Date.now() };
     this.departed.set(a.id, keep); this.ctx.storage.put("dep:" + a.id, keep).catch(() => {});
     for (const [k, v] of this.departed) if (Date.now() - v.at > 10 * MIN) { this.departed.delete(k); this.ctx.storage.delete("dep:" + k).catch(() => {}); }
     if (a.party) this.sendParty(a.party);
@@ -330,12 +367,12 @@ export class Royale {
       if (typeof d.token === "string" && d.token) {
         accounts(this.env).fetch("https://internal/internal/who", { method: "POST", body: JSON.stringify({ token: d.token }) }).then(r => r.json()).then(r => {
           const cur = this.att(ws); if (!cur || cur.gone) return;
-          this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [], bw: Math.max(0, Math.floor(Number(r.bw) || 0)), acc: r.acc || null, disp: r.display && !badName(r.display) ? r.display : r.display ? "Player" : null });
+          this.setAtt(ws, { ...cur, perks: Array.isArray(r.perks) ? r.perks : [], perksKnown: true, bw: Math.max(0, Math.floor(Number(r.bw) || 0)), acc: r.acc || null, disp: r.display && !badName(r.display) ? r.display : r.display ? "Player" : null });
           this.send(ws, { t: "you", acc: r.acc || null });
           if (cur.party) this.sendParty(cur.party);
           if (r.acc) this.deliverInvites(ws, r.acc);
         }).catch(() => {});
-      } else if (a.acc) this.setAtt(ws, { ...a, acc: null, disp: null });
+      } else this.setAtt(ws, { ...a, acc: null, disp: null, perks: [], perksKnown: true });   // not signed in: no hacks
       if (a.party) this.sendParty(a.party);
       return;
     }
@@ -470,7 +507,9 @@ export class Royale {
   // The newest battle royale, if it's young enough to still take players
   joinable() {
     const now = Date.now(); let best = null;
-    for (const m of this.matches.values()) if (now - m.at < LATE_MS && m.players.size < MAX_PLAYERS && (!best || m.at > best.at)) best = m;
+    let total = 0; for (const m of this.matches.values()) total += m.players.size;
+    if (total >= MAX_PLAYERS) return null;
+    for (const m of this.matches.values()) if (now - m.at < LATE_MS && (!best || m.at > best.at || (m.at === best.at && m.players.size < best.players.size))) best = m;   // the newest, and its smaller half
     return best;
   }
   // Your duo got in without you (your iPad was asleep at the start): join them, on their team
@@ -482,16 +521,17 @@ export class Royale {
     m.players.set(a.id, { team: mate.a.team, bs: "up", gone: 0, n: 0, name: a.disp || a.name || "Player", acc: a.acc || null });
     this.setAtt(ws, { ...this.att(ws), inMatch: m.id, team: mate.a.team, queued: false }); this.saveMatch(true);
     this.send(ws, this.startMsg(m, a.id));
-    const news = JSON.stringify({ t: "brteams", teams: m.teams.size, alive: [...m.teams.values()].filter(x => !x.out).length, players: [{ id: a.id, name: m.players.get(a.id).name, team: mate.a.team }] });
+    const news = JSON.stringify({ t: "brteams", teams: this.totals(m).teams, alive: this.totals(m).alive, players: [{ id: a.id, name: m.players.get(a.id).name, team: mate.a.team }] });
     for (const id of m.players.keys()) if (id !== a.id) { const h = this.byId(id); if (h) this.send(h.ws, news); }
     return true;
   }
   // Put a duo (or a solo player) into a battle royale that's already started, on a free spawn slot
   joinRunning(group) {
-    const m = this.joinable(); if (!m || m.players.size + Math.min(2, group.length) > MAX_PLAYERS) return false;
+    const m = this.joinable(); let total = 0; for (const x of this.matches.values()) total += x.players.size;
+    if (!m || total + Math.min(2, group.length) > MAX_PLAYERS) return false;
     const used = new Set([...m.teams.values()].map(T => T.slot)), slot = [...Array(SLOTS).keys()].find(i => !used.has(i));
     if (slot == null) return false;
-    let n = m.teams.size + 1; while (m.teams.has("T" + n)) n++;
+    let n = m.teams.size + 1; while ([...this.matches.values()].some(x => x.teams.has("T" + n))) n++;   // team names are never shared between halves
     const tid = "T" + n, list = group.slice(0, 2);
     m.teams.set(tid, { ids: list.map(h => h.a.id), slot, out: false, place: 0 });
     for (const h of list) {
@@ -500,7 +540,7 @@ export class Royale {
     }
     this.saveMatch(true);
     for (const h of list) this.send(h.ws, this.startMsg(m, h.a.id));
-    const news = JSON.stringify({ t: "brteams", teams: m.teams.size, alive: [...m.teams.values()].filter(x => !x.out).length, players: list.map(h => ({ id: h.a.id, name: m.players.get(h.a.id).name, team: tid })) });
+    const news = JSON.stringify({ t: "brteams", teams: this.totals(m).teams, alive: this.totals(m).alive, players: list.map(h => ({ id: h.a.id, name: m.players.get(h.a.id).name, team: tid })) });
     for (const id of m.players.keys()) if (!list.some(h => h.a.id === id)) { const h = this.byId(id); if (h) this.send(h.ws, news); }   // everyone already in: a new team joined
     this.broadcastInfo(true);
     return true;
@@ -544,38 +584,44 @@ export class Royale {
       return;
     }
     for (const h of q) this.setAtt(h.ws, { ...this.att(h.ws), queued: false });
-    const playing = [], full = []; let count = 0;                        // up to 50 players (and as many teams as there are spawn slots)
-    for (const t of teams) { if (count + t.length <= MAX_PLAYERS && playing.length < SLOTS) { playing.push(t); count += t.length; } else full.push(t); }
+    const playing = [], full = []; let count = 0;                        // up to 150 players (and as many teams as the spawn slots hold)
+    for (const t of teams) { if (count + t.length <= MAX_PLAYERS && playing.length < SLOTS * (count + t.length > this.splitAt ? 2 : 1)) { playing.push(t); count += t.length; } else full.push(t); }
     for (const t of full) for (const h of t) this.send(h.ws, { t: "queue", on: false, msg: `The battle royale is full (${MAX_PLAYERS} players). Try the next one!` });
     const seed = Math.floor(r() * 2147483646) + 1, slots = Array.from({ length: SLOTS }, (_, i) => i);
     for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
-    const m = { id: "M" + now, last: new Map(), at: now, seed, storm: stormPlan(seed, this.cfg.test), teams: new Map(), players: new Map(), taken: new Set(), deadline: now + MATCH_MAX };
+    // more than 80 players: two halves on the same island (same storm and loot), teams split between them
+    const halves = count > this.splitAt ? 2 : 1, storm = stormPlan(seed, this.cfg.test), ms = [];
+    for (let k = 0; k < halves; k++) ms.push({ id: "M" + now + (halves > 1 ? "-" + (k + 1) : ""), half: halves > 1 ? k + 1 : 0, last: new Map(), at: now, seed, storm, teams: new Map(), players: new Map(), taken: new Set(), deadline: now + MATCH_MAX });
+    if (halves > 1) { ms[0].pair = ms[1].id; ms[1].pair = ms[0].id; }
     playing.forEach((list, ti) => {
-      const tid = "T" + (ti + 1);
-      m.teams.set(tid, { ids: list.map(h => h.a.id), slot: slots[ti], out: false, place: 0 });
+      const tid = "T" + (ti + 1), m = ms[ti % halves];
+      m.teams.set(tid, { ids: list.map(h => h.a.id), slot: slots[Math.floor(ti / halves)], out: false, place: 0 });
       for (const h of list) {
         m.players.set(h.a.id, { team: tid, bs: "up", gone: 0, n: 0, name: h.a.disp || h.a.name || "Player", acc: h.a.acc || null });
         this.setAtt(h.ws, { ...this.att(h.ws), inMatch: m.id, team: tid, queued: false });
       }
     });
-    this.matches.set(m.id, m); this.saveMatch(true);
-    for (const id of m.players.keys()) { const h = this.byId(id); if (h) this.send(h.ws, this.startMsg(m, id)); }
+    for (const m of ms) this.matches.set(m.id, m);
+    this.saveMatch(true);
+    for (const m of ms) for (const id of m.players.keys()) { const h = this.byId(id); if (h) this.send(h.ws, this.startMsg(m, id)); }
     this.start = this.nextSlot(now + 30000); this.ctx.storage.put("start", this.start).catch(() => {}); this.ctx.storage.put("custom", false).catch(() => {});
     this.broadcastInfo(true);
   }
   startMsg(m, id) {
     const P = m.players.get(id), T = m.teams.get(P.team);
     return { t: "brstart", now: Date.now(), at: m.at, seed: m.seed, storm: m.storm, team: P.team, slot: T.slot, bs: P.bs, pos: (m.last.get(id) || {}).p || null, mates: T.ids.filter(x => x !== id),
-      players: [...m.players].map(([pid, q]) => ({ id: pid, name: q.name, team: q.team })), teams: m.teams.size, alive: [...m.teams.values()].filter(x => !x.out).length, taken: [...m.taken] };
+      players: [...m.players].map(([pid, q]) => ({ id: pid, name: q.name, team: q.team })), teams: this.totals(m).teams, alive: this.totals(m).alive, half: m.half || 0, finalAt: this.finalAt, taken: [...m.taken] };
   }
 
   // ---- during the match
   relay(m, ws, a, d) {
     const P = m.players.get(a.id); if (!P) return;
     // hacks are gone: a game still sending them is an old or changed copy, so it has to update
+    // (right after connecting, before we've looked up the account's hacks, they're just ignored: no kick)
     if (!(a.perks || []).length && (d.iv === 1 || d.nk || d.hx === 1 || (Array.isArray(d.hits) && d.hits.some(h => h && h.nk)))) {
-      this.send(ws, { t: "update" }); try { ws.close(4001, "Update your game"); } catch {}
-      return;
+      if (!a.perksKnown) {
+      delete d.iv; delete d.nk; d.hx = 0; if (Array.isArray(d.hits)) d.hits = d.hits.filter(h => h && !h.nk);
+      } else { this.send(ws, { t: "update" }); try { ws.close(4001, "Update your game"); } catch {} return; }
     }
     if (typeof d.n === "string" && badName(d.n)) d.n = "Player";
     d.bw = a.bw || 0;                                         // battle royale wins: from their account, not their game
@@ -630,10 +676,13 @@ export class Royale {
     for (const [tid, T] of m.teams) {
       if (T.out) continue;
       if (!T.ids.some(id => m.players.get(id).bs === "up")) {
-        T.out = true; T.place = [...m.teams.values()].filter(x => !x.out).length + 1;
+        T.out = true; T.place = this.totals(m).alive + 1;                // place among both halves
         tell({ t: "teamout", team: tid, place: T.place, alive: T.place - 1 });
       }
     }
+    const o = this.pairOf(m);
+    if (o) { const n = this.totals(m), out = JSON.stringify({ t: "bralive", alive: n.alive, teams: n.teams }); for (const id of o.players.keys()) { const h = this.byId(id); if (h) this.send(h.ws, out); } }   // the other half's count
+    if (this.maybeMerge(m)) return;
     const alive = [...m.teams].filter(([, T]) => !T.out);
     this.saveMatch(true);
     if (alive.length <= 1 && m.teams.size > 1) this.endMatch(m, alive.length ? alive[0][0] : null);
