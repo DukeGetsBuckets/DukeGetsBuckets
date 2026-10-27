@@ -787,9 +787,12 @@ export class Accounts {
     if (!this.sql.exec("SELECT 1 FROM admins WHERE token = ? AND exp > ?", String(b.admin || ""), Date.now()).toArray()[0]) throw new UserError("Please sign in again");
     const users = () => this.sql.exec("SELECT name, display, data, created FROM users").toArray().map(u => ({ ...u, d: this.data(u) }));
     if (op === "admin-overview") {
-      const days = []; for (let i = 13; i >= 0; i--) days.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
-      const rows = new Map(this.sql.exec("SELECT * FROM daily WHERE day >= ?", days[0]).toArray().map(r => [r.day, r]));
-      const uniq = new Map(this.sql.exec("SELECT day, COUNT(*) AS n FROM seen WHERE day >= ? GROUP BY day", days[0]).toArray().map(r => [r.day, r.n]));
+      // the 14 days ending on the day picked on the dashboard (today if none)
+      const end = /^\d{4}-\d{2}-\d{2}$/.test(String(b.day || "")) && b.day <= today() ? Date.parse(b.day + "T12:00:00Z") : Date.now();
+      const days = []; for (let i = 13; i >= 0; i--) days.push(new Date(end - i * 86400000).toISOString().slice(0, 10));
+      const first = (this.sql.exec("SELECT MIN(day) AS d FROM daily").toArray()[0] || {}).d || today();
+      const rows = new Map(this.sql.exec("SELECT * FROM daily WHERE day >= ? AND day <= ?", days[0], days[13]).toArray().map(r => [r.day, r]));
+      const uniq = new Map(this.sql.exec("SELECT day, COUNT(*) AS n FROM seen WHERE day >= ? AND day <= ? GROUP BY day", days[0], days[13]).toArray().map(r => [r.day, r.n]));
       const all = users(), tiers = RANK_TIERS.map(([name, min]) => ({ name, min, n: 0 })), skinCount = {};
       for (const u of all) {
         const rk = u.d.rank || 0; let t = 0; RANK_TIERS.forEach(([, min], i) => { if (rk >= min) t = i; }); tiers[t].n++;
@@ -797,7 +800,7 @@ export class Accounts {
       }
       const count = sql => this.sql.exec(sql).toArray()[0].n;
       return {
-        days: days.map(day => ({ day, unique: uniq.get(day) || 0, ...Object.fromEntries(DAILY_FIELDS.map(f => [f, (rows.get(day) || {})[f] || 0])) })),
+        days: days.map(day => ({ day, unique: uniq.get(day) || 0, ...Object.fromEntries(DAILY_FIELDS.map(f => [f, (rows.get(day) || {})[f] || 0])) })), first, today: today(),
         totals: { accounts: all.length, premium: count("SELECT COUNT(*) AS n FROM push"), bans: count("SELECT COUNT(*) AS n FROM bans"), hacked: count("SELECT COUNT(*) AS n FROM perks") },
         ranks: tiers, skins: Object.entries(skinCount).sort((x, y) => y[1] - x[1]).slice(0, 10), ultra: all.filter(u => (u.d.owned || []).some(k => SKINS.ultra.includes(k))).length,
         online: await this.online(), kill: this.setting("kill") === "1", killmsg: this.setting("killmsg") || "",

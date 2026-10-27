@@ -39,6 +39,9 @@ h2{font-size:15px;margin:0;letter-spacing:.06em;text-transform:uppercase;color:v
 .kill.on{border-color:var(--hot);background:rgba(255,79,94,.12)}
 .kill b{font-size:13px;letter-spacing:.06em;text-transform:uppercase}
 .kill.on b{color:var(--hot)}
+.daybar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px}
+.daybar label{display:flex;align-items:center;gap:8px;font-weight:600}
+.daybar input{font:inherit;padding:6px 8px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px}
 .tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
 .tile span{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
@@ -103,6 +106,12 @@ tr:hover td{background:rgba(243,239,228,.03)}
     <button type="button" id="logout">Sign out</button>
   </div>
 
+  <div class="daybar">
+    <label>Stats for <input type="date" id="statDay"></label>
+    <button type="button" id="dayPrev" aria-label="Day before">‹</button>
+    <button type="button" id="dayNext" aria-label="Day after">›</button>
+    <button type="button" id="dayToday">Today</button>
+  </div>
   <div class="tiles" id="tiles"></div>
 
   <section class="card">
@@ -183,7 +192,15 @@ $("#logout").addEventListener("click", signOut);
 let timer = null;
 function start() { $("#login").hidden = true; $("#app").hidden = false; load(); clearInterval(timer); timer = setInterval(() => { if (!document.hidden) loadOverview(); }, 15000); }
 async function load() { await Promise.all([loadOverview(), loadUsers()]); }
-async function loadOverview() { try { data = await api("admin-overview"); renderOverview(); } catch (e) { if (token) toast(e.message); } }
+// Stats for any day: pick it in the date box (or step a day at a time); empty means today
+let statDay = "";
+async function loadOverview() { try { data = await api("admin-overview", statDay ? { day: statDay } : {}); renderOverview(); } catch (e) { if (token) toast(e.message); } }
+function pickDay(d) { statDay = d && data && d >= data.today ? "" : d || ""; loadOverview(); }
+const shiftDay = (d, n) => new Date(Date.parse(d + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
+$("#statDay").addEventListener("change", e => pickDay(e.target.value));
+$("#dayPrev").addEventListener("click", () => data && pickDay(shiftDay(statDay || data.today, -1)));
+$("#dayNext").addEventListener("click", () => data && statDay && pickDay(shiftDay(statDay, 1)));
+$("#dayToday").addEventListener("click", () => pickDay(""));
 async function loadUsers() { try { users = (await api("admin-users")).users; renderUsers(); } catch (e) { if (token) toast(e.message); } }
 $("#refresh").addEventListener("click", load);
 
@@ -191,15 +208,18 @@ $("#refresh").addEventListener("click", load);
 function renderOverview() {
   $("#updated").textContent = "Updated " + new Date().toLocaleTimeString();
   const d = data.days, t = d[d.length - 1], playing = data.online.filter(p => p.pl);
+  const isToday = t.day === data.today, on = isToday ? "today" : "on " + day(t.day), before = isToday ? " yesterday" : " the day before";
+  const box = $("#statDay"); box.max = data.today; box.min = data.first; if (document.activeElement !== box) box.value = t.day;
+  $("#dayNext").disabled = isToday; $("#dayToday").disabled = isToday;
   const tiles = [
     ["Online now", data.online.length, playing.length + " in a match"],
-    ["Players today", t.unique, (d[d.length - 2] || {}).unique + " yesterday"],
-    ["Visits today", t.visits, "page opens"],
-    ["Rounds today", t.rounds, t.kills + " eliminations"],
-    ["Peak today", t.peak, "playing at once"],
-    ["Accounts", data.totals.accounts, t.signups + " new today"],
+    ["Players " + on, t.unique, (d[d.length - 2] || {}).unique + before],
+    ["Visits " + on, t.visits, "page opens"],
+    ["Rounds " + on, t.rounds, t.kills + " eliminations"],
+    ["Peak " + on, t.peak, "playing at once"],
+    ["Accounts", data.totals.accounts, t.signups + " new " + on],
     ["Premium", data.totals.premium, "notifications on"],
-    ["Spins today", t.spins, t.calls + " player calls"],
+    ["Spins " + on, t.spins, t.calls + " player calls"],
     ["Banned", data.totals.bans, data.totals.hacked + " with hacks"],
   ];
   $("#tiles").replaceChildren(...tiles.map(([k, v, s]) => el("div", { className: "tile" }, [el("span", { textContent: k }), el("b", { textContent: v }), el("small", { textContent: s })])));
