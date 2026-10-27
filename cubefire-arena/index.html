@@ -1640,7 +1640,7 @@ const MAPS = {
   castle: { name: "Castle", size: 120, build: buildCastle, sky: 0x9fc8ee, ground: 0x6f9f4a, outer: 0x5f8a40, fog: [80, 230] },
   snow: { name: "Snowbase", size: 104, build: buildSnow, sky: 0xcfe2f0, ground: 0xe8eef3, outer: 0xdfe8ef, fog: [60, 190] },
   jungle: { name: "Jungle", size: 120, build: buildJungle, sky: 0x9fd6c0, ground: 0x4f8a3a, outer: 0x3f7a2f, fog: [60, 180] },
-  royale: { name: "Royale Island", size: 448, build: buildRoyale, sky: 0x8fcdf5, ground: 0x6fa24c, outer: 0x3a7fc0, fog: [70, 175], royale: true },   // battle royale only
+  royale: { name: "Royale Island", size: 448, build: buildRoyale, sky: 0x8fcdf5, ground: 0x6fa24c, outer: 0x3a7fc0, fog: [90, 210], royale: true },   // battle royale only
 };
 let mapId = "arena";
 const spawns = [];
@@ -5538,7 +5538,8 @@ function brMsg(m) {
     BR.queued = !!m.on; if (m.msg) brToast(m.on ? "Queued" : "Battle royale", String(m.msg), 5);
     else if (m.on) banner("Queued for the battle royale!");
     renderBrLobby();
-  } else if (m.t === "br" && m.ph === "cancelled") { BR.queued = BR.queued && !!m.stay; if (BR.queued || state === "menu") brToast("Not enough teams yet", String(m.msg || "Not enough teams queued"), 7); renderBrLobby(); }
+  } else if (m.t === "br" && m.ph === "waiting") { brToast("Battle royale going", String(m.msg || "A battle royale is going right now. You're queued for the next one"), 7); renderBrLobby(); }
+  else if (m.t === "br" && m.ph === "cancelled") { BR.queued = BR.queued && !!m.stay; if (BR.queued || state === "menu") brToast("Not enough teams yet", String(m.msg || "Not enough teams queued"), 7); renderBrLobby(); }
   else if (m.t === "brstart") brStart(m);
   else if (m.t === "st" && m.id) { if (mode === "royale" && state === "play" && BR.m) onPeer({ peer: String(m.id), presence: m.d && typeof m.d === "object" ? m.d : {}, kind: "viewer", sameTab: false }); }
   else if (m.t === "sb" && Array.isArray(m.l)) { for (const x of m.l.slice(0, 400)) if (x && x.t === "st") brMsg(x); }   // a batch of player updates
@@ -5681,6 +5682,7 @@ function renderBrLobby() {
   if (P) {
     let top, time, sub, hot = false;
     if (P.ph === "match") { top = "Battle royale live"; time = P.I.match ? plural(P.I.match.alive, "team") + " left" : "Live"; sub = "Next one in " + mmss(Math.ceil(P.toStart)); }
+    else if (P.I.afterMatch) { top = "Battle royale live"; time = "LIVE"; sub = `Next one starts 1 minute after it ends · ${plural(P.I.teams, "team")} queued`; }   // only one runs at a time
     else if (P.ph === "queue" && P.I.joinable) { top = "Battle royale"; time = "LIVE"; sub = "It just started · tap Queue to jump in now"; hot = true; }
     else if (P.ph === "queue") { top = "Next battle royale in"; time = mmss(Math.ceil(P.toStart)); sub = `${plural(P.I.teams, "team")} queued · ${P.I.minTeams} needed` + (P.I.live ? ` · ${P.I.live} live now` : ""); hot = P.toStart < 60; }
     else { top = "Next battle royale in"; time = mmss(Math.ceil(P.toStart)); sub = "Queue opens in " + mmss(Math.ceil(P.toOpen)); }
@@ -5728,11 +5730,11 @@ function renderBrPlay() {
   const P = brPhase(), mate = brPartner();
   let b = "Queue", sub, off = false;
   if (!P) { sub = netKind === "ws" ? "Connecting to the battle royale…" : "The battle royale needs the game server"; off = true; }
-  else if (BR.queued) { b = "Cancel"; sub = "Queued · starts in " + mmss(Math.ceil(P.toStart)); }
+  else if (BR.queued) { b = "Cancel"; sub = "Queued · " + (P.I.afterMatch ? "starts 1 minute after the live one ends" : "starts in " + mmss(Math.ceil(P.toStart))); }
   else if (P.ph === "match") { sub = "Running now · next queue opens in " + mmss(Math.ceil(P.toOpen)); off = true; }
   else if (P.ph !== "queue") { sub = "Queue opens in " + mmss(Math.ceil(P.toOpen)); off = true; }
   else if (P.I.joinable) { b = "Jump in"; sub = "A battle royale just started · tap to jump in now!"; }
-  else sub = (mate ? "Duo with " + mate.name : "Solo · random partner") + " · starts in " + mmss(Math.ceil(P.toStart));
+  else sub = (mate ? "Duo with " + mate.name : "Solo · random partner") + (P.I.afterMatch ? " · next one starts 1 minute after the live one ends" : " · starts in " + mmss(Math.ceil(P.toStart)));
   bp.classList.toggle("on", BR.queued); bp.classList.toggle("off", off);
   bp.firstChild.textContent = b; $("#playSub").textContent = sub;
 }
@@ -5758,7 +5760,7 @@ let brSoonBeep = 0;
 function renderBrSoon() {
   const el = $("#brSoon"), P = brPhase();
   const ranked = state === "play" && mode === "online" && !partyCode;
-  const show = state === "play" && mode !== "royale" && P && P.ph === "queue" && (BR.queued || P.toStart <= (ranked ? 150 : 60));   // the last minutes, or when you're queued
+  const show = state === "play" && mode !== "royale" && P && P.ph === "queue" && !P.I.afterMatch && (BR.queued || P.toStart <= (ranked ? 150 : 60));   // the last minutes, or when you're queued
   el.hidden = !show; if (!show) return;
   el.textContent = ranked && !BR.queued ? "Battle royale in " + mmss(Math.ceil(P.toStart)) + " · everyone in ranked joins it" : BR.queued ? "Queued · battle royale in " + mmss(Math.ceil(P.toStart)) + " · you'll be pulled in" : "Battle royale in " + mmss(Math.ceil(P.toStart)) + " · queue in the lobby";
   const sec = Math.ceil(P.toStart);
@@ -5776,6 +5778,7 @@ function brStart(m) {
     if (num(m.alive) !== null && !BR.m.done) BR.m.alive = Math.max(1, Math.floor(m.alive));
     return;
   }
+  if (m.bs === "out") { renderBrLobby(); return; }                       // you're already out of that one (you left it)
   const fromRanked = state === "play" && mode === "online";
   if (state === "play") leaveMatch();
   const players = new Map();
@@ -5783,6 +5786,7 @@ function brStart(m) {
   const teams = Math.max(1, Math.floor(num(m.teams) || 1));
   BR.m = { at, seed: Math.floor(num(m.seed) || 1), storm: (Array.isArray(m.storm) ? m.storm : []).filter(p => p && num(p.t0) !== null && num(p.t1) !== null).slice(0, 12),
     team: String(m.team || ""), slot: Math.floor(num(m.slot) || 0), mates: (Array.isArray(m.mates) ? m.mates : []).map(String).slice(0, 1), players, teams, alive: num(m.alive) !== null ? Math.max(1, Math.floor(m.alive)) : teams,
+    back: Array.isArray(m.pos) && m.pos.length === 3 && m.pos.every(v => num(v) !== null) ? new V3(clamp(m.pos[0], 1, W - 2), clamp(m.pos[1], 1, H - 2), clamp(m.pos[2], 1, D - 2)) : null,   // back in after the game reopened: where you were
     loot: [], done: false, ended: false, place: 0, card: null, carry: new Set(), rb: null, rbSeq: 0, useT: 0, useC: null, revT: 0, revSeen: 0, revBy: "", dhp: 100, knocker: null, kb: null, stormT: 0, swapL: null, lootT: 0, mapT: 0 };
   // the match runs on the hub, so leave the ranked lobby until it's over
   if (sock) { sock.onclose = null; try { sock.close(); } catch (e) {} sock = null; }
@@ -5795,6 +5799,7 @@ function brStart(m) {
   $("#brMap").hidden = false; $("#shWrap").hidden = false;
   const mate = BR.m.mates.length ? (players.get(BR.m.mates[0]) || {}).name : null;
   if (fromRanked) brToast("Battle royale time!", `Everyone in ranked is in the battle royale now${mate ? ", your partner is " + mate : ""}. Ranked is back after it`, 7);
+  else if (BR.m.back) brToast("You're back in!", "Right where you left off in the battle royale", 5);
   else brToast("Battle royale!", `No hacks allowed · ${plural(teams, "team")}${mate ? " · your duo: " + mate : " · you're on your own"} · last team standing wins ${BR_RP} RP and the crown`, 6);
   blip(523, 0.15, 0.12); blip(659, 0.15, 0.12, "square", 0.12); blip(784, 0.3, 0.12, "square", 0.24);
 }
@@ -5805,7 +5810,7 @@ function brSpawn() {
   const base = brSlots.length ? brSlots[((M.slot % brSlots.length) + brSlots.length) % brSlots.length] : spawns[0];
   const order = [BR.id, ...M.mates].sort(), k = Math.max(0, order.indexOf(BR.id));
   const near = spawns.slice().sort((a, b) => a.distanceTo(base) - b.distanceTo(base));
-  me.pos.copy(near[Math.min(k, near.length - 1)] || base); me.vel.set(0, 0, 0);
+  me.pos.copy(M.back || near[Math.min(k, near.length - 1)] || base); me.vel.set(0, 0, 0);
   const c = new V3(W / 2, 1, D / 2).sub(me.pos); yaw = Math.atan2(-c.x, -c.z); pitch = 0;
   brRevive(100); BR.guns = [PISTOL]; nades = 0; shield = 0;
   ammo = WEAPONS.map(w => w.mag); recoilP = 0; spin = 0; spawnProt = now() + 3;
@@ -6227,7 +6232,7 @@ function brDecorate(r, t) {
     av.mark.scale.set(0.55, 0.55, 1); av.mark.renderOrder = 9; av.g.add(av.mark);
   }
   if (av.mark) { av.mark.visible = mate; av.mark.material.color.set(r.bs === "down" ? 0xff4f5e : 0xffffff); }
-  stackHead(av, TAG_Y + 0.38);
+  stackHead(av, TAG_Y + 0.38 + 0.7 * ((av.tagK || 1) - 1));
   animCrown(av, t); animPro(av, t); animStreak(av, t);
 }
 // Lay the head icons out upward from y (the top of the name tag), each with its own height
@@ -6628,8 +6633,12 @@ function tick() {
     r.pos.lerp(r.target, kk);
     r.av.g.position.copy(r.pos);
     // past the fog nobody can be seen, so don't draw or animate them (big battle royales)
-    if (r.pos.distanceToSquared(camera.position) > (scene.fog.far + 4) ** 2) { r.av.g.visible = false; continue; }
+    const d2 = r.pos.distanceToSquared(camera.position);
+    if (d2 > (scene.fog.far + 4) ** 2) { r.av.g.visible = false; continue; }
     setAvatarName(r.av, r.name, r.rk, proPlace(r.ac || r.name)); setAvatarGun(r.av, r.w);
+    // battle royale: names stay readable far away (they grow with distance, and the haze doesn't fade them); walls still hide them
+    r.av.tagK = mode === "royale" ? Math.max(1, Math.sqrt(d2) / 15) : 1;
+    if (r.av.tag) { const k = r.av.tagK; r.av.tag.scale.set(2.8 * k, 0.7 * k, 1); r.av.tag.position.y = TAG_Y + 0.35 * (k - 1); if (r.av.tag.material.fog !== (k === 1)) { r.av.tag.material.fog = k === 1; r.av.tag.material.needsUpdate = true; } }
     if (r.av.colorIdx !== r.color) { r.av.colorIdx = r.color; r.av.body.color.set(PAL[r.color]); }
     if (r.av.legs) animatePig(r.av, r.pos, dt);
     r.av.g.scale.y += ((r.bs === "down" ? 0.42 : r.cr ? 0.75 : 1) - r.av.g.scale.y) * kk;
