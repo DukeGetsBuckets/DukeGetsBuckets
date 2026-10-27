@@ -152,7 +152,13 @@ export class Royale {
     return true;
   }
   att(ws) { let a = this.atts.get(ws); if (a === undefined) { a = ws.deserializeAttachment() || null; this.atts.set(ws, a); } return a; }
-  setAtt(ws, a) { this.atts.set(ws, a); try { ws.serializeAttachment(a); } catch {} }
+  setAtt(ws, a) {
+    const old = this.atts.get(ws);
+    this.atts.set(ws, a); try { ws.serializeAttachment(a); } catch {}
+    if (a && a.id && (old ? old.party : undefined) !== a.party) {        // your duo is kept even through a server update
+      if (a.party) this.ctx.storage.put("pty:" + a.id, a.party).catch(() => {}); else this.ctx.storage.delete("pty:" + a.id).catch(() => {});
+    }
+  }
   hubs() { const out = []; for (const ws of this.ctx.getWebSockets()) { const a = this.att(ws); if (a && !a.replaced && !a.gone) out.push({ ws, a }); } return out; }
   byId(id) {
     let ws = this.wsById.get(id);
@@ -323,6 +329,7 @@ export class Royale {
       const o = this.att(ws);
       if (o && o.id === id && !o.replaced) { carry = { party: o.party, queued: o.queued, inMatch: o.inMatch, team: o.team, acc: o.acc, disp: o.disp, name: o.name, skin: o.skin, color: o.color, perks: o.perks, perksKnown: o.perksKnown, bw: o.bw }; this.setAtt(ws, { ...o, replaced: true }); try { ws.close(4005, "Reconnected"); } catch {} }
     }
+    if (!carry.party) { const p = await this.ctx.storage.get("pty:" + id).catch(() => null); if (p) carry.party = p; }   // your duo, saved
     if (!this.matchOf(carry)) for (const m of this.matches.values()) if (m.players.has(id)) { carry.inMatch = m.id; carry.team = m.players.get(id).team; carry.queued = false; }   // you're still in the battle royale
     this.ctx.acceptWebSocket(server);
     this.setAtt(server, { id, ...carry }); this.wsById.set(id, server);
@@ -331,7 +338,7 @@ export class Royale {
     if (cm) { const P = cm.players.get(id); if (P) { P.gone = 0; P.lastAt = Date.now(); } } else if (carry.inMatch) carry.inMatch = null;
     this.send(server, { t: "welcome", id });
     this.send(server, this.info());
-    if (carry.party) this.sendParty(carry.party);
+    if (carry.party) this.sendParty(carry.party); else this.send(server, { t: "party", id: null, members: [] });   // the game always shows the duo the server really has
     if (cm) this.send(server, this.startMsg(cm, id));
     this.schedule();
     return new Response(null, { status: 101, webSocket: client });
@@ -568,7 +575,7 @@ export class Royale {
     const teams = [];
     for (const list of parties.values()) {
       if (!list.some(fresh)) continue;                       // nobody on this duo is really here
-      if (list.length >= 2) teams.push(list.slice(0, 2)); else solos.push(...list);
+      teams.push(list.slice(0, 2));                          // a duo, or one of a duo: never given a random partner, so the other can join them late
     }
     const r = rng(now & 0x7fffffff);
     for (let i = solos.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [solos[i], solos[j]] = [solos[j], solos[i]]; }
