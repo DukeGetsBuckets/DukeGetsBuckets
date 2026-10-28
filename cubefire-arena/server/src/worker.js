@@ -627,8 +627,12 @@ async function vapidAuth(jwk, endpoint) {
   const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc.encode(head + "." + claims));
   return "vapid t=" + head + "." + claims + "." + b64u(sig) + ", k=" + vapidPublic(jwk);
 }
+// All notifications are switched off: nothing is sent (subscriptions are kept, so setting this
+// back to false turns them on again for everyone who had them)
+const PUSH_OFF = true;
 // Sends one message; resolves to the push service's HTTP status (0 if unreachable)
 async function sendPush(jwk, sub, message) {
+  if (PUSH_OFF) return 0;
   try {
     const res = await fetch(sub.endpoint, { method: "POST", body: await encryptPush(sub, JSON.stringify(message)),
       headers: { Authorization: await vapidAuth(jwk, sub.endpoint), TTL: "1800", Urgency: "high", "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream" } });
@@ -723,6 +727,7 @@ export class Accounts {
       this.setSetting("hacksGoneSent", "1"); return { go: true };   // the battle royale sends it, 40 at a time
     }
     if (op === "pushall") {                                   // battle royale reminders: everyone with notifications on, 40 at a time
+      if (PUSH_OFF) return { sent: 0, gone: 0, next: null };
       const jwk = this.vapid(), offset = Math.max(0, Math.floor(Number(b.offset) || 0)), skip = new Set((Array.isArray(b.skip) ? b.skip : []).map(String));
       const message = { title: cleanText(b.title, 60) ? String(b.title).slice(0, 60) : "Cubefire Arena", body: String(b.body || "").slice(0, 200), url: String(b.url || "/").slice(0, 60), tag: String(b.tag || "cfa-br").slice(0, 20) };
       const subs = this.sql.exec("SELECT * FROM push ORDER BY created LIMIT 40 OFFSET ?", offset).toArray();
