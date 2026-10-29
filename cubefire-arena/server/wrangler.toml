@@ -3,7 +3,8 @@
 name = "cubefire-arena"
 main = "src/worker.js"
 compatibility_date = "2025-09-01"
-workers_dev = true
+workers_dev = false   # no public address: the game is at cubefire.secret321.workers.dev (wrangler.site.toml); this worker keeps the data and the schedule
+preview_urls = false
 
 [assets]
 directory = "./public"
