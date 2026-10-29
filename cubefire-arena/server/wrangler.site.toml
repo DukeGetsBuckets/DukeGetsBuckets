@@ -1,0 +1,31 @@
+# Cubefire Arena's public address: https://cubefire.secret321.workers.dev
+# This worker serves the game page and the multiplayer connections. Everything it stores
+# (accounts, ranks, skins, lobbies, the battle royale) lives in the cubefire-arena worker's
+# Durable Objects (wrangler.toml), so nothing is lost and both workers share the same data.
+# The once-a-minute battle royale wake-up runs in cubefire-arena, not here.
+# Deploy with `npx wrangler deploy -c wrangler.site.toml` after running ../build.py
+# (deploy wrangler.toml first when the Durable Objects' code changed).
+name = "cubefire"
+main = "src/worker.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+preview_urls = false
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "Lobby"
+script_name = "cubefire-arena"
+
+[[durable_objects.bindings]]
+name = "ACCOUNTS"
+class_name = "Accounts"
+script_name = "cubefire-arena"
+
+[[durable_objects.bindings]]
+name = "ROYALE"
+class_name = "Royale"
+script_name = "cubefire-arena"

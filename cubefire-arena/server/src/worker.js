@@ -591,7 +591,7 @@ async function hashPw(password, salt) {
 //   POST /api/push-unsub {endpoint}   POST /api/push-call {endpoint, name, map, mapName, code}
 // A call only goes to the caller's friends (both signed in; the subscription remembers its account).
 // ======================================================================
-const PUSH_SUBJECT = "https://cubefire-arena.secret321.workers.dev";
+const PUSH_SUBJECT = "https://cubefire.secret321.workers.dev";
 // Only real push services, so the server can't be pointed at any other address
 const PUSH_HOSTS = /(^|\.)push\.apple\.com$|^fcm\.googleapis\.com$|(^|\.)push\.services\.mozilla\.com$|(^|\.)notify\.windows\.com$/;
 const CALL_EACH_MS = 2 * 60000;   // one call per player every 2 min
