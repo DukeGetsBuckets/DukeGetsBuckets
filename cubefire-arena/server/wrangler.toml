@@ -1,6 +1,6 @@
 # Cubefire Arena: game page + multiplayer relay on Cloudflare Workers.
 # Deploy with `npx wrangler deploy` after running ../build.py.
-name = "cubefire-arena"
+name = "cubefire"
 main = "src/worker.js"
 compatibility_date = "2025-09-01"
 workers_dev = true
