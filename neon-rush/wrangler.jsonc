@@ -1,0 +1,35 @@
+{
+  // NEON RUSH — Cloudflare Worker config.
+  // Serves the built game (static assets), the REST API (D1-backed), and
+  // real-time multiplayer rooms (Durable Objects + WebSockets).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "neon-rush",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/ws/*"]
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "RACE_ROOM", "class_name": "RaceRoom" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RaceRoom"] }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "neon-rush-db",
+      // Replace with the id printed by `wrangler d1 create neon-rush-db` before deploying.
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "vars": {
+    "APP_ENV": "production"
+  },
+  "observability": { "enabled": true }
+}
