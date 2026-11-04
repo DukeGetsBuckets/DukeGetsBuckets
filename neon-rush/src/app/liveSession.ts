@@ -112,7 +112,8 @@ export class LiveSession {
     if (this.loadedTrackId === room.trackId && g.trackDef?.id === room.trackId) return;
     this.set({ loadingTrack: true });
     const def = await this.resolveTrack(room.trackId, room.trackSource);
-    if (def && g.trackDef?.id !== def.id) { await g.loadTrack(def); useStore.getState().setTrack(def); }
+    if (def && g.trackDef?.id !== def.id) await g.loadTrack(def);
+    if (def) useStore.getState().setTrack(def);
     if (def) this.loadedTrackId = def.id;
     this.set({ loadingTrack: false });
   }
@@ -176,3 +177,4 @@ export class LiveSession {
 function ordinal(n: number) { const s = ['th', 'st', 'nd', 'rd']; const v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 
 export const liveSession = new LiveSession();
+(window as unknown as { __neonrushLive?: LiveSession }).__neonrushLive = liveSession;

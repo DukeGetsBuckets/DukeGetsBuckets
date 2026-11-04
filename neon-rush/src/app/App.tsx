@@ -149,7 +149,9 @@ export default function App() {
   }, [ready, name, pendingRoom, screen, mpJoin, setScreen]);
   useEffect(() => {
     if (live.phase === 'countdown' || live.phase === 'racing') { if (track) getAudio().startMusic('race', track.theme); }
-  }, [live.phase, track]);
+    // room went back to the lobby (rematch / auto-return): everyone follows
+    if (live.phase === 'lobby' && useStore.getState().screen === 'race') { setResult(null); setPaused(false); getAudio().startMusic('menu'); setScreen('multiplayer'); }
+  }, [live.phase, track, setScreen, setResult, setPaused]);
 
   const open = (s: Screen) => { getAudio().playSfx('click'); setScreen(s); };
   const ownership = { level: 1, coins: 0, unlocked: [] as string[], achievements: [] as string[], signedIn: false };
