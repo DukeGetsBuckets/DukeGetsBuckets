@@ -29,6 +29,8 @@ export const CAR_SPEC = {
   suspensionRest: 0.5,
   suspensionStiffness: 58000,
   suspensionDamping: 4400,
+  bumpStart: 0.55,           // compression (0..1) where the bump stop engages
+  bumpStiffness: 420000,     // N at full compression (progressive, squared)
   engineForce: 26500,
   brakeForce: 34000,
   reverseForce: 11000,
@@ -41,6 +43,8 @@ export const CAR_SPEC = {
   muRearDrift: 1.35,
   downforce: 0.0085,         // acceleration per (m/s)^2
   stickStrength: 1.0,        // how strongly gravity follows the road surface when grounded at speed
+  extraStick: 0.6,           // additional surface pull (fraction of g) while grounded at speed
+  landingAbsorb: 0.75,       // fraction of the into-surface velocity removed on touchdown
   alignTorque: 14,           // chassis-to-surface alignment torque (per kg)
   steerMaxLow: 0.60,
   steerMaxHigh: 0.17,
@@ -88,6 +92,9 @@ export class CarPhysics {
   input: CarInput = { throttle: 0, brake: 0, steer: 0, handbrake: false };
   private steerCurrent = 0;
   private airTime = 0;
+  private wasAirborne = false;
+  private lastAirTime = 0;
+  landedImpact = 0;
   private boostTime = 0;
   private driftTime = 0;
   position: Vec3 = v3();
@@ -240,6 +247,12 @@ export class CarPhysics {
         const pv = vadd(vel, vcross(this.angularVelocity, rel));
         const springVel = vdot(pv, this.up);
         let force = spec.suspensionStiffness * compression * spec.suspensionRest - spec.suspensionDamping * springVel;
+        // progressive bump stop: lets the suspension carry huge loads in loops / corkscrews
+        // at top speed without the chassis bottoming out on the road
+        if (compression > spec.bumpStart) {
+          const b = (compression - spec.bumpStart) / (1 - spec.bumpStart);
+          force += spec.bumpStiffness * b * b - spec.suspensionDamping * 2 * Math.min(0, springVel);
+        }
         force = Math.max(0, force);
         body.addForceAtPoint(vscale(this.up, force), attach, true);
 
@@ -304,7 +317,20 @@ export class CarPhysics {
     const gWorld = v3(0, GRAVITY, 0);
     const gSurf = vscale(surfaceUp, GRAVITY);
     const gEff = { x: lerp(gWorld.x, gSurf.x, stick), y: lerp(gWorld.y, gSurf.y, stick), z: lerp(gWorld.z, gSurf.z, stick) };
-    body.addForce(vscale(gEff, spec.mass), true);
+    // extra "stick" presses the car onto the road at speed (acts like downforce on any surface)
+    const extra = vscale(surfaceUp, GRAVITY * spec.extraStick * stick);
+    body.addForce(vscale(vadd(gEff, extra), spec.mass), true);
+    // landing absorber: when touching down after a jump, bleed off the velocity into the surface
+    if (grounded && this.wasAirborne && this.lastAirTime > 0.15) {
+      const vn = vdot(vel, surfaceUp);
+      if (vn < 0) {
+        body.setLinvel(vsub(vel, vscale(surfaceUp, vn * spec.landingAbsorb)), true);
+        body.setAngvel(vscale(this.angularVelocity, 0.4), true);
+      }
+      this.landedImpact = Math.min(1, -vn / 30);
+    } else this.landedImpact = 0;
+    this.lastAirTime = this.airTime;
+    this.wasAirborne = !grounded;
     // --- align the chassis with the surface while grounded (keeps wheels planted through
     //     twisting corkscrews, loops and wall rides) ---
     if (grounded && stick > 0) {

@@ -97,6 +97,15 @@ export class RaceController {
     }
   }
 
+  /** Live races: back to the start line with checkpoints cleared, but the clock keeps running. */
+  restartKeepTime() {
+    this.nextCheckpoint = 0;
+    this.splits = [];
+    this.lastCheckpointSpawn = this.startSpawn;
+    if (this.state === 'finished') return;
+    this.state = 'racing';
+  }
+
   /** Respawn position: last checkpoint (or start). Timer keeps running (Trackmania style). */
   respawnPoint(): SpawnPoint {
     this.respawnCount++;

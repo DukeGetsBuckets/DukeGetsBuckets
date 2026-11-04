@@ -42,7 +42,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     gate: { start: '#a3e635', checkpoint: '#22d3ee', finish: '#f472b6' },
     ground: { kind: 'city', color: '#0b0724', line: '#4c1d95', depth: 70 },
     decor: [
-      { kind: 'towers', count: 220, color: '#1e1b4b', color2: '#22d3ee', minDist: 40, maxDist: 520, scale: [0.6, 2.4], heightOffset: [0, 0] },
+      { kind: 'towers', count: 130, color: '#1e1b4b', color2: '#22d3ee', minDist: 60, maxDist: 560, scale: [0.5, 1.8], heightOffset: [0, 0] },
       { kind: 'pillars', count: 60, color: '#ec4899', color2: '#a855f7', minDist: 30, maxDist: 300, scale: [0.8, 1.6], heightOffset: [0, 0] },
       { kind: 'rings', count: 6, color: '#a855f7', color2: '#22d3ee', minDist: 120, maxDist: 400, scale: [1, 2], heightOffset: [40, 140] },
     ],
@@ -114,7 +114,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     gate: { start: '#a3e635', checkpoint: '#38bdf8', finish: '#a855f7' },
     ground: { kind: 'grid', color: '#06041a', line: '#4f46e5', depth: 90 },
     decor: [
-      { kind: 'cubes', count: 160, color: '#1e1b4b', color2: '#38bdf8', minDist: 35, maxDist: 520, scale: [0.5, 2.5], heightOffset: [-120, 160] },
+      { kind: 'cubes', count: 110, color: '#1e1b4b', color2: '#38bdf8', minDist: 45, maxDist: 520, scale: [0.5, 2.2], heightOffset: [-120, 160] },
       { kind: 'rings', count: 10, color: '#a855f7', color2: '#38bdf8', minDist: 80, maxDist: 420, scale: [1, 2.5], heightOffset: [0, 120] },
       { kind: 'pillars', count: 50, color: '#38bdf8', color2: '#a855f7', minDist: 30, maxDist: 320, scale: [0.8, 2], heightOffset: [-60, 0] },
     ],

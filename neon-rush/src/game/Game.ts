@@ -23,6 +23,8 @@ import { RaceController, type RaceState } from './race/raceController';
 import { ParticleSystem } from './fx/particles';
 import { Trail, trailColor } from './fx/trails';
 import { createNeonMaterial } from './render/materials';
+import { BotDriver } from './physics/bot';
+import { getAudio } from './audio/audio';
 
 export interface HudState {
   timeMs: number;
@@ -102,6 +104,7 @@ export class Game {
   private raf = 0;
   private hemi: THREE.HemisphereLight;
   private sun: THREE.DirectionalLight;
+  private ambient: THREE.AmbientLight;
   private exhaustTrails: Trail[] = [];
   private skidTrails: Trail[] = [];
   private platform: THREE.Group;
@@ -121,8 +124,19 @@ export class Game {
   private impactQueue: { mag: number; x: number; y: number; z: number }[] = [];
   private finishedCelebration = 0;
   clockOffsetMs = 0; // local -> server time offset (multiplayer)
+  /** 'live' races keep the clock running on restart and never re-arm. */
+  raceMode: 'solo' | 'live' = 'solo';
+  /** Autopilot (demo mode / automated tests): drives the car along the centerline. */
+  autopilot = false;
+  private bot: BotDriver | null = null;
   private disposed = false;
   private autoQuality = true;
+  private engineAudioOn = false;
+  /** wall-clock vs simulated time during a run (anti slow-motion): ratio < 0.85 marks the run unranked */
+  private runWallStart = 0;
+  private runSimSteps = 0;
+  runRealtimeRatio = 1;
+  private landSfxCooldown = 0;
 
   private constructor(public canvas: HTMLCanvasElement, quality: QualityLevel) {
     this.quality = quality;
@@ -136,7 +150,8 @@ export class Game {
     this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = 300;
     this.sun.shadow.camera.left = -60; this.sun.shadow.camera.right = 60; this.sun.shadow.camera.top = 60; this.sun.shadow.camera.bottom = -60;
     this.sun.shadow.bias = -0.0005;
-    this.scene.add(this.hemi, this.sun, this.sun.target);
+    this.ambient = new THREE.AmbientLight(0xffffff, 0.35);
+    this.scene.add(this.hemi, this.sun, this.sun.target, this.ambient);
     this.scene.add(this.particles.points);
     // environment map for car reflections
     const pmrem = new THREE.PMREMGenerator(this.renderer.renderer);
@@ -201,17 +216,18 @@ export class Game {
     // lights
     this.hemi.color.set(theme.light.hemiSky); this.hemi.groundColor.set(theme.light.hemiGround); this.hemi.intensity = theme.light.hemiIntensity;
     this.sun.color.set(theme.light.sun); this.sun.intensity = theme.light.sunIntensity;
+    this.ambient.color.set(theme.light.hemiSky); this.ambient.intensity = 0.45;
     const sd = new THREE.Vector3(...theme.sky.sunDir).normalize();
     sharedUniforms.uSunDir.value.copy(sd);
     sharedUniforms.uSunColor.value.set(theme.light.sun).multiplyScalar(theme.light.sunIntensity * 0.6);
     sharedUniforms.uAmbient.value.set(theme.light.ambient);
     this.race = new RaceController(compiled);
     this.race.events = {
-      onCheckpoint: (i, t, diff) => { this.trackView?.triggerGate(i); this.hud.diffMs = diff; this.hud.diffAge = 0; this.checkpointBurst(i); this.callbacks.onCheckpoint?.(i, t, diff); },
-      onFinish: (t, splits) => { this.trackView?.triggerGate(this.race!.checkpointCount); this.finishCelebration(); this.stopRecording(); this.callbacks.onFinish?.(t, splits, this.buildReplay(t, splits)); },
-      onStart: () => { this.startRecording(); this.launchBurst(); this.callbacks.onStart?.(); },
-      onCountdown: (n) => { this.hud.countdown = n; this.callbacks.onCountdown?.(n); },
-      onRespawn: (toStart) => this.callbacks.onRespawn?.(toStart),
+      onCheckpoint: (i, t, diff) => { this.trackView?.triggerGate(i); this.hud.diffMs = diff; this.hud.diffAge = 0; this.checkpointBurst(i); getAudio().playSfx('checkpoint'); this.callbacks.onCheckpoint?.(i, t, diff); },
+      onFinish: (t, splits) => { this.trackView?.triggerGate(this.race!.checkpointCount); this.finishCelebration(); this.stopRecording(); getAudio().playSfx('finish'); getAudio().duck(2.5); this.callbacks.onFinish?.(t, splits, this.buildReplay(t, splits)); },
+      onStart: () => { this.startRecording(); this.launchBurst(); getAudio().playSfx('go'); this.runWallStart = performance.now(); this.runSimSteps = 0; this.runRealtimeRatio = 1; this.callbacks.onStart?.(); },
+      onCountdown: (n) => { this.hud.countdown = n; if (n > 0) getAudio().playSfx('countdown'); this.callbacks.onCountdown?.(n); },
+      onRespawn: (toStart) => { getAudio().playSfx('respawn'); this.callbacks.onRespawn?.(toStart); },
     };
     this.cameraRig.frames = compiled.frames;
     this.hud.checkpointTotal = this.race.checkpointCount;
@@ -263,6 +279,7 @@ export class Game {
   startRace(countdownSeconds = 3) {
     if (!this.race) return;
     this.setSceneMode('race');
+    this.wasAirborne = false;
     this.placeCarAtStart();
     this.race.reset(countdownSeconds);
     this.hud.countdown = Math.ceil(countdownSeconds);
@@ -275,6 +292,18 @@ export class Game {
   /** Instant restart: back to the start line, timer armed (starts on first input). */
   restart() {
     if (!this.race) return;
+    if (this.raceMode === 'live') {
+      if (this.race.state === 'finished' || this.race.state === 'countdown') return;
+      this.placeCarAtStart();
+      this.car.frozen = false;
+      this.race.restartKeepTime();
+      this.respawnFade = 1;
+      this.cameraRig.snap();
+      for (const t of this.exhaustTrails) t.break();
+      for (const t of this.skidTrails) t.break();
+      this.callbacks.onRestart?.();
+      return;
+    }
     this.placeCarAtStart();
     this.race.reset(0);
     this.hud.countdown = 0;
@@ -289,7 +318,7 @@ export class Game {
 
   respawn() {
     if (!this.race || this.race.state === 'finished') return;
-    if (this.race.state !== 'racing') { this.restart(); return; }
+    if (this.race.state !== 'racing') { if (this.raceMode !== 'live') this.restart(); return; }
     const sp = this.race.respawnPoint();
     this.car.teleport(sp.pos, sp.forward, sp.up);
     this.car.frozen = false;
@@ -300,6 +329,13 @@ export class Game {
   }
 
   setReferenceSplits(splits: number[] | null) { if (this.race) this.race.referenceSplits = splits; }
+
+  /** Live race ended (time limit / results): stop the car where it is. */
+  endRace() {
+    if (!this.race) return;
+    if (this.race.state !== 'finished') { this.race.state = 'finished'; this.stopRecording(); }
+    this.car.frozen = true;
+  }
 
   setPaused(p: boolean) { this.paused = p; this.input.enabled = !p && this.sceneMode === 'race'; if (!p) this.lastTime = performance.now(); }
 
@@ -468,6 +504,11 @@ export class Game {
     const car = this.car;
     if (inRace) {
       car.input = { throttle: input.throttle, brake: input.brake, steer: input.steer, handbrake: input.handbrake };
+      if (this.autopilot && this.compiled) {
+        if (!this.bot || this.bot.track !== this.compiled) { this.bot = new BotDriver(this.compiled, { aggression: 1 }); this.bot.reset(car); }
+        car.input = this.bot.update(car);
+        if (race.state === 'armed') race.step(car.prevPosition, car.position, true);
+      }
       const hasInput = input.throttle > 0 || input.brake > 0;
       const frozenNow = race.state === 'countdown' || race.state === 'armed' || race.state === 'idle';
       car.frozen = frozenNow;
@@ -481,6 +522,11 @@ export class Game {
     car.postStep();
     if (inRace) {
       race.step(car.prevPosition, car.position, input.throttle > 0 || input.brake > 0);
+      if (race.state === 'racing') {
+        this.runSimSteps++;
+        const wall = (performance.now() - this.runWallStart) / 1000;
+        if (wall > 3) this.runRealtimeRatio = (this.runSimSteps * PHYSICS_DT) / wall;
+      }
       // record replay at REPLAY_HZ
       if (this.recorder.active) {
         this.recorder.stepCounter++;
@@ -504,7 +550,7 @@ export class Game {
       const rel = vsub(p, b.pos);
       if (Math.abs(vdot(rel, b.forward)) <= b.halfLength && Math.abs(vdot(rel, b.right)) <= b.halfWidth && Math.abs(vdot(rel, b.up)) < 4) { inside = true; break; }
     }
-    if (inside && !this.boostInside) { this.car.applyBoost(); this.callbacks.onBoost?.(); this.cameraRig.shake(0.25); }
+    if (inside && !this.boostInside) { this.car.applyBoost(); getAudio().playSfx('boost'); this.callbacks.onBoost?.(); this.cameraRig.shake(0.25); }
     this.boostInside = inside;
   }
 
@@ -575,6 +621,7 @@ export class Game {
       for (const imp of this.impactQueue) {
         this.particles.emit({ count: Math.round(10 + imp.mag * 40), position: new THREE.Vector3(imp.x, imp.y, imp.z), spread: 6 + imp.mag * 10, color: [new THREE.Color('#ffd166'), new THREE.Color('#ff7b00'), new THREE.Color('#ffffff')], size: 0.35, life: 0.5, gravity: 18, drag: 1.5 });
         this.cameraRig.shake(0.25 + imp.mag * 0.9);
+        getAudio().playSfx('crash', clamp(0.3 + imp.mag, 0.3, 1));
         this.callbacks.onImpact?.(imp.mag);
       }
       this.impactQueue.length = 0;
@@ -587,7 +634,7 @@ export class Game {
           for (const w of c.wheels) if (w.grounded) this.particles.emit({ count: 8, position: new THREE.Vector3(w.contact.x, w.contact.y, w.contact.z), spread: 3, color: new THREE.Color(this.theme.road.line), size: 0.5, life: 0.5, gravity: 2, drag: 2 });
         }
       }
-      if (!tel.grounded) this.lastAirTime = tel.airTime;
+      if (!tel.grounded) { if (!this.wasAirborne && speed > 15) getAudio().playSfx('jump', 0.6); this.lastAirTime = tel.airTime; }
       this.wasAirborne = !tel.grounded;
       // drift / skid
       const skidColor = trailColor(cfg.trail, t, new THREE.Color(cfg.tireColor));
@@ -642,6 +689,14 @@ export class Game {
     }
     // remote cars
     this.updateRemoteCars(dt);
+
+    // audio
+    const audio = getAudio();
+    const engineOn = racing && !this.paused && this.race?.state !== 'idle';
+    if (engineOn !== this.engineAudioOn) { this.engineAudioOn = engineOn; audio.setEngineActive(engineOn); }
+    if (engineOn) audio.updateEngine({ speed, throttle: c.input.throttle, grounded: tel.grounded, drifting: tel.drifting, slip: tel.slip, boost: tel.boostTime > 0, airborne: !tel.grounded, braking: c.input.brake > 0.2 }, dt);
+    if (racing && c.landedImpact > 0.15 && this.landSfxCooldown <= 0) { audio.playSfx('land', clamp(c.landedImpact, 0.3, 1)); this.landSfxCooldown = 0.4; }
+    this.landSfxCooldown = Math.max(0, this.landSfxCooldown - dt);
 
     // post effects
     const speedK = clamp((speed - 32) / 45, 0, 1);

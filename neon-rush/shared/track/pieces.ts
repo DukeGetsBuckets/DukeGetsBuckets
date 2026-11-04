@@ -313,7 +313,7 @@ const list: PieceDef[] = [
   },
   {
     id: 'kickerBig', name: 'Big Jump Ramp', category: 'stunt', length: CELL * 2,
-    exit: { x: 0, y: 11, z: CELL * 2, rot: 0 }, curve: kickerCurve(CELL * 2, 11), profile: basicProfile(), step: 1.5,
+    exit: { x: 0, y: 7, z: CELL * 2, rot: 0 }, curve: kickerCurve(CELL * 2, 7), profile: basicProfile(), step: 1.5,
   },
   {
     id: 'wallrideL', name: 'Wall Ride Left', category: 'stunt', length: CELL * 2,

@@ -17,7 +17,7 @@ export class BotDriver {
   aggression: number;
   lateralAccel: number;
 
-  constructor(private track: CompiledTrack, opts: BotOptions = {}) {
+  constructor(public readonly track: CompiledTrack, opts: BotOptions = {}) {
     this.aggression = opts.aggression ?? 1;
     this.lateralAccel = opts.lateralAccel ?? 38;
   }
@@ -68,22 +68,33 @@ export class BotDriver {
     const angle = Math.atan2(sin, cos);
     // cross-track correction (positive = car is right of the centerline -> steer left)
     const e = vdot(vsub(car.position, near.pos), near.right);
-    let steer = clamp(angle * 2.4 + clamp(e * 0.05, -0.35, 0.35), -1, 1);
+    const vLat = vdot(car.velocity, near.right); // lateral drift speed relative to the road
+    let steer = clamp(angle * 2.4 + clamp(e * 0.07 + vLat * 0.06, -0.6, 0.6), -1, 1);
     steer = this.lastSteer + clamp(steer - this.lastSteer, -0.25, 0.25);
     this.lastSteer = steer;
 
-    // speed planning from upcoming curvature
-    const kNear = this.maxCurvature(this.frameHint, 0, 20 + speed * 0.3);
-    const kFar = this.maxCurvature(this.frameHint, 20 + speed * 0.3, 55 + speed * 0.9);
-    const vFor = (k: number) => (k < 1e-4 ? 999 : Math.sqrt(this.lateralAccel * this.aggression / k));
-    const target1 = vFor(kNear);
-    const target2 = vFor(kFar) + 6; // we have time to brake before far curves
-    const vTarget = Math.min(target1, target2, 74 * this.aggression + 20);
+    // speed planning: for every upcoming turn, the speed we may carry now is limited by the
+    // speed that turn allows plus what we can shed by braking before reaching it.
+    const aBrake = 19 * this.aggression; // conservative braking deceleration (m/s^2)
+    const horizon = Math.max(120, speed * speed / (2 * aBrake) + 80);
+    const i1 = this.frameAtDist(this.frameHint, horizon);
+    let vTarget = 74 * this.aggression + 20;
+    for (let i = this.frameHint; i < i1; i += 2) {
+      const a = frames[i], b = frames[Math.min(frames.length - 1, i + 2)];
+      const ds = Math.max(0.5, b.dist - a.dist);
+      const dt = vsub(b.tangent, a.tangent);
+      const k = Math.abs(vdot(dt, a.right)) / ds;
+      if (k < 1e-4) continue;
+      const vCurve = Math.sqrt(this.lateralAccel * this.aggression / k);
+      const d = Math.max(0, a.dist - frames[this.frameHint].dist - 4);
+      const vAllowed = Math.sqrt(vCurve * vCurve + 2 * aBrake * d);
+      if (vAllowed < vTarget) vTarget = vAllowed;
+    }
     let throttle = 0, brake = 0;
     if (cos < -0.2 && speed < 5) { brake = 1; steer = -steer; } // wrong way: reverse
     else if (speed < vTarget - 1) throttle = 1;
-    else if (speed > vTarget + 3) brake = 1;
-    else throttle = 0.4;
+    else if (speed > vTarget + 2) brake = 1;
+    else throttle = 0.5;
     // keep speed on vertical sections (loops) regardless of planner
     if (car.up.y < 0.5 && car.telemetry.grounded) { throttle = 1; brake = 0; }
     // airborne: no pitch inputs so the auto-level lands the car flat

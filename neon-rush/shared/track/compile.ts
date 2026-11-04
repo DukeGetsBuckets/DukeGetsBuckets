@@ -288,5 +288,5 @@ export function crossesGate(gate: GateInfo, a: Vec3, b: Vec3): boolean {
   const rel = vsub(hit, gate.pos);
   const lateral = Math.abs(vdot(rel, gate.right));
   const vertical = vdot(rel, gate.up);
-  return lateral <= gate.halfWidth && vertical > -2.5 && vertical < 14;
+  return lateral <= gate.halfWidth + 6 && vertical > -3 && vertical < 60;
 }
