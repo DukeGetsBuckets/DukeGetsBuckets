@@ -102,7 +102,8 @@ function ribbonIndices(n: number, base: number, out: number[]) {
 function disposeObject(obj: THREE.Object3D) {
   obj.traverse((o) => {
     const m = o as THREE.Mesh;
-    if (m.geometry) m.geometry.dispose();
+    // sprites share one module-level geometry inside three.js: never dispose it
+    if (m.geometry && !(o as THREE.Sprite).isSprite) m.geometry.dispose();
     const mat = m.material as THREE.Material | THREE.Material[] | undefined;
     if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
     else mat?.dispose();
@@ -583,7 +584,7 @@ export class EditorScene {
     const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
     const tanH = tanV * (W / H);
     const fit = r / Math.min(tanV * freeH, tanH * freeW);
-    this.distance = THREE.MathUtils.clamp(fit * 0.92 + 10, 60, 2000);
+    this.distance = THREE.MathUtils.clamp(fit + 10, 60, 2000);
     if (snap) this.setCameraState(this.getCameraState(), true);
   }
 

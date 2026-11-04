@@ -21,6 +21,7 @@ export function MainMenu({ playerName, level, onOpen, unread = 0 }: { playerName
         <div className="anim-slide-left">
           <h1 className="font-display text-5xl md:text-7xl font-black tracking-[0.08em] gradient-text anim-gradient leading-none">NEON<br />RUSH</h1>
           <div className="mt-2 text-xs md:text-sm font-bold tracking-[0.3em] uppercase text-white/60">Race · Beat records · Build tracks</div>
+          {import.meta.env.VITE_STATIC_DEMO && <div className="mt-2 inline-block rounded-full border border-yellow-300/50 bg-yellow-400/10 px-3 py-1 text-[11px] font-bold text-yellow-200">Prototype · solo racing works offline · multiplayer and leaderboards need the server</div>}
         </div>
         <div className="anim-slide-right pointer-events-auto panel rounded-xl px-4 py-2 flex items-center gap-3 cursor-pointer" onClick={() => onOpen('profile')}>
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-fuchsia-500 flex items-center justify-center font-display font-black text-[#07061a]">{playerName.slice(0, 1).toUpperCase()}</div>

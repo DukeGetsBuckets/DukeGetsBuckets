@@ -705,7 +705,7 @@ export function TrackBuilder(props: TrackBuilderProps) {
         {/* top bar */}
         <div ref={topRef} className="panel relative z-30 rounded-2xl px-2 py-2 flex flex-wrap items-center gap-2 pointer-events-auto anim-fade-in">
           <IconBtn icon="back" title="Exit builder" onClick={onExit} />
-          {view.w >= 1240 && <div className="font-display font-black tracking-widest text-sm gradient-text px-1">BUILDER</div>}
+          {view.w >= (meta.code ? 1400 : 1240) && <div className="font-display font-black tracking-widest text-sm gradient-text px-1">BUILDER</div>}
           <input className="input rounded-xl px-3 font-display text-sm" style={{ height: 44, width: compact ? 150 : 190 }} value={meta.name} maxLength={MAX_NAME}
             placeholder="Track name" aria-label="Track name"
             onChange={(e) => { const name = e.target.value.slice(0, MAX_NAME); setMeta((m) => ({ ...m, name })); }}

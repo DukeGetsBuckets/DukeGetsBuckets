@@ -7,3 +7,4 @@ dist
 .env.*
 playwright-report
 test-results
+dist-artifact
