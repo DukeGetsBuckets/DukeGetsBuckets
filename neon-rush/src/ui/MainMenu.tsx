@@ -7,12 +7,13 @@ const ITEMS: { id: Screen; label: string; sub: string; color: string }[] = [
   { id: 'daily', label: 'DAILY CHALLENGE', sub: 'Today\'s featured track', color: '#facc15' },
   { id: 'garage', label: 'GARAGE', sub: 'Customize your ride', color: '#a855f7' },
   { id: 'leaderboards', label: 'LEADERBOARDS', sub: 'Global · School · Friends', color: '#a3e635' },
-  { id: 'builder', label: 'TRACK BUILDER', sub: 'Create and share tracks', color: '#fb923c' },
+  { id: 'community', label: 'COMMUNITY', sub: 'Play tracks built by players', color: '#fb923c' },
+  { id: 'builder', label: 'TRACK BUILDER', sub: 'Create and share tracks', color: '#f472b6' },
   { id: 'profile', label: 'PROFILE', sub: 'Level, badges, friends', color: '#38bdf8' },
   { id: 'settings', label: 'SETTINGS', sub: 'Graphics, audio, controls', color: '#cbd5e1' },
 ];
 
-export function MainMenu({ playerName, level, onOpen }: { playerName: string; level: number; onOpen: (s: Screen) => void }) {
+export function MainMenu({ playerName, level, onOpen, unread = 0 }: { playerName: string; level: number; onOpen: (s: Screen) => void; unread?: number }) {
   const online = useStore((s) => s.online);
   return (
     <div className="absolute inset-0 flex flex-col pointer-events-none" style={{ paddingTop: 'calc(var(--safe-top) + 12px)', paddingBottom: 'calc(var(--safe-bottom) + 12px)', paddingLeft: 'calc(var(--safe-left) + 16px)', paddingRight: 'calc(var(--safe-right) + 16px)' }}>
@@ -27,6 +28,8 @@ export function MainMenu({ playerName, level, onOpen }: { playerName: string; le
             <div className="font-display text-sm font-bold">{playerName}</div>
             <div className="text-[10px] uppercase tracking-widest text-cyan-300/90 font-bold">Level {level} {online ? '' : '· offline'}</div>
           </div>
+          {unread > 0 && <div className="ml-1 rounded-full bg-fuchsia-500 text-white text-[11px] font-black w-6 h-6 flex items-center justify-center anim-pulse">{unread}</div>}
+
         </div>
       </div>
       <div className="mt-auto md:mt-6 grid grid-cols-2 md:grid-cols-1 gap-2 md:gap-2.5 md:w-[360px] pointer-events-auto stagger">

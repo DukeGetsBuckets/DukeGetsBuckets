@@ -20,6 +20,14 @@ import { NamePrompt } from '@ui/NamePrompt';
 import { liveSession, type LiveState } from './liveSession';
 import { loadBests, saveBests, saveLocalReplay, loadLocalReplay, loadLocalName, saveLocalName, medalFor } from './localData';
 import { getAudio } from '@game/audio/audio';
+import { useSession, initSession, submitRecord, saveCarToServer, refreshProfile, playerLevel } from './session';
+import { api } from './api';
+import { encodeReplay, decodeReplay, bytesToBase64, base64ToBytes } from '@shared/game/replay';
+import { ACHIEVEMENT_MAP, levelForXp } from '@shared/game/progression';
+import { LeaderboardsScreen } from '@ui/Leaderboards';
+import { DailyScreen } from '@ui/Daily';
+import { ProfileScreen } from '@ui/Profile';
+import { CommunityScreen } from '@ui/Community';
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -46,8 +54,22 @@ export default function App() {
   const [mpBusy, setMpBusy] = useState(false);
   const [mpError, setMpError] = useState<string | null>(null);
   const [pendingRoom, setPendingRoom] = useState<string | null>(() => new URLSearchParams(location.search).get('room'));
+  const player = useSession((st) => st.player);
+  const serverBests = useSession((st) => st.serverBests);
+  const unread = useSession((st) => st.unread);
+  const mergedBests = React.useMemo(() => {
+    const m: Record<string, number> = { ...bests };
+    for (const [k, v] of Object.entries(serverBests)) if (m[k] == null || v < m[k]) m[k] = v;
+    return m;
+  }, [bests, serverBests]);
+  const [raceMode, setRaceModeLocal] = useState<'solo' | 'daily'>('solo');
+  const [ghostLabel, setGhostLabel] = useState<string | null>(null);
+  const [lbTrack, setLbTrack] = useState<TrackDefinition | null>(null);
+  const [communityDefs, setCommunityDefs] = useState<TrackDefinition[]>([]);
   const bestsRef = useRef(bests);
   bestsRef.current = bests;
+  const mergedBestsRef = useRef(mergedBests);
+  mergedBestsRef.current = mergedBests;
   const ghostDirty = useRef(false);
   const showTouch = settings.showTouchControls === 'on' || (settings.showTouchControls === 'auto' && isTouch);
 
@@ -75,6 +97,20 @@ export default function App() {
   }, []);
 
   useEffect(() => liveSession.subscribe(setLive), []);
+  useEffect(() => { if (ready && name) void initSession(name); }, [ready, name]);
+  useEffect(() => {
+    liveSession.onRaceFinished = (position, playerCount, timeMs) => {
+      const room = liveSession.state.room;
+      if (!useSession.getState().player || !room) return;
+      api.live.result({ roomCode: room.code, trackId: room.trackId, position, playerCount, timeMs })
+        .then((r) => { useSession.getState().setPlayer(r.player); for (const a of r.achievements) pushBanner({ text: `${ACHIEVEMENT_MAP[a]?.icon ?? '🏆'} ${ACHIEVEMENT_MAP[a]?.name ?? a}`, sub: 'Achievement unlocked', kind: 'pb' }); })
+        .catch(() => { /* offline */ });
+    };
+    liveSession.resolveTrack = async (id, source) => {
+      if (source === 'official') return OFFICIAL_TRACKS.find((t) => t.id === id) ?? null;
+      try { return (await api.tracks.get(id)).definition; } catch { return null; }
+    };
+  }, [pushBanner]);
   useEffect(() => { if (ready && screen !== 'garage') tryGame()?.setCarConfig(carConfig); }, [carConfig, ready, screen]);
   useEffect(() => {
     const on = () => useStore.getState().setOnline(true), off = () => useStore.getState().setOnline(false);
@@ -94,13 +130,23 @@ export default function App() {
   }, [setResult, setPaused, setScreen]);
 
   /* ---------------- solo racing ---------------- */
+  const forcedGhost = useRef<{ replay: Replay; name: string } | null>(null);
   const applyGhost = useCallback((g: Game, t: TrackDefinition) => {
+    if (forcedGhost.current) {
+      g.setGhost(forcedGhost.current.replay, forcedGhost.current.name, '#f472b6');
+      g.setReferenceSplits(forcedGhost.current.replay.splits);
+      return;
+    }
     const rep = settings.showGhost ? loadLocalReplay(t.id) : null;
     g.setGhost(rep, 'Your best', '#67e8f9');
     g.setReferenceSplits(rep ? rep.splits : null);
   }, [settings.showGhost]);
 
-  const startRace = useCallback(async (t: TrackDefinition) => {
+  const startRace = useCallback(async (t: TrackDefinition, opts: { ghost?: { replay: Replay; name: string } | null; mode?: 'solo' | 'daily' } = {}) => {
+    forcedGhost.current = opts.ghost ?? null;
+    setGhostLabel(opts.ghost ? opts.ghost.name : null);
+    const mode = opts.mode ?? 'solo';
+    setRaceModeLocal(mode);
     const g = tryGame(); if (!g) return;
     setResult(null); setPaused(false); g.setPaused(false);
     g.raceMode = 'solo';
@@ -113,13 +159,31 @@ export default function App() {
       onStart: () => { setCountdown(0, true); setArmed(false); setTimeout(() => setCountdown(0, false), 700); },
       onCheckpoint: (i, _t, diff) => pushBanner({ text: `Checkpoint ${i + 1}`, sub: diff != null ? formatTime(diff, true) : undefined, kind: 'checkpoint' }),
       onFinish: (timeMs, splits, replay: Replay) => {
-        const prev = bestsRef.current[t.id] ?? null;
+        const prev = mergedBestsRef.current[t.id] ?? null;
         const isPb = prev == null || timeMs < prev;
         if (isPb) { const nb = { ...bestsRef.current, [t.id]: timeMs }; setBests(nb); saveBests(nb); saveLocalReplay(t.id, replay); ghostDirty.current = true; }
+        else if (bestsRef.current[t.id] == null || timeMs < bestsRef.current[t.id]) { const nb = { ...bestsRef.current, [t.id]: timeMs }; setBests(nb); saveBests(nb); saveLocalReplay(t.id, replay); }
         const medal = medalFor(timeMs, t.medals);
-        setTimeout(() => setResult({ timeMs, splits, isPb, prevPb: prev, medal }), 900);
-        if (isPb && prev != null) { pushBanner({ text: 'NEW PERSONAL BEST!', sub: formatTime(prev - timeMs) + ' faster', kind: 'pb' }); getAudio().playSfx('pb'); }
-        else if (isPb) getAudio().playSfx('pb');
+        const base = { timeMs, splits, isPb, prevPb: prev, medal } as const;
+        setTimeout(() => { if (!useStore.getState().result) setResult({ ...base }); }, 900);
+        if (isPb) { if (prev != null) pushBanner({ text: 'NEW PERSONAL BEST!', sub: formatTime(prev - timeMs) + ' faster', kind: 'pb' }); getAudio().playSfx('pb'); }
+        // online submission (server validates the replay)
+        if (useSession.getState().player && g.runRealtimeRatio > 0.6) {
+          void submitRecord({
+            trackId: t.id, timeMs, splits, replay: bytesToBase64(encodeReplay(replay)), car: useStore.getState().carConfig,
+            respawns: g.race?.respawnCount ?? 0, topSpeed: g.runTopSpeed, mode: forcedGhost.current ? 'ghost' : mode, clientVersion: '1.0.0',
+          }).then((r) => {
+            if (!r) return;
+            if (!r.accepted) { pushBanner({ text: 'Run not ranked', sub: r.reason, kind: 'warn' }); return; }
+            const cur = useStore.getState().result;
+            const merged = { ...base, ...(cur ?? {}), rank: r.rank, xp: r.xp, coins: r.coins, worldRecord: r.worldRecord, achievements: r.achievements.map((a) => `${ACHIEVEMENT_MAP[a]?.icon ?? '🏆'} ${ACHIEVEMENT_MAP[a]?.name ?? a}`) };
+            setResult(merged);
+            if (r.worldRecord) { pushBanner({ text: 'WORLD RECORD!', sub: `#1 on ${t.name}`, kind: 'wr' }); getAudio().playSfx('wr'); g.celebrate(true); }
+            else if (r.isPb && r.rank != null && r.rank <= 10) pushBanner({ text: `You're now #${r.rank} on ${t.name}!`, kind: 'rival' });
+            for (const rv of r.rivalsBeaten.slice(0, 2)) pushBanner({ text: `You beat ${rv.name}'s record!`, sub: `by ${formatTime(rv.byMs)}`, kind: 'rival' });
+            if (r.levelUp) { pushBanner({ text: `LEVEL ${r.levelUp}!`, sub: 'New cosmetics may be unlocked in the garage', kind: 'pb' }); getAudio().playSfx('unlock'); }
+          });
+        }
       },
       onRestart: () => { setResult(null); setArmed(true); setCountdown(0, false); if (ghostDirty.current) { ghostDirty.current = false; applyGhost(g, t); } },
       onPause: () => { const p = !useStore.getState().paused; setPaused(p); g.setPaused(p); },
@@ -130,6 +194,21 @@ export default function App() {
     getAudio().startMusic('race', t.theme);
     g.startRace(3);
   }, [setResult, setPaused, setScreen, setTrack, settings.cameraMode, setCountdown, pushBanner, applyGhost]);
+
+  const raceVsRecord = useCallback(async (t: TrackDefinition, recordId: string, label: string) => {
+    if (!recordId) { // world record ghost (falls back to your own ghost offline)
+      try {
+        const lb = await api.leaderboard(t.id, 'global', 1);
+        const top = lb.entries[0];
+        if (top && top.hasReplay && top.playerId !== useSession.getState().player?.id) { recordId = top.recordId; label = `WR · ${top.name}`; }
+      } catch { /* offline */ }
+    }
+    if (!recordId) { void startRace(t); return; }
+    try {
+      const r = await api.replay(recordId);
+      void startRace(t, { ghost: { replay: decodeReplay(base64ToBytes(r.replay)), name: label || r.player.name } });
+    } catch { void startRace(t); }
+  }, [startRace]);
 
   const retry = useCallback(() => { const g = tryGame(); setResult(null); g?.restart(); if (g?.raceMode !== 'live') setArmed(true); }, [setResult]);
   const nextTrack = track ? (() => { const i = OFFICIAL_TRACKS.findIndex((x) => x.id === track.id); const n = OFFICIAL_TRACKS[i + 1]; return n ? () => startRace(n) : undefined; })() : undefined;
@@ -153,9 +232,15 @@ export default function App() {
     if (live.phase === 'lobby' && useStore.getState().screen === 'race') { setResult(null); setPaused(false); getAudio().startMusic('menu'); setScreen('multiplayer'); }
   }, [live.phase, track, setScreen, setResult, setPaused]);
 
+  const openBuilderTrack = async (_id: string) => { setScreen('builder'); };
+  const builderElement = (
+    <div className="absolute inset-0 flex items-center justify-center"><div className="panel rounded-2xl p-8 text-center"><div className="font-display text-2xl font-black gradient-text mb-3">TRACK BUILDER</div><Button onClick={goMenu}>Back</Button></div></div>
+  );
   const open = (s: Screen) => { getAudio().playSfx('click'); setScreen(s); };
-  const ownership = { level: 1, coins: 0, unlocked: [] as string[], achievements: [] as string[], signedIn: false };
-  const buyItem = async (_item: CosmeticItem) => false;
+  const ownership = { level: playerLevel(player), coins: player?.coins ?? 0, unlocked: player?.unlocked ?? [], achievements: (player?.achievements ?? []).map((a) => a.id), signedIn: !!player };
+  const buyItem = async (item: CosmeticItem) => {
+    try { const r = await api.shop.buy(item.id); useSession.getState().setPlayer(r.player); getAudio().playSfx('coin'); return true; } catch { return false; }
+  };
 
   const inLive = live.phase === 'countdown' || live.phase === 'racing' || live.phase === 'results';
   const me = live.room?.players.find((p) => p.id === live.you);
@@ -171,9 +256,9 @@ export default function App() {
         </div>
       )}
       {ready && !name && <NamePrompt onDone={(n) => { saveLocalName(n); setName(n); getAudio().playSfx('unlock'); }} />}
-      {ready && name && screen === 'menu' && <MainMenu playerName={name} level={ownership.level} onOpen={open} />}
-      {ready && screen === 'tracks' && <TrackSelect onBack={goMenu} onPlay={(t) => startRace(t)} onGhost={(t) => startRace(t)} bests={bests} />}
-      {ready && screen === 'garage' && <GarageScreen onBack={goMenu} ownership={ownership} onBuy={buyItem} onSave={(cfg) => { setCarConfig(cfg); }} />}
+      {ready && name && screen === 'menu' && <MainMenu playerName={player?.name ?? name} level={ownership.level} onOpen={open} unread={unread} />}
+      {ready && screen === 'tracks' && <TrackSelect onBack={goMenu} onPlay={(t) => startRace(t)} onGhost={(t) => raceVsRecord(t, '', '')} bests={mergedBests} />}
+      {ready && screen === 'garage' && <GarageScreen onBack={goMenu} ownership={ownership} onBuy={buyItem} onSave={(cfg) => { setCarConfig(cfg); void saveCarToServer(); }} />}
       {ready && screen === 'settings' && <SettingsScreen onBack={() => { useStore.getState().prevScreen === 'race' ? setScreen('race') : goMenu(); }} inRace={useStore.getState().prevScreen === 'race'} />}
       {ready && screen === 'multiplayer' && !inLive && (
         live.phase === 'lobby' && live.room ? (
@@ -190,13 +275,13 @@ export default function App() {
       )}
       {ready && screen === 'race' && track && (
         <>
-          <Hud pb={inLive ? null : bests[track.id] ?? null} position={inLive && me ? me.position || null : null} playerCount={live.room?.players.length} />
+          <Hud ghostLabel={inLive ? null : ghostLabel} pb={inLive ? null : mergedBests[track.id] ?? null} position={inLive && me ? me.position || null : null} playerCount={live.room?.players.length} />
           {inLive && live.room && <LivePositions room={live.room} you={live.you} />}
           <Countdown />
           {armed && !result && !paused && !inLive && <ArmedHint />}
           {showTouch && !paused && !result && live.phase !== 'results' && <TouchControls onRestart={retry} onPause={() => { setPaused(true); tryGame()?.setPaused(!inLive); if (inLive) { const g = tryGame(); if (g) g.input.enabled = false; } }} onCamera={() => tryGame()?.cycleCamera()} />}
           {paused && <PauseMenu onResume={() => { setPaused(false); tryGame()?.setPaused(false); const g = tryGame(); if (g) g.input.enabled = true; }} onRestart={() => { setPaused(false); tryGame()?.setPaused(false); retry(); }} onQuit={inLive ? mpLeave : goMenu} onSettings={() => setScreen('settings')} />}
-          {!inLive && result && <Results onRetry={retry} onQuit={goMenu} onNext={nextTrack} />}
+          {!inLive && result && <Results onRetry={retry} onQuit={goMenu} onNext={raceMode === 'daily' ? undefined : nextTrack} onLeaderboard={() => { setLbTrack(track); setResult(null); const g = tryGame(); g?.setGhost(null); g?.setSceneMode('menu'); setScreen('leaderboards'); }} />}
           {live.phase === 'results' && live.results && live.room && (
             <LiveResults results={live.results} room={live.room} you={live.you} waiting={false} onRematch={() => { liveSession.client.rematch(); setScreen('multiplayer'); }} onLeave={mpLeave} />
           )}
@@ -205,15 +290,11 @@ export default function App() {
           )}
         </>
       )}
-      {ready && ['daily', 'leaderboards', 'profile', 'builder', 'community'].includes(screen) && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
-          <div className="panel rounded-2xl p-8 text-center max-w-sm">
-            <div className="font-display text-2xl font-black gradient-text mb-3">{screen.toUpperCase()}</div>
-            <div className="text-white/60 mb-4 font-semibold">Online services are warming up. This screen connects to the leaderboard server.</div>
-            <Button onClick={goMenu}>Back</Button>
-          </div>
-        </div>
-      )}
+      {ready && screen === 'leaderboards' && <LeaderboardsScreen onBack={goMenu} initialTrack={lbTrack} extraTracks={communityDefs} onGhost={(t, id, label) => raceVsRecord(t, id, label)} />}
+      {ready && screen === 'daily' && <DailyScreen onBack={goMenu} onPlay={(t) => startRace(t, { mode: 'daily' })} />}
+      {ready && screen === 'profile' && <ProfileScreen onBack={goMenu} localBests={bests} />}
+      {ready && screen === 'community' && <CommunityScreen onBack={goMenu} onPlay={(def) => { setCommunityDefs((d) => [def, ...d.filter((x) => x.id !== def.id)].slice(0, 10)); void startRace(def); }} onBuild={() => setScreen('builder')} onEdit={(id) => { void openBuilderTrack(id); }} />}
+      {ready && screen === 'builder' && builderElement}
     </div>
   );
 }

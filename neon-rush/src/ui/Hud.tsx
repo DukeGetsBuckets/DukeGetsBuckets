@@ -5,7 +5,7 @@ import { formatTime } from '@shared/math';
 import { DIFFICULTY_NAMES } from '@shared/track/officialTracks';
 
 /** High-frequency HUD values are written straight into the DOM every frame (no React re-renders). */
-export function Hud({ pb, position, playerCount }: { pb: number | null; position?: number | null; playerCount?: number }) {
+export function Hud({ pb, position, playerCount, ghostLabel }: { pb: number | null; position?: number | null; playerCount?: number; ghostLabel?: string | null }) {
   const timeRef = useRef<HTMLDivElement>(null);
   const speedRef = useRef<HTMLDivElement>(null);
   const speedBarRef = useRef<HTMLDivElement>(null);
@@ -55,6 +55,7 @@ export function Hud({ pb, position, playerCount }: { pb: number | null; position
         <div ref={timeRef} className="font-display text-4xl md:text-6xl font-black tracking-wider text-white hud-shadow tabular-nums">0.000</div>
         <div className="flex items-center gap-3 mt-1">
           <div className="text-xs md:text-sm font-bold tracking-widest text-cyan-300/90 hud-shadow uppercase">Best {pb != null ? formatTime(pb) : '—'}</div>
+          {ghostLabel && <div className="text-[10px] md:text-xs font-bold tracking-widest uppercase text-pink-300 hud-shadow">vs {ghostLabel}</div>}
           <div ref={diffRef} className="font-display text-sm md:text-lg font-bold hud-shadow tabular-nums opacity-0 transition-opacity">+0.000</div>
         </div>
       </div>

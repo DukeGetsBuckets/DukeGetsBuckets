@@ -136,6 +136,8 @@ export class Game {
   private runWallStart = 0;
   private runSimSteps = 0;
   runRealtimeRatio = 1;
+  /** top speed of the current run (m/s), reported with record submissions */
+  runTopSpeed = 0;
   private landSfxCooldown = 0;
 
   private constructor(public canvas: HTMLCanvasElement, quality: QualityLevel) {
@@ -225,7 +227,7 @@ export class Game {
     this.race.events = {
       onCheckpoint: (i, t, diff) => { this.trackView?.triggerGate(i); this.hud.diffMs = diff; this.hud.diffAge = 0; this.checkpointBurst(i); getAudio().playSfx('checkpoint'); this.callbacks.onCheckpoint?.(i, t, diff); },
       onFinish: (t, splits) => { this.trackView?.triggerGate(this.race!.checkpointCount); this.finishCelebration(); this.stopRecording(); getAudio().playSfx('finish'); getAudio().duck(2.5); this.callbacks.onFinish?.(t, splits, this.buildReplay(t, splits)); },
-      onStart: () => { this.startRecording(); this.launchBurst(); getAudio().playSfx('go'); this.runWallStart = performance.now(); this.runSimSteps = 0; this.runRealtimeRatio = 1; this.callbacks.onStart?.(); },
+      onStart: () => { this.startRecording(); this.launchBurst(); getAudio().playSfx('go'); this.runWallStart = performance.now(); this.runSimSteps = 0; this.runRealtimeRatio = 1; this.runTopSpeed = 0; this.callbacks.onStart?.(); },
       onCountdown: (n) => { this.hud.countdown = n; if (n > 0) getAudio().playSfx('countdown'); this.callbacks.onCountdown?.(n); },
       onRespawn: (toStart) => { getAudio().playSfx('respawn'); this.callbacks.onRespawn?.(toStart); },
     };
@@ -524,6 +526,7 @@ export class Game {
       race.step(car.prevPosition, car.position, input.throttle > 0 || input.brake > 0);
       if (race.state === 'racing') {
         this.runSimSteps++;
+        if (car.telemetry.speedAbs > this.runTopSpeed) this.runTopSpeed = car.telemetry.speedAbs;
         const wall = (performance.now() - this.runWallStart) / 1000;
         if (wall > 3) this.runRealtimeRatio = (this.runSimSteps * PHYSICS_DT) / wall;
       }
@@ -759,6 +762,11 @@ export class Game {
     const p = this.carView.group.position.clone();
     this.particles.emit({ count: 80, position: p, spread: 12, color: [new THREE.Color('#22d3ee'), new THREE.Color('#a855f7'), new THREE.Color('#f472b6'), new THREE.Color('#facc15')], size: 0.6, life: 1.1, gravity: 8, drag: 1.2, positionSpread: 2 });
     this.cameraRig.shake(0.3);
+  }
+  /** Extra celebration (world record): big multi-burst fireworks around the car. */
+  celebrate(big: boolean) {
+    const n = big ? 4 : 1;
+    for (let i = 0; i < n; i++) setTimeout(() => this.finishCelebration(), i * 350);
   }
   private finishCelebration() {
     const p = this.carView.group.position.clone();
