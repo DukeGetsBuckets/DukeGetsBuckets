@@ -1,0 +1,2 @@
+# Copy to .dev.vars for local development. Never commit .dev.vars.
+IP_HASH_SECRET=change-me-to-a-long-random-string

@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sawyer-burner",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-08-15",
+  "observability": { "enabled": true },
+
+  // React SPA served as static assets. API + image routes always hit the Worker first.
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/img/*"]
+  },
+
+  // Relational data: users, sessions, posts, comments, reactions, reports, rate limits.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sawyer-burner",
+      // Created with `wrangler d1 create sawyer-burner`.
+      "database_id": "f2964459-1926-4597-a081-0fffbd8a252c",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Photo storage. Objects are deleted by the cron cleanup when posts expire.
+  "r2_buckets": [
+    { "binding": "IMAGES", "bucket_name": "sawyer-burner-images" }
+  ],
+
+  // Every 5 minutes: purge expired posts (+ comments, reactions, reports, R2 objects),
+  // expired sessions and stale rate-limit counters. Hourly at :17 an R2 orphan sweep also runs.
+  "triggers": { "crons": ["*/5 * * * *", "17 * * * *"] },
+
+  "vars": {
+    "APP_NAME": "Sawyer Burner"
+  }
+  // Secrets (set with `npx wrangler secret put <NAME>`; locally in .dev.vars):
+  //   IP_HASH_SECRET – random string used to HMAC client IPs for rate limiting (raw IPs are never stored)
+}
