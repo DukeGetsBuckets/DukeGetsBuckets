@@ -20,12 +20,12 @@
   /* a literal percent sign would be URL-decoded out of the bookmark; esbuild folds fromCharCode(37), so compute it */
   var PCT = String.fromCharCode(Math.floor(37.5));
 
-  if (window[NS] && window[NS].rescan) {
-    window[NS].rescan();
+  if (window[NS] && window[NS].tap) {
+    window[NS].tap();
     return;
   }
 
-  var state = { marks: [], wraps: [], badges: [], panel: null, lines: [], listener: null, gen: 0 };
+  var state = { marks: [], wraps: [], badges: [], panel: null, lines: [], listener: null, gen: 0, hidden: false, keyHandler: null };
 
   /* ---------- 1. collect the visible text as lines ---------- */
 
@@ -147,6 +147,52 @@
       if (m.style === null) m.el.removeAttribute("style"); else m.el.setAttribute("style", m.style);
     }
     state.marks = []; state.wraps = []; state.badges = [];
+    state.hidden = false;
+  }
+
+  /* ---------- hide / show: the x key toggles everything ---------- */
+
+  function setHidden(hide) {
+    hide = !!hide;
+    if (hide === state.hidden) return;
+    state.hidden = hide;
+    var i, m, w;
+    if (state.panel) state.panel.style.display = hide ? "none" : "flex";
+    if (hide) {
+      for (i = state.marks.length - 1; i >= 0; i--) {
+        m = state.marks[i];
+        m.painted = m.el.getAttribute("style");
+        if (m.style === null) m.el.removeAttribute("style"); else m.el.setAttribute("style", m.style);
+      }
+    } else {
+      for (i = 0; i < state.marks.length; i++) {
+        m = state.marks[i];
+        if (typeof m.painted === "string") m.el.setAttribute("style", m.painted);
+      }
+    }
+    for (i = 0; i < state.wraps.length; i++) {
+      w = state.wraps[i];
+      if (hide) { w._painted = w.getAttribute("style"); w.removeAttribute("style"); }
+      else if (typeof w._painted === "string") w.setAttribute("style", w._painted);
+    }
+    for (i = 0; i < state.badges.length; i++) state.badges[i].style.display = hide ? "none" : "inline-block";
+  }
+
+  function isTyping(t) {
+    if (!t || t.nodeType !== 1) return false;
+    if (t.isContentEditable) return true;
+    var tag = t.tagName;
+    if (tag === "TEXTAREA" || tag === "SELECT") return true;
+    if (tag === "INPUT") return !/^(radio|checkbox|button|submit|reset|range|color|file)$/i.test(t.type || "text");
+    return false;
+  }
+
+  function onKey(e) {
+    if (e.defaultPrevented || e.repeat || e.isComposing) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key !== "x" && e.key !== "X") return;
+    if (isTyping(e.target)) return;
+    setHidden(!state.hidden);
   }
 
   function applyAnswers(data) {
@@ -208,8 +254,9 @@
     var title = el("div", { fontWeight: "700", flex: "1 1 auto", fontSize: "15px" }, "ejlnab");
     head.appendChild(title);
     head.appendChild(button("Rescan", function () { run(); }, true));
-    var close = button("\u2715", function () { destroy(); });
-    close.setAttribute("aria-label", "Close Answer Scan and remove the highlights");
+    var close = button("\u2715", function () { setHidden(true); });
+    close.setAttribute("aria-label", "Hide the panel and highlights; press x to bring them back");
+    close.title = "Hide (press x to show again)";
     close.style.width = "36px"; close.style.height = "36px"; close.style.padding = "0"; close.style.borderRadius = "999px";
     close.style.fontSize = "16px"; close.style.lineHeight = "36px";
     head.appendChild(close);
@@ -264,6 +311,7 @@
     clearMarks();
     if (state.panel && state.panel.parentNode) state.panel.parentNode.removeChild(state.panel);
     if (state.listener) window.removeEventListener("message", state.listener);
+    if (state.keyHandler) document.removeEventListener("keydown", state.keyHandler, true);
     state.panel = null;
     try { delete window[NS]; } catch (e) { window[NS] = null; }
   }
@@ -304,6 +352,7 @@
   function run() {
     var gen = ++state.gen;
     var live = function () { return gen === state.gen; };
+    setHidden(false);
     clearMarks();
     state.lines = collect();
     var payload = payloadFor(state.lines);
@@ -328,6 +377,10 @@
     }
   }
 
-  window[NS] = { rescan: run, clear: destroy };
+  function tap() { if (state.hidden) setHidden(false); else run(); }
+
+  state.keyHandler = onKey;
+  document.addEventListener("keydown", onKey, true);
+  window[NS] = { tap: tap, rescan: run, clear: destroy, hide: function () { setHidden(true); }, show: function () { setHidden(false); } };
   run();
 })();

@@ -20,7 +20,11 @@ The landing page is deliberately bare: a black screen with the name and a
    returning the line numbers of the correct choices.
 4. The bookmarklet highlights those lines green, tags each question, and shows
    a black panel at the bottom with the answers and a one-line explanation.
-   **Rescan** runs it again; **✕** removes the panel and every highlight.
+   **Rescan** runs it again.
+5. Press the **x** key to hide the panel and every highlight; press **x** again
+   to bring them back. The ✕ button on the panel hides too, and tapping the
+   bookmark while hidden shows everything again without rescanning. Typing an
+   x inside a text box does not trigger it.
 
 Sites that block outside requests (strict Content Security Policy) get a
 fallback: the panel offers "Open results in a new tab", the scan runs in a tab
