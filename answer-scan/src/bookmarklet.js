@@ -230,7 +230,7 @@
     var p = panel();
     p.style.display = "flex";
     var qs = data.questions || [];
-    p._title.textContent = "Answer Scan · " + qs.length + (qs.length === 1 ? " question" : " questions") + (data.backend ? " · " + data.backend : "");
+    p._title.textContent = qs.length + (qs.length === 1 ? " answer" : " answers") + (data.backend ? " · " + data.backend : "");
     p._body.textContent = "";
     if (!qs.length) {
       p._body.appendChild(el("div", { padding: "6px 0" }, "No questions found on this page. Scroll to the questions and tap Rescan."));
