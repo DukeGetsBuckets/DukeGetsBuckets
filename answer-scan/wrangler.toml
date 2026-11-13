@@ -1,0 +1,27 @@
+name = "answer-scan"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[build]
+command = "node scripts/build-bookmarklet.mjs"
+
+# Workers AI: zero-config answer backend (free tier). Set the ANTHROPIC_API_KEY
+# secret to switch the backend to Claude:  npx wrangler secret put ANTHROPIC_API_KEY
+[ai]
+binding = "AI"
+
+# Per-IP rate limit so a leaked link can't burn the AI quota.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 30, period = 60 }
+
+[[rules]]
+type = "Text"
+globs = ["**/*.html", "**/*.txt"]
+fallthrough = true
+
+[observability]
+enabled = true

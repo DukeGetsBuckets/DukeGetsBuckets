@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Answer Scan</title>
+<meta name="description" content="A Safari bookmark that scans the page you are on, finds the questions, and highlights the answers.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2316a34a'/%3E%3Cpath d='M18 34l10 10 18-22' fill='none' stroke='%23fff' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
+    --green: #16a34a; --green-soft: rgba(34,197,94,.18); --blue: #2563eb; --blue-soft: rgba(37,99,235,.12);
+    --radius: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0b0f17; --card: #141a24; --text: #f3f4f6; --muted: #9ca3af; --line: #273040; --green-soft: rgba(34,197,94,.22); --blue-soft: rgba(37,99,235,.2); }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, Segoe UI, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased; padding: 0 16px calc(32px + env(safe-area-inset-bottom));
+  }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 30px; line-height: 1.15; margin: 32px 0 8px; letter-spacing: -.02em; }
+  h2 { font-size: 19px; margin: 0 0 10px; letter-spacing: -.01em; }
+  p { margin: 0 0 12px; }
+  .muted { color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin: 16px 0; }
+  .btn-big {
+    display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 64px;
+    background: var(--green); color: #fff; font-weight: 700; font-size: 20px; text-decoration: none;
+    border-radius: 18px; border: 0; cursor: grab; box-shadow: 0 10px 30px rgba(22,163,74,.35);
+    -webkit-user-drag: element; user-select: none; -webkit-user-select: none;
+  }
+  .btn-big:active { transform: scale(.98); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px;
+    border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+  .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .btn.green { background: var(--green); border-color: var(--green); color: #fff; }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  ol.steps { padding-left: 22px; margin: 8px 0 0; }
+  ol.steps li { margin: 6px 0; }
+  kbd { font: inherit; font-weight: 600; background: var(--blue-soft); padding: 1px 6px; border-radius: 6px; }
+  textarea { width: 100%; min-height: 72px; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; resize: vertical; }
+  .tabs { display: flex; gap: 6px; background: var(--bg); padding: 4px; border-radius: 12px; margin-bottom: 14px; }
+  .tabs button { flex: 1; min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  .hidden { display: none !important; }
+  fieldset { border: 0; padding: 0; margin: 0 0 14px; }
+  legend { font-weight: 600; margin-bottom: 6px; }
+  .quiz label { display: block; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; margin: 6px 0; cursor: pointer; }
+  .quiz input { margin-right: 8px; }
+  .status { padding: 10px 12px; border-radius: 10px; background: var(--blue-soft); margin-top: 12px; }
+  .status.error { background: rgba(220,38,38,.12); }
+  .result { border-top: 1px solid var(--line); padding: 12px 0; }
+  .result:first-child { border-top: 0; }
+  .result .q { color: var(--muted); font-size: 14px; }
+  .result .a { font-weight: 700; color: var(--green); font-size: 18px; }
+  .result .a small { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 8px; }
+  .result .e { font-size: 14px; color: var(--muted); }
+  .drop { border: 2px dashed var(--line); border-radius: 14px; padding: 18px; text-align: center; }
+  .drop input { display: none; }
+  footer { margin-top: 28px; color: var(--muted); font-size: 13px; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-weight: 600; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <div id="relay" class="hidden">
+    <h1>Answer Scan</h1>
+    <p class="muted" id="relayStatus">Waiting for the page that opened this tab…</p>
+    <div class="card"><div id="relayResults"></div></div>
+    <p class="muted">Keep this tab open. Answers also get highlighted back on the original page.</p>
+  </div>
+
+  <div id="install">
+    <h1>Answer Scan</h1>
+    <p class="muted">One tap finds every question on the page you are looking at and highlights the answer. Runs from a Safari bookmark, so it works on iPhone, iPad and Mac.</p>
+
+    <div class="card">
+      <a id="bm" class="btn-big" href="#" title="Drag me to the Favorites bar">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="m8 11 2 2 4-4"/></svg>
+        Scan this page
+      </a>
+      <div class="row">
+        <button id="copy" class="btn primary" type="button">Copy bookmark code</button>
+        <button id="demo" class="btn" type="button">Try it on this page</button>
+      </div>
+      <p class="muted" style="margin:12px 0 0;font-size:14px">On a Mac, drag the green button onto the Favorites bar and you are done. On iPhone or iPad use the steps below.</p>
+    </div>
+
+    <div class="card">
+      <h2>Install on iPhone / iPad</h2>
+      <ol class="steps">
+        <li>Tap <kbd>Copy bookmark code</kbd> above.</li>
+        <li>Tap Safari's <kbd>Share</kbd> button, choose <kbd>Add Bookmark</kbd>, name it <b>Answer Scan</b>, tap <kbd>Save</kbd>.</li>
+        <li>Open <kbd>Bookmarks</kbd> (the book icon), tap <kbd>Edit</kbd>, tap the <b>Answer Scan</b> bookmark.</li>
+        <li>Clear the address field, <kbd>Paste</kbd> the code, tap <kbd>Done</kbd>.</li>
+        <li>On any quiz page: open Bookmarks and tap <b>Answer Scan</b>. Answers light up green.</li>
+      </ol>
+      <details style="margin-top:12px">
+        <summary class="muted">Show the code (if you want to paste it by hand)</summary>
+        <textarea id="code" readonly spellcheck="false"></textarea>
+      </details>
+    </div>
+
+    <div class="card quiz">
+      <h2>Test it here</h2>
+      <p class="muted">Tap <b>Try it on this page</b> (or your new bookmark) and watch the right answers get highlighted.</p>
+      <fieldset>
+        <legend>1. Which gas do plants take in during photosynthesis?</legend>
+        <label><input type="radio" name="q1"> Oxygen</label>
+        <label><input type="radio" name="q1"> Carbon dioxide</label>
+        <label><input type="radio" name="q1"> Nitrogen</label>
+        <label><input type="radio" name="q1"> Hydrogen</label>
+      </fieldset>
+      <fieldset>
+        <legend>2. What is the value of 7 × 8?</legend>
+        <label><input type="radio" name="q2"> 54</label>
+        <label><input type="radio" name="q2"> 56</label>
+        <label><input type="radio" name="q2"> 58</label>
+      </fieldset>
+      <fieldset>
+        <legend>3. True or false: the chemical formula for table salt is NaCl.</legend>
+        <label><input type="radio" name="q3"> True</label>
+        <label><input type="radio" name="q3"> False</label>
+      </fieldset>
+      <fieldset>
+        <legend>4. Short answer: what is the capital of Australia?</legend>
+        <input type="text" placeholder="Type your answer" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit">
+      </fieldset>
+    </div>
+
+    <div class="card">
+      <h2>Screenshot mode</h2>
+      <p class="muted">For apps, PDFs or pages where a bookmark cannot run: take a screenshot, then pick it here.</p>
+      <label class="drop">
+        <input id="file" type="file" accept="image/*">
+        <span class="btn green" style="pointer-events:none">Choose a screenshot</span>
+        <div class="muted" style="margin-top:8px;font-size:14px">or paste an image anywhere on this page</div>
+      </label>
+      <div id="shotStatus" class="hidden"></div>
+      <div id="shotResults"></div>
+    </div>
+
+    <footer>
+      <p>Backend: <span class="pill">__BACKEND__</span></p>
+      <p>Built for studying and checking your own work. Do not use it where outside help is not allowed.</p>
+    </footer>
+  </div>
+</main>
+
+<script>
+(function () {
+  var BOOKMARKLET = __BOOKMARKLET_JSON__;
+  var $ = function (id) { return document.getElementById(id); };
+  var params = new URLSearchParams(location.search);
+
+  function renderResults(container, data) {
+    container.textContent = "";
+    var qs = (data && data.questions) || [];
+    if (!qs.length) {
+      var none = document.createElement("div");
+      none.className = "muted";
+      none.textContent = "No questions found.";
+      container.appendChild(none);
+      return;
+    }
+    qs.forEach(function (q, i) {
+      var r = document.createElement("div"); r.className = "result";
+      var qEl = document.createElement("div"); qEl.className = "q"; qEl.textContent = "Q" + (i + 1) + ". " + (q.question || "");
+      var aEl = document.createElement("div"); aEl.className = "a"; aEl.textContent = q.answer || "?";
+      if (typeof q.confidence === "number") {
+        var c = document.createElement("small"); c.textContent = Math.round(q.confidence * 100) + "% sure"; aEl.appendChild(c);
+      }
+      r.appendChild(qEl); r.appendChild(aEl);
+      if (q.explanation) { var e = document.createElement("div"); e.className = "e"; e.textContent = q.explanation; r.appendChild(e); }
+      container.appendChild(r);
+    });
+  }
+
+  function ask(payload) {
+    return fetch("/api/answer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }); });
+  }
+
+  /* ---- relay mode: another page opened us because its site blocks fetch ---- */
+  if (params.get("relay") === "1" && window.opener) {
+    $("install").classList.add("hidden");
+    $("relay").classList.remove("hidden");
+    var status = $("relayStatus");
+    window.addEventListener("message", function (e) {
+      if (!e.data || e.data.type !== "answerscan-scan") return;
+      var source = e.source, origin = e.origin;
+      status.textContent = "Scanning " + (e.data.payload.lines || []).length + " lines from " + origin + "…";
+      ask(e.data.payload).then(function (data) {
+        status.textContent = (data.questions || []).length + " question(s) answered. Switch back to the other tab to see the highlights.";
+        renderResults($("relayResults"), data);
+        source.postMessage({ type: "answerscan-result", data: data }, origin);
+      }).catch(function (err) {
+        status.textContent = "Error: " + err.message;
+        source.postMessage({ type: "answerscan-error", error: err.message }, origin);
+      });
+    });
+    window.opener.postMessage({ type: "answerscan-ready" }, "*");
+    return;
+  }
+
+  /* ---- install page ---- */
+  var bm = $("bm");
+  bm.setAttribute("href", BOOKMARKLET);
+  bm.addEventListener("click", function (e) { e.preventDefault(); runHere(); });
+  $("code").value = BOOKMARKLET;
+
+  function runHere() {
+    try { new Function(BOOKMARKLET.replace(/^javascript:/, ""))(); }
+    catch (err) { alert("Could not run the scanner: " + err.message); }
+  }
+  $("demo").addEventListener("click", runHere);
+
+  $("copy").addEventListener("click", function () {
+    var btn = this, done = function (ok) {
+      btn.textContent = ok ? "Copied! Now add a bookmark" : "Copy failed - use the code box below";
+      setTimeout(function () { btn.textContent = "Copy bookmark code"; }, 3000);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(BOOKMARKLET).then(function () { done(true); }, function () { fallbackCopy(done); });
+    } else fallbackCopy(done);
+  });
+  function fallbackCopy(done) {
+    var ta = $("code"); ta.closest("details").open = true; ta.focus(); ta.select();
+    try { done(document.execCommand("copy")); } catch (e) { done(false); }
+  }
+
+  /* ---- screenshot mode ---- */
+  var shotStatus = $("shotStatus"), shotResults = $("shotResults");
+  function setShot(msg, isError) {
+    shotStatus.className = "status" + (isError ? " error" : "");
+    shotStatus.textContent = msg;
+  }
+  function downscale(file) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        var max = 1600, w = img.naturalWidth, h = img.naturalHeight, s = Math.min(1, max / Math.max(w, h));
+        var c = document.createElement("canvas"); c.width = Math.round(w * s); c.height = Math.round(h * s);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        var dataUrl = c.toDataURL("image/jpeg", 0.88);
+        resolve({ media_type: "image/jpeg", data: dataUrl.split(",")[1] });
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("That file is not an image Safari can read.")); };
+      img.src = url;
+    });
+  }
+  function scanImage(file) {
+    if (!file) return;
+    shotResults.textContent = "";
+    setShot("Reading the screenshot…");
+    downscale(file).then(function (image) {
+      setShot("Finding questions…");
+      return ask({ image: image, title: "screenshot" });
+    }).then(function (data) {
+      setShot((data.questions || []).length + " question(s) found · " + (data.backend || ""));
+      renderResults(shotResults, data);
+    }).catch(function (err) { setShot("Error: " + err.message, true); });
+  }
+  $("file").addEventListener("change", function () { scanImage(this.files && this.files[0]); this.value = ""; });
+  document.addEventListener("paste", function (e) {
+    var items = (e.clipboardData && e.clipboardData.items) || [];
+    for (var i = 0; i < items.length; i++) if (items[i].type.indexOf("image/") === 0) { scanImage(items[i].getAsFile()); break; }
+  });
+})();
+</script>
+</body>
+</html>
