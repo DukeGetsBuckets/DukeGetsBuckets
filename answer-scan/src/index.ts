@@ -180,7 +180,7 @@ async function handleAnswer(request: Request, env: Env): Promise<Response> {
     const result = env.ANTHROPIC_API_KEY
       ? await askClaude(env, lines, image, body)
       : await askWorkersAI(env, lines, image, body);
-    const questions = normalize(result.raw, lines.length);
+    const questions = normalize(result.raw, lines);
     console.log(JSON.stringify({
       event: "scan", ...where, image: !!image, lines: lines.length, chars: lines.join("").length,
       questions: questions.length, located: questions.filter((q) => q.answer_lines.length).length,
@@ -353,7 +353,34 @@ function parseJson(v: unknown): unknown {
   }
 }
 
-function normalize(raw: unknown, lineCount: number): Question[] {
+/** Loose text comparison used to confirm that a cited line really holds the answer. */
+function normText(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/^[([]?[a-z0-9]{1,2}[)\].:]\s+/i, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** True when the page line plausibly contains the answer (models often cite lines that do not). */
+function lineMatchesAnswer(lineText: string, answer: string): boolean {
+  const letter = lineText.trim().match(/^[([]?([a-z0-9]{1,2})[)\].:]\s*/i);
+  const bare = answer.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (letter && bare && letter[1].toLowerCase() === bare) return true; // answer given as "B" for a "B) ..." line
+  const l = normText(lineText);
+  const a = normText(answer);
+  if (!l || !a) return false;
+  if (l === a) return true;
+  if (a.length >= 3 && l.includes(a)) return true;
+  if (l.length >= 3 && a.includes(l)) return true;
+  if (a.length < 3 && l.split(" ").includes(a)) return true;
+  // multi-part answers: "A and C", "red; blue", "2, 3"
+  const parts = answer.split(/\s*(?:;|,|\band\b|\/|\|)\s*/i).map(normText).filter((p) => p.length >= 2);
+  return parts.length > 1 && parts.some((p) => l === p || (p.length >= 3 && l.includes(p)));
+}
+
+function normalize(raw: unknown, lines: string[]): Question[] {
+  const lineCount = lines.length;
   const list = raw && typeof raw === "object" && Array.isArray((raw as { questions?: unknown }).questions)
     ? ((raw as { questions: unknown[] }).questions)
     : [];
@@ -365,12 +392,15 @@ function normalize(raw: unknown, lineCount: number): Question[] {
       const i = typeof n === "number" ? Math.trunc(n) : typeof n === "string" ? parseInt(n, 10) : NaN;
       return Number.isFinite(i) && i >= 0 && i < lineCount ? i : -1;
     };
-    const answerLines = Array.isArray(q.answer_lines) ? q.answer_lines.map(toLine).filter((i) => i >= 0) : [];
+    const answer = String(q.answer ?? "").slice(0, 1000);
+    const answerLines = Array.isArray(q.answer_lines)
+      ? q.answer_lines.map(toLine).filter((i) => i >= 0 && lineMatchesAnswer(lines[i], answer))
+      : [];
     const conf = typeof q.confidence === "number" ? Math.max(0, Math.min(1, q.confidence)) : 0.5;
     out.push({
       question_line: toLine(q.question_line),
       question: String(q.question ?? "").slice(0, 500),
-      answer: String(q.answer ?? "").slice(0, 1000),
+      answer,
       answer_lines: [...new Set(answerLines)],
       explanation: String(q.explanation ?? "").slice(0, 600),
       confidence: conf,
