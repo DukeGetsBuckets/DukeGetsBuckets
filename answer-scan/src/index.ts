@@ -28,6 +28,7 @@ interface AnswerRequest {
   image?: { media_type?: string; data?: string };
   url?: string;
   title?: string;
+  v?: string;
 }
 
 interface Question {
@@ -173,16 +174,35 @@ async function handleAnswer(request: Request, env: Env): Promise<Response> {
   if (!image && !lines.length) return json({ error: "Send either lines[] of page text or an image." }, 400);
   if (body.image && !image) return json({ error: "Image must be a base64 JPEG, PNG, GIF or WebP under 4.5 MB." }, 400);
 
+  const started = Date.now();
+  const where = describeSource(body);
   try {
     const result = env.ANTHROPIC_API_KEY
       ? await askClaude(env, lines, image, body)
       : await askWorkersAI(env, lines, image, body);
     const questions = normalize(result.raw, lines.length);
+    console.log(JSON.stringify({
+      event: "scan", ...where, image: !!image, lines: lines.length, chars: lines.join("").length,
+      questions: questions.length, located: questions.filter((q) => q.answer_lines.length).length,
+      model: result.model, ms: Date.now() - started,
+    }));
     return json({ questions, backend: result.backend, model: result.model });
   } catch (err) {
-    console.error("answer failed", err);
+    console.error(JSON.stringify({ event: "scan-error", ...where, lines: lines.length, image: !!image, ms: Date.now() - started, error: describeError(err) }));
     return json({ error: describeError(err) }, 502);
   }
+}
+
+function describeSource(body: AnswerRequest): { host: string; path: string; title: string; v: string } {
+  let host = "", path = "";
+  try {
+    const u = new URL(String(body.url || ""));
+    host = u.host;
+    path = u.pathname.slice(0, 80);
+  } catch {
+    /* no usable url */
+  }
+  return { host, path, title: String(body.title || "").slice(0, 80), v: String(body.v || "") };
 }
 
 function parseLines(v: unknown): string[] {

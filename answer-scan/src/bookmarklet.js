@@ -17,6 +17,9 @@
   var BLUE = "rgb(37,99,235)";
   var MAX_CHARS = 48000;
   var MAX_LINES = 700;
+  var HARD_CHARS = 250000;
+  var HARD_LINES = 3000;
+  var VERSION = "5";
   /* a literal percent sign would be URL-decoded out of the bookmark; esbuild folds fromCharCode(37), so compute it */
   var PCT = String.fromCharCode(Math.floor(37.5));
 
@@ -51,7 +54,7 @@
     }
 
     function walk(node) {
-      if (total > MAX_CHARS || lines.length > MAX_LINES) return;
+      if (total > HARD_CHARS || lines.length > HARD_LINES) return;
       if (node.nodeType === 3) {
         var t = node.nodeValue.replace(/\s+/g, " ").trim();
         if (!t) return;
@@ -80,7 +83,31 @@
 
     walk(document.body);
     flush();
-    return lines;
+    return trimToBudget(lines);
+  }
+
+  function lineTop(line) {
+    try { return line.el.getBoundingClientRect().top + (window.pageYOffset || 0); } catch (e) { return 0; }
+  }
+
+  // Long pages: send the lines nearest to what is on screen, in document order.
+  function trimToBudget(lines) {
+    var total = 0, i;
+    for (i = 0; i < lines.length; i++) total += lines[i].text.length;
+    if (lines.length <= MAX_LINES && total <= MAX_CHARS) return lines;
+    var center = (window.pageYOffset || 0) + (window.innerHeight || 800) / 2;
+    var order = [];
+    for (i = 0; i < lines.length; i++) order.push({ idx: i, d: Math.abs(lineTop(lines[i]) - center) });
+    order.sort(function (a, b) { return a.d - b.d; });
+    var keep = {}, chars = 0, count = 0;
+    for (i = 0; i < order.length; i++) {
+      var l = lines[order[i].idx];
+      if (count >= MAX_LINES || chars + l.text.length > MAX_CHARS) break;
+      keep[order[i].idx] = true; chars += l.text.length; count++;
+    }
+    var out = [];
+    for (i = 0; i < lines.length; i++) if (keep[i]) out.push(lines[i]);
+    return out;
   }
 
   /* ---------- 2. highlighting ---------- */
@@ -195,23 +222,48 @@
     setHidden(!state.hidden);
   }
 
+  var ANSWER_CSS = {
+    background: GREEN, outline: "3px solid " + GREEN_LINE, outlineOffset: "2px", borderRadius: "6px",
+    boxShadow: "0 0 0 6px rgba(34,197,94,.18)"
+  };
+
+  function stripPrefix(t) { return t.replace(/^[\(\[]?[a-z0-9][\)\].:]\s*/i, "").trim(); }
+
+  // Find the line whose text is the answer (ignoring an "A)" / "1." prefix), preferably after the question.
+  function findLineByText(answer, fromIdx) {
+    var a = norm(answer).toLowerCase();
+    if (!a) return -1;
+    var best = -1;
+    for (var i = 0; i < state.lines.length; i++) {
+      if (i === fromIdx) continue;
+      var t = norm(state.lines[i].text).toLowerCase();
+      if (t === a || stripPrefix(t) === a || stripPrefix(t) === stripPrefix(a)) {
+        if (i > fromIdx) return i;
+        if (best < 0) best = i;
+      }
+    }
+    return best;
+  }
+
   function applyAnswers(data) {
     clearMarks();
     var qs = data.questions || [];
     var firstHit = null;
     for (var i = 0; i < qs.length; i++) {
       var q = qs[i];
-      var qEl = highlightLine(state.lines[q.question_line], { borderLeft: "4px solid " + BLUE, paddingLeft: "6px", borderRadius: "4px" });
+      var qIdx = typeof q.question_line === "number" ? q.question_line : -1;
+      var qEl = highlightLine(state.lines[qIdx], { borderLeft: "4px solid " + BLUE, paddingLeft: "6px", borderRadius: "4px" });
       badge(qEl, "Q" + (i + 1), BLUE);
-      var hit = false;
+      var hit = false, el;
       for (var j = 0; j < (q.answer_lines || []).length; j++) {
         var line = state.lines[q.answer_lines[j]];
-        if (!line || q.answer_lines[j] === q.question_line) continue;
-        var el = highlightLine(line, {
-          background: GREEN, outline: "3px solid " + GREEN_LINE, outlineOffset: "2px", borderRadius: "6px",
-          boxShadow: "0 0 0 6px rgba(34,197,94,.18)"
-        });
+        if (!line || q.answer_lines[j] === qIdx) continue;
+        el = highlightLine(line, ANSWER_CSS);
         if (el) { hit = true; if (!firstHit) firstHit = el; }
+      }
+      if (!hit && q.answer) {
+        var k = findLineByText(q.answer, qIdx);
+        if (k >= 0) { el = highlightLine(state.lines[k], ANSWER_CSS); if (el) { hit = true; if (!firstHit) firstHit = el; } }
       }
       if (!hit && q.answer) badge(qEl, "Answer: " + q.answer, GREEN_LINE);
     }
@@ -283,7 +335,8 @@
     p._title.textContent = qs.length + (qs.length === 1 ? " answer" : " answers") + (data.backend ? " · " + data.backend : "");
     p._body.textContent = "";
     if (!qs.length) {
-      p._body.appendChild(el("div", { padding: "6px 0" }, "No questions found on this page. Scroll to the questions and tap Rescan."));
+      p._body.appendChild(el("div", { padding: "6px 0" }, "No questions found in the " + state.lines.length + " lines scanned. Scroll to the questions and tap Rescan."));
+      frameButtons(p._body);
       return;
     }
     for (var i = 0; i < qs.length; i++) {
@@ -296,6 +349,23 @@
       if (q.explanation) row.appendChild(el("div", { fontSize: "13px", opacity: ".8", marginTop: "2px" }, q.explanation));
       p._body.appendChild(row);
     }
+  }
+
+  // Quizzes embedded in a frame cannot be read from the outer page: offer to open the frame itself.
+  function frameButtons(container) {
+    var frames = document.querySelectorAll("iframe"), added = 0;
+    for (var i = 0; i < frames.length && added < 4; i++) {
+      var f = frames[i], src = f.src || "";
+      var r = f.getBoundingClientRect();
+      if (!/^https?:/.test(src) || r.width < 200 || r.height < 150) continue;
+      (function (url) {
+        var b = button("Open the quiz frame in a new tab, then scan there", function () { window.open(url, "_blank"); }, true);
+        b.style.marginLeft = "0"; b.style.marginTop = "6px";
+        container.appendChild(b);
+      })(src);
+      added++;
+    }
+    if (added) container.appendChild(el("div", { fontSize: "13px", opacity: ".8", marginTop: "6px" }, "The quiz looks like it is inside a frame, which the bookmark cannot read from this page."));
   }
 
   function showError(msg, payload) {
@@ -321,12 +391,18 @@
   function payloadFor(lines) {
     var texts = [];
     for (var i = 0; i < lines.length; i++) texts.push(lines[i].text);
-    return { lines: texts, url: location.href, title: document.title };
+    return { lines: texts, url: location.href, title: document.title, v: VERSION };
   }
 
   function finish(data) {
-    applyAnswers(data);
-    renderPanel(data);
+    var wasHidden = state.hidden; // x pressed while the scan was running: keep the result hidden
+    try {
+      applyAnswers(data);
+      renderPanel(data);
+      if (wasHidden) setHidden(true);
+    } catch (e) {
+      setStatus("Error while highlighting: " + (e && e.message ? e.message : e));
+    }
   }
 
   function popupPreferred() {
@@ -356,7 +432,12 @@
     clearMarks();
     state.lines = collect();
     var payload = payloadFor(state.lines);
-    if (!payload.lines.length) { setStatus("Nothing readable on this page yet. Wait for it to load, then tap Rescan."); return; }
+    if (!payload.lines.length) {
+      var hint = el("div");
+      frameButtons(hint);
+      setStatus("Nothing readable on this page yet. Wait for it to load, then tap Rescan.", hint);
+      return;
+    }
     if (popupPreferred()) { viaPopup(payload, live); return; }
     setStatus("Scanning " + payload.lines.length + " lines...");
     var ok = false;
@@ -377,7 +458,7 @@
     }
   }
 
-  function tap() { if (state.hidden) setHidden(false); else run(); }
+  function tap() { run(); }
 
   state.keyHandler = onKey;
   document.addEventListener("keydown", onKey, true);
