@@ -25,7 +25,7 @@
     return;
   }
 
-  var state = { marks: [], wraps: [], badges: [], panel: null, lines: [], listener: null };
+  var state = { marks: [], wraps: [], badges: [], panel: null, lines: [], listener: null, gen: 0 };
 
   /* ---------- 1. collect the visible text as lines ---------- */
 
@@ -199,17 +199,20 @@
     if (state.panel && state.panel.parentNode) return state.panel;
     var p = el("div", {
       position: "fixed", left: "0", right: "0", bottom: "0", zIndex: "2147483647", maxHeight: "46vh",
-      display: "flex", flexDirection: "column", background: "rgba(17,24,39,.97)", color: "rgb(249,250,251)",
-      font: "14px/1.45 -apple-system,system-ui,sans-serif", borderTop: "1px solid rgba(255,255,255,.12)",
+      display: "flex", flexDirection: "column", background: "rgba(0,0,0,.96)", color: "rgb(249,250,251)",
+      font: "14px/1.45 -apple-system,system-ui,sans-serif", borderTop: "1px solid rgba(255,255,255,.18)",
       boxShadow: "0 -8px 30px rgba(0,0,0,.35)", borderRadius: "16px 16px 0 0", textAlign: "left",
       paddingBottom: "env(safe-area-inset-bottom)"
     });
     var head = el("div", { display: "flex", alignItems: "center", padding: "10px 12px", gap: "6px", flex: "0 0 auto" });
-    var title = el("div", { fontWeight: "700", flex: "1 1 auto", fontSize: "15px" }, "Answer Scan");
+    var title = el("div", { fontWeight: "700", flex: "1 1 auto", fontSize: "15px" }, "ejlnab");
     head.appendChild(title);
     head.appendChild(button("Rescan", function () { run(); }, true));
-    head.appendChild(button("Hide", function () { p.style.display = "none"; }));
-    head.appendChild(button("Clear", function () { destroy(); }));
+    var close = button("\u2715", function () { destroy(); });
+    close.setAttribute("aria-label", "Close Answer Scan and remove the highlights");
+    close.style.width = "36px"; close.style.height = "36px"; close.style.padding = "0"; close.style.borderRadius = "999px";
+    close.style.fontSize = "16px"; close.style.lineHeight = "36px";
+    head.appendChild(close);
     var body = el("div", { overflow: "auto", padding: "0 12px 12px", flex: "1 1 auto", WebkitOverflowScrolling: "touch" });
     p.appendChild(head); p.appendChild(body);
     p._title = title; p._body = body;
@@ -250,13 +253,14 @@
 
   function showError(msg, payload) {
     var wrap = el("div");
-    var b = button("Open results in a new tab", function () { viaPopup(payload); }, true);
+    var b = button("Open results in a new tab", function () { viaPopup(payload, function () { return true; }); }, true);
     b.style.marginLeft = "0";
     wrap.appendChild(b);
     setStatus(msg, payload ? wrap : null);
   }
 
   function destroy() {
+    state.gen++;
     clearMarks();
     if (state.panel && state.panel.parentNode) state.panel.parentNode.removeChild(state.panel);
     if (state.listener) window.removeEventListener("message", state.listener);
@@ -281,27 +285,30 @@
     try { return sessionStorage.getItem("answerscan.popup") === "1"; } catch (e) { return false; }
   }
 
-  function viaPopup(payload) {
+  function viaPopup(payload, live) {
+    live = live || function () { return true; };
     try { sessionStorage.setItem("answerscan.popup", "1"); } catch (e) { }
     var w = window.open(APP + "/?relay=1", "answerscan_relay");
     if (!w) { setStatus("Safari blocked the pop-up. Allow pop-ups for this site, then tap the bookmark again."); return; }
-    setStatus("Sending the page to Answer Scan in a new tab...");
+    setStatus("Sending the page to the new tab...");
     if (state.listener) window.removeEventListener("message", state.listener);
     state.listener = function (e) {
-      if (e.origin !== APP || !e.data) return;
+      if (e.origin !== APP || !e.data || !live()) return;
       if (e.data.type === "answerscan-ready") w.postMessage({ type: "answerscan-scan", payload: payload }, APP);
       else if (e.data.type === "answerscan-result") finish(e.data.data);
-      else if (e.data.type === "answerscan-error") setStatus("Answer Scan error: " + e.data.error);
+      else if (e.data.type === "answerscan-error") setStatus("Error: " + e.data.error);
     };
     window.addEventListener("message", state.listener);
   }
 
   function run() {
+    var gen = ++state.gen;
+    var live = function () { return gen === state.gen; };
     clearMarks();
     state.lines = collect();
     var payload = payloadFor(state.lines);
     if (!payload.lines.length) { setStatus("Nothing readable on this page yet. Wait for it to load, then tap Rescan."); return; }
-    if (popupPreferred()) { viaPopup(payload); return; }
+    if (popupPreferred()) { viaPopup(payload, live); return; }
     setStatus("Scanning " + payload.lines.length + " lines...");
     var ok = false;
     try {
@@ -310,9 +317,10 @@
           ok = true;
           return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; });
         })
-        .then(finish)
+        .then(function (data) { if (live()) finish(data); })
         .catch(function (err) {
-          if (ok) setStatus("Answer Scan error: " + (err && err.message ? err.message : err));
+          if (!live()) return;
+          if (ok) setStatus("Error: " + (err && err.message ? err.message : err));
           else showError("This site blocks outside requests, so the scan has to run in a new tab.", payload);
         });
     } catch (e) {
