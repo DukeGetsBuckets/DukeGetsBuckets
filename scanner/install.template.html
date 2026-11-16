@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Question Scanner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+  /* Layout: a single reading column; the generated code sits in a highlighted "ticket" block. */
+  :root {
+    --bg: #f6f7fb; --fg: #16181d; --muted: #5d6470; --panel: #ffffff; --line: #d9dde6;
+    --accent: #0b5fff; --accent-fg: #ffffff; --soft: #e8efff; --ok: #1d7a46; --warn: #8a5a00;
+    --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-head: "Space Grotesk", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101217; --fg: #e9ebf0; --muted: #9aa3b2; --panel: #181b22; --line: #2b303b;
+      --accent: #5b94ff; --accent-fg: #0b1020; --soft: #1a2640; --ok: #5ed28e; --warn: #f0b84a; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101217; --fg: #e9ebf0; --muted: #9aa3b2; --panel: #181b22; --line: #2b303b;
+    --accent: #5b94ff; --accent-fg: #0b1020; --soft: #1a2640; --ok: #5ed28e; --warn: #f0b84a; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 var(--font-body);
+    padding-block: 32px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  main { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+  h1, h2 { font-family: var(--font-head); text-wrap: balance; margin: 0; line-height: 1.15; }
+  h1 { font-size: clamp(30px, 5vw, 40px); }
+  h2 { font-size: 21px; }
+  p { margin: 0; }
+  .lede { color: var(--muted); font-size: 17px; max-width: 60ch; }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  section { display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  label { font-size: 13px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 4px; }
+  input, select, textarea { font: inherit; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--fg); min-height: 44px; }
+  input:focus, select:focus, textarea:focus, button:focus-visible { outline: 3px solid var(--soft); outline-offset: 1px; border-color: var(--accent); }
+  textarea { font-family: var(--font-mono); font-size: 12px; line-height: 1.4; height: 120px; resize: vertical; word-break: break-all; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button { font: inherit; font-weight: 600; border: 1px solid var(--line); border-radius: 10px; padding: 0 16px; min-height: 44px; background: var(--panel); color: var(--fg); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  button:active { transform: translateY(1px); }
+  .hint { font-size: 13px; color: var(--muted); }
+  .ticket { background: var(--soft); border: 1px dashed var(--accent); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .ticket[hidden] { display: none; }
+  .status { font-size: 14px; font-weight: 600; min-height: 1.4em; }
+  .status.ok { color: var(--ok); }
+  ol.steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
+  ol.steps li::marker { font-weight: 700; color: var(--accent); }
+  kbd { font-family: var(--font-body); font-weight: 600; background: var(--soft); border-radius: 6px; padding: 1px 6px; }
+  details { border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; background: var(--panel); }
+  summary { cursor: pointer; font-weight: 600; }
+  details p, details ul { margin-top: 10px; }
+  ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  a { color: var(--accent); }
+  .drag { display: inline-block; padding: 10px 16px; border-radius: 10px; background: var(--accent); color: var(--accent-fg); font-weight: 700; text-decoration: none; }
+  .desktop-only { display: none; }
+  @media (hover: hover) and (pointer: fine) { .desktop-only { display: block; } }
+  footer { font-size: 13px; color: var(--muted); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Safari bookmarklet for iPad</p>
+    <h1>Question Scanner</h1>
+    <p class="lede">One tap on any page finds the questions on it, pulls out answers the page already contains, and can ask Claude for the rest. Build your copy below, then add it to Safari as a bookmark.</p>
+  </header>
+
+  <section>
+    <h2>1. Build your bookmarklet</h2>
+    <div class="card">
+      <div>
+        <label for="apiKey">Claude API key (optional)</label>
+        <input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <p class="hint">Without a key the scanner still finds questions, shows answers hidden in the page, and gives you a Search button for each question. With a key, the <strong>Ask AI</strong> button answers everything. The key is baked into the bookmark on your iPad and is only ever sent to api.anthropic.com. Get one at platform.claude.com. Never share a bookmark that contains your key.</p>
+      </div>
+      <div class="grid">
+        <div>
+          <label for="model">Model</label>
+          <select id="model">
+            <option value="claude-opus-5-5">Claude Opus 5.5 (most accurate)</option>
+            <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (faster)</option>
+            <option value="claude-haiku-5-5">Claude Haiku 5.5 (cheapest)</option>
+          </select>
+        </div>
+        <div>
+          <label for="effort">Effort</label>
+          <select id="effort">
+            <option value="medium">Medium (quick)</option>
+            <option value="high" selected>High (recommended)</option>
+            <option value="xhigh">Extra high (slow, careful)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <button class="primary" id="build" type="button">Build bookmarklet</button>
+        <span class="hint" id="size"></span>
+      </div>
+    </div>
+    <div class="ticket" id="ticket" hidden>
+      <label for="code">Your bookmarklet code</label>
+      <textarea id="code" readonly spellcheck="false"></textarea>
+      <div class="row">
+        <button class="primary" id="copy" type="button">Copy code</button>
+        <span class="status" id="status" aria-live="polite"></span>
+      </div>
+      <p class="desktop-only">On a Mac or PC you can skip the copying: drag this to your bookmarks bar instead. <a class="drag" id="drag" href="#">Scan questions</a></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>2. Add it to Safari on your iPad</h2>
+    <div class="card">
+      <ol class="steps">
+        <li>Tap <strong>Copy code</strong> above.</li>
+        <li>Bookmark this page: tap the <strong>Share</strong> button, then <strong>Add Bookmark</strong>, name it <kbd>Scan</kbd>, and tap <strong>Save</strong>.</li>
+        <li>Open your bookmarks (the book icon), tap <strong>Edit</strong>, then tap the <kbd>Scan</kbd> bookmark.</li>
+        <li>Clear the <strong>Address</strong> field, paste the copied code into it, and tap <strong>Done</strong>.</li>
+      </ol>
+      <p class="hint">Safari keeps the whole code in the bookmark, even though the address field only shows the start of it.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. Use it</h2>
+    <div class="card">
+      <ol class="steps">
+        <li>Open the page with the questions.</li>
+        <li>Open your bookmarks and tap <kbd>Scan</kbd>, or type <kbd>scan</kbd> in the address bar and tap the bookmark when it appears.</li>
+        <li>A panel appears in the corner with every question it found. Green options were marked correct somewhere in the page. Tap <strong>Ask AI</strong> for Claude's answers, <strong>Search</strong> to look one up, or <strong>Show</strong> to jump to it.</li>
+        <li>Tap the bookmark again after the page changes to rescan. Tap <strong>✕</strong> to close.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <h2>Good to know</h2>
+    <details>
+      <summary>How it finds answers in the page</summary>
+      <ul>
+        <li>Options tagged with attributes such as <code>data-correct</code>, <code>data-answer</code>, or classes like <code>correct</code>.</li>
+        <li>Hidden inputs and hidden text such as "Answer: B" next to the question.</li>
+        <li>Quiz data embedded in <code>&lt;script&gt;</code> JSON or in global JavaScript variables.</li>
+      </ul>
+      <p>Many quiz sites only check answers on their server, so nothing is in the page. That is what Ask AI and Search are for.</p>
+    </details>
+    <details>
+      <summary>Ask AI says it cannot reach the API</summary>
+      <p>Some sites block outside requests. Use <strong>Copy for Claude</strong> in the panel and paste the questions into the Claude app instead. A <em>401 CORS</em> message means your Claude organization does not allow browser requests at all.</p>
+    </details>
+    <details>
+      <summary>Privacy and cost</summary>
+      <p>Nothing leaves the page unless you tap Ask AI. That sends the questions, and by default the page text, to api.anthropic.com using your key, which you pay for per request. Turn off page context in the panel's settings (⚙︎) to send less.</p>
+    </details>
+  </section>
+
+  <footer>Question Scanner v__QSCAN_VERSION__ · Source and updates live in the <code>scanner</code> folder of the repository.</footer>
+</main>
+<script>
+(function () {
+  var CODE = __QSCAN_CODE__;
+  var $ = function (id) { return document.getElementById(id); };
+  var keyEl = $('apiKey'), modelEl = $('model'), effortEl = $('effort'), codeEl = $('code'), status = $('status');
+  try { modelEl.value = localStorage.getItem('qscan.install.model') || modelEl.value; effortEl.value = localStorage.getItem('qscan.install.effort') || effortEl.value; } catch (e) {}
+
+  function build() {
+    var cfg = { model: modelEl.value, effort: effortEl.value };
+    var key = keyEl.value.trim();
+    if (key) cfg.key = key;
+    var wrapped = '(function(){var __qscanCfg=' + JSON.stringify(cfg) + ';' + CODE + '})()';
+    var url = 'javascript:' + encodeURIComponent(wrapped);
+    codeEl.value = url;
+    $('drag').setAttribute('href', url);
+    $('ticket').hidden = false;
+    $('size').textContent = Math.round(url.length / 1024) + ' KB' + (key ? ', key included' : ', no key');
+    status.textContent = '';
+    status.className = 'status';
+    try { localStorage.setItem('qscan.install.model', cfg.model); localStorage.setItem('qscan.install.effort', cfg.effort); } catch (e) {}
+    codeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function copy() {
+    if (!codeEl.value) build();
+    var text = codeEl.value;
+    var done = function () { status.textContent = 'Copied. Now paste it into the bookmark address.'; status.className = 'status ok'; };
+    var fallback = function () {
+      codeEl.focus(); codeEl.select(); codeEl.setSelectionRange(0, text.length);
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      if (ok) done(); else { status.textContent = 'Copy blocked. Tap in the box, Select All, then Copy.'; status.className = 'status'; }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+  }
+
+  $('build').addEventListener('click', build);
+  $('copy').addEventListener('click', copy);
+  $('drag').addEventListener('click', function (e) { if (!codeEl.value) { e.preventDefault(); build(); } });
+  modelEl.addEventListener('change', function () { if (codeEl.value) build(); });
+  effortEl.addEventListener('change', function () { if (codeEl.value) build(); });
+  keyEl.addEventListener('input', function () { if (codeEl.value) build(); });
+})();
+</script>
+</body>
+</html>

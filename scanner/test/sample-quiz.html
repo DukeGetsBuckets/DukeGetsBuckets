@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unit 3 Review Quiz — Sample</title>
+<style>
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; background: #fafafa; color: #222; }
+  nav, footer { background: #333; color: #fff; padding: 12px 20px; }
+  nav a, footer a { color: #fff; margin-right: 16px; }
+  main { max-width: 760px; margin: 0 auto; padding: 20px; }
+  .question { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 14px 16px; margin: 14px 0; }
+  .option { padding: 6px 8px; border: 1px solid #eee; border-radius: 6px; margin: 4px 0; cursor: pointer; }
+  .passage { background: #fff8e1; padding: 14px; border-left: 4px solid #f0b429; }
+  .hidden { display: none; }
+  button.tf { padding: 10px 20px; margin-right: 8px; font-size: 16px; }
+</style>
+</head>
+<body>
+<nav><a href="#">Home</a><a href="#">Courses</a><a href="#">Need help?</a></nav>
+<main>
+  <h1>Unit 3 Review Quiz</h1>
+  <p class="passage">The mitochondrion is a double-membrane-bound organelle found in most eukaryotic organisms. Mitochondria generate most of the cell's supply of adenosine triphosphate (ATP), which is used as a source of chemical energy. Jupiter is the largest planet in the Solar System, and water (H₂O) covers about 71% of Earth's surface.</p>
+
+  <!-- Q1: radios with data-correct on the li -->
+  <form class="question" id="q1">
+    <p class="stem">1. What is the capital of France?</p>
+    <ul style="list-style:none;padding:0">
+      <li><label><input type="radio" name="q1" value="a"> Berlin</label></li>
+      <li data-correct="true"><label><input type="radio" name="q1" value="b"> Paris</label></li>
+      <li><label><input type="radio" name="q1" value="c"> Madrid</label></li>
+      <li><label><input type="radio" name="q1" value="d"> Rome</label></li>
+    </ul>
+  </form>
+
+  <!-- Q2: lettered list, answer only in a JSON script -->
+  <div class="question" id="q2">
+    <h3>Question 2</h3>
+    <p>Which gas do plants absorb from the atmosphere during photosynthesis?</p>
+    <ol type="A">
+      <li>Oxygen</li>
+      <li>Nitrogen</li>
+      <li>Carbon dioxide</li>
+      <li>Hydrogen</li>
+    </ol>
+  </div>
+  <script type="application/json" id="quiz-data">
+    {"items":[{"id":2,"question":"Which gas do plants absorb from the atmosphere during photosynthesis?","options":["Oxygen","Nitrogen","Carbon dioxide","Hydrogen"],"correctIndex":2}]}
+  </script>
+
+  <!-- Q3: select with a hidden answer input -->
+  <div class="question" id="q3">
+    <label for="sel3">3. Which planet is the largest in the Solar System?</label>
+    <select id="sel3" name="q3">
+      <option value="">-- choose --</option>
+      <option>Mars</option>
+      <option>Jupiter</option>
+      <option>Saturn</option>
+      <option>Earth</option>
+    </select>
+    <input type="hidden" name="q3_answer" value="Jupiter">
+  </div>
+
+  <!-- Q4: open answer, numbered -->
+  <div class="question" id="q4">
+    <p>4. Solve for x: 2x + 6 = 14</p>
+    <input type="text" placeholder="Your answer">
+  </div>
+
+  <!-- Q5: inline options in a single paragraph -->
+  <div class="question" id="q5">
+    <p>5. What is the chemical formula for water? A. NaCl B. H2O C. CO2 D. O2</p>
+  </div>
+
+  <!-- Q6: checkboxes, select all; correct ones flagged by class -->
+  <fieldset class="question" id="q6">
+    <legend>6. Select all of the prime numbers.</legend>
+    <div><label class="choice"><input type="checkbox" name="q6" value="4"> 4</label></div>
+    <div><label class="choice correct"><input type="checkbox" name="q6" value="5"> 5</label></div>
+    <div><label class="choice correct"><input type="checkbox" name="q6" value="7"> 7</label></div>
+    <div><label class="choice"><input type="checkbox" name="q6" value="9"> 9</label></div>
+  </fieldset>
+
+  <!-- Q7: true/false buttons with data-answer -->
+  <div class="question" id="q7">
+    <p class="stem">7. True or false: The Great Wall of China is visible from the Moon with the naked eye.</p>
+    <button type="button" class="tf">True</button>
+    <button type="button" class="tf" data-answer="true">False</button>
+    <div class="hidden feedback">Answer: False — it is far too narrow to see from that distance.</div>
+  </div>
+
+  <!-- Q8: div options, answer only in a global JS object -->
+  <div class="question" id="q8">
+    <div class="stem">8. Which organelle is known as the powerhouse of the cell?</div>
+    <div class="option">Ribosome</div>
+    <div class="option">Mitochondrion</div>
+    <div class="option">Nucleus</div>
+    <div class="option">Golgi apparatus</div>
+  </div>
+  <script>
+    window.quizState = {
+      attempt: 1,
+      questions: [
+        { id: 8, prompt: 'Which organelle is known as the powerhouse of the cell?', choices: ['Ribosome', 'Mitochondrion', 'Nucleus', 'Golgi apparatus'], correctAnswer: 'Mitochondrion' }
+      ]
+    };
+  </script>
+
+  <p>Good luck! When you are done, press Submit.</p>
+  <button type="button">Submit</button>
+</main>
+<footer>Questions? Contact us at help@example.edu · <a href="#">Privacy</a></footer>
+</body>
+</html>
