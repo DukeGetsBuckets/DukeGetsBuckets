@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 
 export function ChallengeDialog({ open, onClose, recipient }: { open: boolean; onClose: () => void; recipient: { id: string; username: string } | null }) {
-  const { socket } = useSocket();
+  const { socket, connected } = useSocket();
   const { toast } = useToast();
   const [category, setCategory] = React.useState<RatingCategory>("BLITZ");
   const [rated, setRated] = React.useState(true);
@@ -54,8 +54,8 @@ export function ChallengeDialog({ open, onClose, recipient }: { open: boolean; o
           <Segmented value={rated ? "rated" : "casual"} onChange={(v) => setRated(v === "rated")} options={[{ value: "rated", label: "Rated" }, { value: "casual", label: "Casual" }]} size="sm" />
           <Segmented value={color} onChange={setColor} options={[{ value: "RANDOM", label: "Random" }, { value: "WHITE", label: "White" }, { value: "BLACK", label: "Black" }]} size="sm" />
         </div>
-        <Button size="lg" fullWidth onClick={send} loading={busy}>
-          Send challenge
+        <Button size="lg" fullWidth onClick={send} loading={busy} disabled={!connected}>
+          {connected ? "Send challenge" : "Connecting…"}
         </Button>
       </div>
     </Modal>

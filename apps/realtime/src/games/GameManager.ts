@@ -748,6 +748,7 @@ export class GameManager {
       where: { OR: [{ blockerId: userId, blockedId: opponent.id }, { blockerId: opponent.id, blockedId: userId }] },
     });
     if (blocked) fail(ErrorCodes.BLOCKED, "Chat is unavailable with this player");
+    // eslint-disable-next-line no-control-regex
     const clean = text.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, GAME_RULES.maxChatLength);
     if (!clean) fail(ErrorCodes.INVALID_PAYLOAD, "Empty message");
     const msg = await this.prisma.chatMessage.create({ data: { gameId, userId, text: clean } });
@@ -801,7 +802,7 @@ export class GameManager {
     }
   }
 
-  /** Periodic clock broadcast for all running games. */
+  /** Periodic clock broadcast for all running games; also checkpoints clocks to the database. */
   broadcastClocks(): void {
     const now = Date.now();
     for (const game of this.games.values()) {
@@ -809,6 +810,29 @@ export class GameManager {
         this.emitter.toGame(game.id, "game:clock:sync", { gameId: game.id, clock: game.clockState(now) });
       }
     }
+    void this.persistClocks().catch((err) => logger.warn({ err }, "clock checkpoint failed"));
+  }
+
+  /**
+   * Write the current clock state of every running game to the database so that a restart
+   * (graceful or not) loses at most one checkpoint interval of thinking time.
+   */
+  async persistClocks(): Promise<number> {
+    const now = Date.now();
+    const running = [...this.games.values()].filter((g) => g.isActive() && g.clock.running && g.clock.lastClockAt != null);
+    await Promise.all(
+      running.map((game) =>
+        this.mutex.run(game.id, async () => {
+          if (!game.isActive() || !game.clock.running || game.clock.lastClockAt == null) return;
+          const c = game.clockState(now);
+          game.clock.whiteMs = c.whiteMs;
+          game.clock.blackMs = c.blackMs;
+          game.clock.lastClockAt = now;
+          await this.prisma.game.update({ where: { id: game.id }, data: { whiteTimeMs: c.whiteMs, blackTimeMs: c.blackMs, lastClockAt: new Date(now) } });
+        }),
+      ),
+    );
+    return running.length;
   }
 
   static newActionId(): string {

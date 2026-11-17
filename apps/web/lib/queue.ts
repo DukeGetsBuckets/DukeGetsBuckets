@@ -3,7 +3,6 @@ import { Redis } from "ioredis";
 import { ANALYSIS_QUEUE, POSITION_QUEUE, type AnalysisJobData } from "@tempo/shared";
 
 declare global {
-  // eslint-disable-next-line no-var
   var __tempoQueues: { connection: Redis; analysis: Queue<AnalysisJobData>; position: Queue<AnalysisJobData>; positionEvents: QueueEvents; publisher: Redis } | undefined;
 }
 

@@ -1,0 +1,79 @@
+# Local development stack: Postgres + Redis (+ optional full app stack with --profile app).
+# App services use the Dockerfiles in apps/*; for day-to-day development run `pnpm dev` on the host.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tempo
+      POSTGRES_PASSWORD: tempo
+      POSTGRES_DB: tempo
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tempo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  realtime:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/realtime/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://tempo:tempo@postgres:5432/tempo?schema=public
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://tempo:tempo@postgres:5432/tempo?schema=public
+      REDIS_URL: redis://redis:6379
+      STOCKFISH_PATH: /usr/games/stockfish
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  web:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://tempo:tempo@postgres:5432/tempo?schema=public
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  redisdata:

@@ -13,7 +13,7 @@ import { ChallengeDialog } from "@/components/friends/ChallengeDialog";
 type Relation = "self" | "friend" | "outgoing" | "incoming" | "blocked" | "blockedBy" | "none";
 
 export function ProfileActions({ target, initialRelation, authenticated }: { target: { id: string; username: string }; initialRelation: Relation; authenticated: boolean }) {
-  const { socket } = useSocket();
+  const { socket, connected } = useSocket();
   const { toast } = useToast();
   const [relation, setRelation] = React.useState<Relation>(initialRelation);
   const [challenge, setChallenge] = React.useState(false);
@@ -52,12 +52,12 @@ export function ProfileActions({ target, initialRelation, authenticated }: { tar
   return (
     <div className="flex flex-wrap gap-2">
       {relation === "blocked" || relation === "blockedBy" ? null : (
-        <Button onClick={() => setChallenge(true)}>
+        <Button onClick={() => setChallenge(true)} disabled={!connected}>
           <Swords className="h-4 w-4" /> Challenge
         </Button>
       )}
       {relation === "none" ? (
-        <Button variant="secondary" onClick={addFriend} loading={busy}>
+        <Button variant="secondary" onClick={addFriend} loading={busy} disabled={!connected}>
           <UserPlus className="h-4 w-4" /> Add friend
         </Button>
       ) : relation === "friend" ? (

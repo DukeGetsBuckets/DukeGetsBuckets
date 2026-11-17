@@ -20,20 +20,25 @@ export function PracticeScreen({ initial }: { initial: TrainingPositionDTO[] }) 
   const { settings } = useSettings();
   const [positions, setPositions] = React.useState(initial);
   const [filter, setFilter] = React.useState<"pending" | "solved" | "all">("pending");
-  const [index, setIndex] = React.useState(0);
+  const [currentId, setCurrentId] = React.useState<string | null>(null);
   const [feedback, setFeedback] = React.useState<Feedback | null>(null);
   const [hintSquare, setHintSquare] = React.useState<Square | null>(null);
   const [shownUci, setShownUci] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
   const list = positions.filter((p) => (filter === "pending" ? p.status === "NEW" || p.status === "FAILED" || p.status === "REVIEW" : filter === "solved" ? p.status === "SOLVED" : true));
-  const current = list[Math.min(index, Math.max(0, list.length - 1))] ?? null;
+  // The displayed position stays on screen after it is solved/failed until the user moves on.
+  const current = (currentId ? positions.find((p) => p.id === currentId) : null) ?? list[0] ?? null;
+  const index = current ? Math.max(0, list.findIndex((p) => p.id === current.id)) : 0;
 
   React.useEffect(() => {
     setFeedback(null);
     setHintSquare(null);
     setShownUci(null);
   }, [current?.id]);
+  React.useEffect(() => {
+    if (!currentId && current) setCurrentId(current.id);
+  }, [currentId, current]);
 
   const chess = React.useMemo(() => (current ? new Chess(current.fen) : null), [current]);
   const dests = React.useMemo(() => {
@@ -92,7 +97,12 @@ export function PracticeScreen({ initial }: { initial: TrainingPositionDTO[] }) 
       update({ status: current.status === "SOLVED" ? "SOLVED" : "FAILED", attempts: current.attempts + 1 });
     }
   };
-  const next = () => setIndex((i) => (list.length ? (i + 1) % list.length : 0));
+  const next = () => {
+    const remaining = list.filter((p) => p.id !== current?.id);
+    const pos = current ? list.findIndex((p) => p.id === current.id) : -1;
+    const candidate = remaining[pos >= 0 ? pos % Math.max(1, remaining.length) : 0] ?? remaining[0] ?? null;
+    setCurrentId(candidate?.id ?? null);
+  };
   const retry = async () => {
     if (!current) return;
     await post({ action: "reset" });
@@ -135,7 +145,7 @@ export function PracticeScreen({ initial }: { initial: TrainingPositionDTO[] }) 
       </div>
       <aside className="flex w-full flex-col gap-3 lg:w-[22rem]">
         <div className="flex items-center justify-between">
-          <Segmented size="sm" value={filter} onChange={(v) => { setFilter(v); setIndex(0); }} options={[{ value: "pending", label: `To do (${positions.filter((p) => p.status !== "SOLVED" && p.status !== "SKIPPED").length})` }, { value: "solved", label: `Solved (${solved})` }, { value: "all", label: "All" }]} />
+          <Segmented size="sm" value={filter} onChange={(v) => { setFilter(v); setCurrentId(null); }} options={[{ value: "pending", label: `To do (${positions.filter((p) => p.status !== "SOLVED" && p.status !== "SKIPPED").length})` }, { value: "solved", label: `Solved (${solved})` }, { value: "all", label: "All" }]} />
         </div>
         {current ? (
           <>
@@ -178,7 +188,7 @@ export function PracticeScreen({ initial }: { initial: TrainingPositionDTO[] }) 
                   <SkipForward className="h-4 w-4" /> Skip
                 </Button>
               )}
-              <Button onClick={next} disabled={list.length < 2}>
+              <Button onClick={next} disabled={list.filter((p) => p.id !== current.id).length === 0}>
                 Next position
               </Button>
             </div>

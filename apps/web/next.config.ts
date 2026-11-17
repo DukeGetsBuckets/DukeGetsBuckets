@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  output: "standalone",
+  agentRules: false,
   transpilePackages: ["@tempo/shared", "@tempo/chess-core", "@tempo/database"],
   serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "pg", "bullmq", "ioredis", "nodemailer"],
   experimental: {

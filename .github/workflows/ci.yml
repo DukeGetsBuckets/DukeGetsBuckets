@@ -1,0 +1,64 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: tempo, POSTGRES_PASSWORD: tempo, POSTGRES_DB: tempo }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tempo" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://tempo:tempo@localhost:5432/tempo?schema=public
+      REDIS_URL: redis://localhost:6379
+      BETTER_AUTH_SECRET: ci-secret-ci-secret-ci-secret-ci-secret
+      BETTER_AUTH_URL: http://localhost:3000
+      REALTIME_JWT_SECRET: ci-realtime-secret-ci-realtime-secret
+      NEXT_PUBLIC_WEB_URL: http://localhost:3000
+      NEXT_PUBLIC_REALTIME_URL: http://localhost:4000
+      ALLOWED_ORIGINS: http://localhost:3000
+      STOCKFISH_PATH: /usr/games/stockfish
+      ANALYSIS_DEPTH: "12"
+      AUTH_SIGNUP_RATE_LIMIT: "200"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: sudo apt-get update && sudo apt-get install -y stockfish
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - run: pnpm --filter @tempo/database exec prisma migrate deploy
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test:unit
+      - name: Start services
+        run: |
+          (cd apps/realtime && pnpm exec tsx src/index.ts > /tmp/realtime.log 2>&1 &)
+          (cd apps/worker && pnpm exec tsx src/index.ts > /tmp/worker.log 2>&1 &)
+          (cd apps/web && pnpm exec next dev -p 3000 > /tmp/web.log 2>&1 &)
+          for i in $(seq 1 60); do curl -sf localhost:4000/health && curl -sf localhost:4100 && curl -sf localhost:3000/login > /dev/null && break; sleep 2; done
+      - run: pnpm test:integration
+      - name: Playwright e2e (iPad + desktop)
+        run: pnpm exec playwright install --with-deps chromium && pnpm test:e2e
+      - name: Production builds
+        run: pnpm build
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: logs
+          path: |
+            /tmp/*.log
+            test-results

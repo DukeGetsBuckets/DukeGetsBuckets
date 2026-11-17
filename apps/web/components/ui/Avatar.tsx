@@ -13,7 +13,6 @@ export function Avatar({ name, src, size = 40, className, status }: { name: stri
   return (
     <span className={cn("relative inline-flex shrink-0", className)} style={{ width: size, height: size }}>
       {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt="" width={size} height={size} className="h-full w-full rounded-full object-cover" />
       ) : (
         <span

@@ -124,6 +124,8 @@ async function main(): Promise<void> {
     clearInterval(clockTimer);
     services.matchmaker.stop();
     services.challenges.stop();
+    const checkpointed = await services.games.persistClocks().catch(() => 0);
+    logger.info({ checkpointed }, "clocks checkpointed");
     io.close();
     server.close();
     await prisma.$disconnect().catch(() => undefined);

@@ -1,0 +1,2 @@
+/** Inline script that sets data-theme before first paint to avoid a flash of the wrong theme. */
+export const themeInitScript = `(function(){try{var m=document.cookie.match(/(?:^|; )tempo-theme=(system|dark|light)/);var p=m?m[1]:"system";var r=p==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):p;document.documentElement.dataset.theme=r;}catch(e){document.documentElement.dataset.theme="dark"}})();`;

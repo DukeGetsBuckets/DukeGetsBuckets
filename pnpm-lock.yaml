@@ -65,6 +65,12 @@ importers:
 
   apps/realtime:
     dependencies:
+      '@prisma/adapter-pg':
+        specifier: 7.10.1
+        version: 7.10.1
+      '@prisma/client':
+        specifier: 7.10.1
+        version: 7.10.1(prisma@7.10.1(@types/node@22.20.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@5.9.3))(typescript@5.9.3)
       '@socket.io/redis-adapter':
         specifier: ^8.3.0
         version: 8.3.0(socket.io-adapter@2.5.8)
@@ -98,6 +104,9 @@ importers:
       jose:
         specifier: ^6.2.0
         version: 6.2.17
+      pg:
+        specifier: ^8.16.0
+        version: 8.23.1
       pino:
         specifier: ^10.0.0
         version: 10.4.0
@@ -205,6 +214,12 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^1.9.0
         version: 1.9.0(zod@4.6.7)
+      '@prisma/adapter-pg':
+        specifier: 7.10.1
+        version: 7.10.1
+      '@prisma/client':
+        specifier: 7.10.1
+        version: 7.10.1(prisma@7.10.1(@types/node@22.20.5)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@5.9.3))(typescript@5.9.3)
       '@tempo/chess-core':
         specifier: workspace:*
         version: link:../../packages/chess-core
@@ -223,6 +238,9 @@ importers:
       ioredis:
         specifier: ^5.11.0
         version: 5.11.1
+      pg:
+        specifier: ^8.16.0
+        version: 8.23.1
       pino:
         specifier: ^10.0.0
         version: 10.4.0

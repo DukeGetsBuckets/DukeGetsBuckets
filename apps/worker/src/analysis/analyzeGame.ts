@@ -19,6 +19,7 @@ import { enhanceCoachingWithAI } from "../coaching/ai";
 import type { EnginePool } from "../engine/pool";
 import { logger } from "../logger";
 import { createTrainingPositions } from "../training/positions";
+import { recordFairPlaySignals } from "./fairplay";
 import { explainMove, materialOutcome, pvToSan } from "./explain";
 
 export interface AnalysisConfig {
@@ -332,6 +333,7 @@ export async function analyzeGame(ctx: AnalysisContext, gameId: string, requeste
 
     // 7) Training positions for both players
     await createTrainingPositions(prisma, { gameId, whiteId: game.whiteId, blackId: game.blackId, moves });
+    if (game.rated) await recordFairPlaySignals(prisma, { gameId, whiteId: game.whiteId, blackId: game.blackId, moves, summary, category: game.category }).catch((err) => logger.warn({ err }, "fair-play signal failed"));
 
     ctx.publish({ type: "analysis:progress", gameId, payload: { status: "COMPLETED", progress: 100 } });
     for (const userId of new Set([requestedById, game.whiteId, game.blackId].filter(Boolean) as string[])) {

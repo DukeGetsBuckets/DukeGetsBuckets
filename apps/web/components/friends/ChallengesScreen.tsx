@@ -14,7 +14,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
 
 export function ChallengesScreen({ initialIncoming, initialOutgoing, meId }: { initialIncoming: ChallengeDTO[]; initialOutgoing: ChallengeDTO[]; meId: string }) {
-  const { socket } = useSocket();
+  const { socket, connected } = useSocket();
   const { toast } = useToast();
   const router = useRouter();
   const [incoming, setIncoming] = React.useState(initialIncoming);
@@ -79,10 +79,10 @@ export function ChallengesScreen({ initialIncoming, initialOutgoing, meId }: { i
                 <p className="truncate text-xs text-fg-muted">{describe(c)}</p>
                 <p className="text-xs text-fg-faint">Expires {new Date(c.expiresAt).toLocaleTimeString()}</p>
               </div>
-              <Button size="sm" variant="success" onClick={() => accept(c)} loading={busy === c.id}>
+              <Button size="sm" variant="success" onClick={() => accept(c)} loading={busy === c.id} disabled={!connected}>
                 <Check className="h-4 w-4" /> Accept
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => decline(c)} aria-label="Decline">
+              <Button size="sm" variant="secondary" onClick={() => decline(c)} aria-label="Decline" disabled={!connected}>
                 <X className="h-4 w-4" />
               </Button>
             </div>

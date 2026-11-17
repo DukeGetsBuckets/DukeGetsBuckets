@@ -5,7 +5,6 @@ export * from "../generated/prisma/client.ts";
 export { Prisma } from "../generated/prisma/client.ts";
 
 declare global {
-  // eslint-disable-next-line no-var
   var __tempoPrisma: PrismaClient | undefined;
 }
 

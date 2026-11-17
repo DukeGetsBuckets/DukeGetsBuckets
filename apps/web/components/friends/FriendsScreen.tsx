@@ -156,7 +156,7 @@ export function FriendsScreen({ initialIncoming, initialOutgoing, meId }: { init
                       {u.username}
                     </Link>
                     {u.relation === "none" ? (
-                      <Button size="sm" onClick={() => sendRequest(u)} loading={busy === `add-${u.id}`}>
+                      <Button size="sm" onClick={() => sendRequest(u)} loading={busy === `add-${u.id}`} disabled={!connected}>
                         <UserPlus className="h-4 w-4" /> Add friend
                       </Button>
                     ) : u.relation === "friend" ? (
@@ -200,7 +200,7 @@ export function FriendsScreen({ initialIncoming, initialOutgoing, meId }: { init
                     · {f.ratings.BULLET} / {f.ratings.BLITZ} / {f.ratings.RAPID}
                   </p>
                 </div>
-                <Button size="sm" onClick={() => setChallenging({ id: f.id, username: f.username })} disabled={f.status === "playing"}>
+                <Button size="sm" onClick={() => setChallenging({ id: f.id, username: f.username })} disabled={f.status === "playing" || !connected}>
                   <Swords className="h-4 w-4" /> Challenge
                 </Button>
                 <button onClick={() => remove(f)} className="rounded-lg p-2 text-fg-faint hover:bg-surface-3 hover:text-danger" aria-label={`Remove ${f.username}`}>
@@ -223,7 +223,7 @@ export function FriendsScreen({ initialIncoming, initialOutgoing, meId }: { init
                 <Link href={`/profile/${r.user.username}`} className="min-w-0 flex-1 truncate font-medium hover:underline">
                   {r.user.username}
                 </Link>
-                <Button size="sm" variant="success" onClick={() => respond(r, true)} loading={busy === `req-${r.id}`} aria-label="Accept">
+                <Button size="sm" variant="success" onClick={() => respond(r, true)} loading={busy === `req-${r.id}`} aria-label="Accept" disabled={!connected}>
                   <Check className="h-4 w-4" />
                 </Button>
                 <Button size="sm" variant="secondary" onClick={() => respond(r, false)} aria-label="Decline">

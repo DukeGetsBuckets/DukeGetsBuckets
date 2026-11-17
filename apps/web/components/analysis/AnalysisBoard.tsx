@@ -106,6 +106,7 @@ export function AnalysisBoard({ authenticated, initialFen }: { authenticated: bo
     try {
       const parsed = parsePgn(pgnText);
       setStartFen(parsed.initialFen);
+      setAnnotations({ arrows: [], circles: [] });
       setMoves(parsed.ucis.map((uci, i) => ({ ply: i + 1, uci, san: parsed.sans[i]!, fen: parsed.fens[i + 1]! })));
       setViewPly(parsed.ucis.length);
       setImportOpen(false);
@@ -118,6 +119,7 @@ export function AnalysisBoard({ authenticated, initialFen }: { authenticated: bo
     try {
       new Chess(fenInput.trim());
       setStartFen(fenInput.trim());
+      setAnnotations({ arrows: [], circles: [] });
       setMoves([]);
       setViewPly(0);
       setImportOpen(false);
@@ -127,6 +129,7 @@ export function AnalysisBoard({ authenticated, initialFen }: { authenticated: bo
   };
   const reset = () => {
     setStartFen(START_FEN);
+    setAnnotations({ arrows: [], circles: [] });
     setMoves([]);
     setViewPly(0);
     setLines(null);

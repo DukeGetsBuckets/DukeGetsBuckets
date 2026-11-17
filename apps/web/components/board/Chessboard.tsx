@@ -107,11 +107,19 @@ export function Chessboard(props: ChessboardProps) {
     return () => ro.disconnect();
   }, []);
 
-  // Clear selection when the position changes under us.
+  // When the position changes, drop the selection only if that piece can no longer be moved.
   React.useEffect(() => {
-    setSelected(null);
     setPromotion(null);
-  }, [fen]);
+    setSelected((current) => {
+      if (!current) return null;
+      const piece = parseFenPieces(fen).find((p) => p.square === current);
+      if (!piece) return null;
+      const stm = sideToMove(fen);
+      const movableNow = !viewOnly && (movable === "both" || movable === piece.color) && piece.color === stm;
+      const premovableNow = !viewOnly && premovable === piece.color && piece.color !== stm;
+      return movableNow || premovableNow ? current : null;
+    });
+  }, [fen, movable, premovable, viewOnly]);
 
   React.useEffect(() => {
     onSelect?.(selected);
@@ -130,7 +138,6 @@ export function Chessboard(props: ChessboardProps) {
       if (canPremoveColor(piece.color)) return { squares: premoveDests(fen, sq), isPremove: true };
       return { squares: [], isPremove: false };
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [pieceAt, dests, fen, movable, premovable, turn, viewOnly],
   );
 
@@ -264,7 +271,7 @@ export function Chessboard(props: ChessboardProps) {
   return (
     <div
       ref={rootRef}
-      className={cn("touch-none-select relative aspect-square w-full overflow-hidden rounded-md shadow-card", className)}
+      className={cn("touch-none-select relative aspect-square w-full scroll-mt-20 overflow-hidden rounded-md shadow-card", className)}
       style={{ background: colors.dark, cursor: drag?.moved ? "grabbing" : undefined }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
