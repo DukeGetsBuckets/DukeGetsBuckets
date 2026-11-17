@@ -1,0 +1,36 @@
+{
+  "name": "@tempo/realtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
+    "@tempo/chess-core": "workspace:*",
+    "@tempo/database": "workspace:*",
+    "@tempo/shared": "workspace:*",
+    "bullmq": "^6.7.0",
+    "chess.js": "^1.4.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.11.0",
+    "jose": "^6.2.0",
+    "pino": "^10.0.0",
+    "socket.io": "^4.8.4",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "pino-pretty": "^13.1.0",
+    "tsup": "^9.0.0",
+    "tsx": "^4.20.0",
+    "socket.io-client": "^4.8.4"
+  }
+}

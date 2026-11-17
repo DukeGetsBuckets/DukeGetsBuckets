@@ -1,0 +1,39 @@
+{
+  "name": "@tempo/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@tempo/chess-core": "workspace:*",
+    "@tempo/database": "workspace:*",
+    "@tempo/shared": "workspace:*",
+    "better-auth": "1.7.25",
+    "bullmq": "^6.7.0",
+    "chess.js": "^1.4.0",
+    "clsx": "^2.1.1",
+    "geist": "^1.9.0",
+    "ioredis": "^5.11.0",
+    "jose": "^6.2.0",
+    "lucide-react": "^1.74.0",
+    "next": "16.4.6",
+    "nodemailer": "^10.6.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "recharts": "^3.11.0",
+    "socket.io-client": "^4.8.4",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/nodemailer": "^7.0.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.0"
+  }
+}

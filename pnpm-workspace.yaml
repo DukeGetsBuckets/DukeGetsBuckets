@@ -1,0 +1,15 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+onlyBuiltDependencies:
+  - argon2
+  - esbuild
+  - prisma
+  - "@prisma/engines"
+  - "@prisma/client"
+  - sharp
+  - msgpackr-extract
+  - unrs-resolver
+  - "@tailwindcss/oxide"
+  - bufferutil
+  - utf-8-validate

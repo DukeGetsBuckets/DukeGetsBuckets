@@ -1,0 +1,634 @@
+// Tempo — PostgreSQL schema (Prisma 7)
+// Auth tables follow Better Auth's core schema (+ username plugin); everything else is the chess domain.
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../generated/prisma"
+  runtime                = "nodejs"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────── Enums ───────────────────────────
+
+enum ProfileVisibility {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+/// Time-control category. Each has an independent rating.
+enum RatingCategory {
+  BULLET
+  BLITZ
+  RAPID
+}
+
+enum Color {
+  WHITE
+  BLACK
+}
+
+enum ColorPreference {
+  RANDOM
+  WHITE
+  BLACK
+}
+
+enum GameSource {
+  MATCHMAKING
+  CHALLENGE
+  REMATCH
+}
+
+enum GameStatus {
+  ACTIVE
+  FINISHED
+  ABORTED
+}
+
+enum GameResult {
+  WHITE_WINS
+  BLACK_WINS
+  DRAW
+}
+
+enum GameEndReason {
+  CHECKMATE
+  RESIGNATION
+  TIMEOUT
+  TIMEOUT_VS_INSUFFICIENT_MATERIAL
+  STALEMATE
+  INSUFFICIENT_MATERIAL
+  THREEFOLD_REPETITION
+  FIVEFOLD_REPETITION
+  FIFTY_MOVE_RULE
+  SEVENTY_FIVE_MOVE_RULE
+  AGREEMENT
+  ABANDONED
+  ABORTED
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELED
+}
+
+enum ChallengeStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELED
+  EXPIRED
+}
+
+enum NotificationType {
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  CHALLENGE
+  CHALLENGE_ACCEPTED
+  CHALLENGE_DECLINED
+  REMATCH
+  GAME_FINISHED
+  ANALYSIS_READY
+  SYSTEM
+}
+
+enum AnalysisStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum MoveClassification {
+  BRILLIANT
+  GREAT
+  BEST
+  EXCELLENT
+  GOOD
+  BOOK
+  INACCURACY
+  MISTAKE
+  BLUNDER
+  FORCED
+}
+
+enum TrainingStatus {
+  NEW
+  SOLVED
+  FAILED
+  REVIEW
+  SKIPPED
+}
+
+enum ReportReason {
+  CHEATING
+  HARASSMENT
+  INAPPROPRIATE_NAME
+  SPAM
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWED
+  DISMISSED
+  ACTIONED
+}
+
+// ─────────────────────────── Auth (Better Auth) ───────────────────────────
+
+model User {
+  id              String   @id
+  name            String
+  email           String   @unique
+  emailVerified   Boolean  @default(false)
+  image           String?
+  username        String?  @unique
+  displayUsername String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Tempo profile fields
+  bio               String?           @db.VarChar(280)
+  country           String?           @db.VarChar(2)
+  profileVisibility ProfileVisibility @default(PUBLIC)
+  role              UserRole          @default(USER)
+  banned            Boolean           @default(false)
+  banReason         String?
+  banExpiresAt      DateTime?
+  lastSeenAt        DateTime?
+
+  sessions               Session[]
+  accounts               Account[]
+  ratings                Rating[]
+  ratingHistory          RatingHistory[]
+  settings               UserSettings?
+  whiteGames             Game[]             @relation("WhiteGames")
+  blackGames             Game[]             @relation("BlackGames")
+  sentFriendRequests     FriendRequest[]    @relation("SentFriendRequests")
+  receivedFriendRequests FriendRequest[]    @relation("ReceivedFriendRequests")
+  friendshipsA           Friendship[]       @relation("FriendshipA")
+  friendshipsB           Friendship[]       @relation("FriendshipB")
+  blocksMade             Block[]            @relation("Blocker")
+  blocksReceived         Block[]            @relation("Blocked")
+  sentChallenges         Challenge[]        @relation("SentChallenges")
+  receivedChallenges     Challenge[]        @relation("ReceivedChallenges")
+  notifications          Notification[]
+  trainingPositions      TrainingPosition[]
+  reportsMade            Report[]           @relation("Reporter")
+  reportsReceived        Report[]           @relation("Reported")
+  chatMessages           ChatMessage[]
+  fairPlayFlags          FairPlayFlag[]
+
+  @@index([lastSeenAt])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+// ─────────────────────────── Ratings ───────────────────────────
+
+model Rating {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    RatingCategory
+  rating      Float          @default(1500)
+  deviation   Float          @default(350)
+  volatility  Float          @default(0.06)
+  gamesPlayed Int            @default(0)
+  wins        Int            @default(0)
+  losses      Int            @default(0)
+  draws       Int            @default(0)
+  peakRating  Float          @default(1500)
+  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime       @default(now())
+
+  @@unique([userId, category])
+  @@index([category, rating(sort: Desc)])
+}
+
+model RatingHistory {
+  id             String         @id @default(cuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId         String
+  game           Game           @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  category       RatingCategory
+  ratingBefore   Float
+  ratingAfter    Float
+  delta          Float
+  deviationAfter Float
+  createdAt      DateTime       @default(now())
+
+  @@unique([userId, gameId])
+  @@index([userId, category, createdAt])
+}
+
+// ─────────────────────────── Games ───────────────────────────
+
+model Game {
+  id      String @id @default(cuid())
+  whiteId String
+  blackId String
+  white   User   @relation("WhiteGames", fields: [whiteId], references: [id])
+  black   User   @relation("BlackGames", fields: [blackId], references: [id])
+
+  category      RatingCategory
+  initialTimeMs Int
+  incrementMs   Int            @default(0)
+  rated         Boolean        @default(true)
+  source        GameSource     @default(MATCHMAKING)
+  rematchOfId   String?
+
+  initialFen String @default("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+  currentFen String @default("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+  /// Number of half-moves applied; doubles as the authoritative sequence number.
+  ply        Int    @default(0)
+
+  status    GameStatus     @default(ACTIVE)
+  result    GameResult?
+  endReason GameEndReason?
+
+  // Clock state: remaining time for each side as of lastClockAt; the side-to-move's clock is the active one when running.
+  whiteTimeMs  Int
+  blackTimeMs  Int
+  clockRunning Boolean   @default(false)
+  lastClockAt  DateTime?
+
+  drawOfferBy  Color?
+  drawOfferPly Int?
+
+  whiteRatingBefore Float?
+  whiteRatingAfter  Float?
+  blackRatingBefore Float?
+  blackRatingAfter  Float?
+  ratingSettled     Boolean @default(false)
+
+  openingEco  String?
+  openingName String?
+  pgn         String?
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  moves         Move[]
+  analysis      GameAnalysis?
+  ratingHistory RatingHistory[]
+  chatMessages  ChatMessage[]
+  challenge     Challenge?      @relation("ChallengeGame")
+  training      TrainingPosition[]
+  fairPlayFlags FairPlayFlag[]
+
+  @@index([whiteId, createdAt(sort: Desc)])
+  @@index([blackId, createdAt(sort: Desc)])
+  @@index([status, updatedAt])
+  @@index([category, rated, createdAt(sort: Desc)])
+}
+
+model Move {
+  id          String   @id @default(cuid())
+  gameId      String
+  game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  ply         Int
+  color       Color
+  uci         String
+  san         String
+  fenBefore   String
+  fenAfter    String
+  /// Milliseconds the mover spent on this move (0 for untimed first moves).
+  spentMs     Int      @default(0)
+  /// Clock remaining for both sides immediately after the move.
+  whiteTimeMs Int
+  blackTimeMs Int
+  createdAt   DateTime @default(now())
+
+  @@unique([gameId, ply])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text      String   @db.VarChar(300)
+  createdAt DateTime @default(now())
+
+  @@index([gameId, createdAt])
+}
+
+// ─────────────────────────── Social ───────────────────────────
+
+model FriendRequest {
+  id          String              @id @default(cuid())
+  senderId    String
+  receiverId  String
+  sender      User                @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User                @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+  status      FriendRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  respondedAt DateTime?
+
+  @@unique([senderId, receiverId])
+  @@index([receiverId, status])
+}
+
+/// Undirected friendship; userAId is always the lexicographically smaller id.
+model Friendship {
+  id        String   @id @default(cuid())
+  userAId   String
+  userBId   String
+  userA     User     @relation("FriendshipA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User     @relation("FriendshipB", fields: [userBId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userAId, userBId])
+  @@index([userBId])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model Challenge {
+  id              String          @id @default(cuid())
+  senderId        String
+  sender          User            @relation("SentChallenges", fields: [senderId], references: [id], onDelete: Cascade)
+  /// Null for open (link-only) challenges.
+  recipientId     String?
+  recipient       User?           @relation("ReceivedChallenges", fields: [recipientId], references: [id], onDelete: Cascade)
+  category        RatingCategory
+  initialTimeMs   Int
+  incrementMs     Int             @default(0)
+  rated           Boolean         @default(true)
+  senderColor     ColorPreference @default(RANDOM)
+  /// Unpredictable token for shareable invitation links.
+  token           String          @unique
+  status          ChallengeStatus @default(PENDING)
+  gameId          String?         @unique
+  game            Game?           @relation("ChallengeGame", fields: [gameId], references: [id])
+  rematchOfGameId String?
+  expiresAt       DateTime
+  createdAt       DateTime        @default(now())
+  respondedAt     DateTime?
+
+  @@index([recipientId, status])
+  @@index([senderId, status])
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       NotificationType
+  payload    Json
+  resourceId String?
+  readAt     DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@index([userId, readAt, createdAt(sort: Desc)])
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  reportedId String
+  reporter   User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported   User         @relation("Reported", fields: [reportedId], references: [id], onDelete: Cascade)
+  gameId     String?
+  reason     ReportReason
+  details    String?      @db.VarChar(1000)
+  status     ReportStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
+  resolvedAt DateTime?
+
+  @@index([status, createdAt])
+}
+
+// ─────────────────────────── Settings ───────────────────────────
+
+model UserSettings {
+  userId             String   @id
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  boardTheme         String   @default("walnut")
+  pieceSet           String   @default("chessnut")
+  showLegalMoves     Boolean  @default(true)
+  showLastMove       Boolean  @default(true)
+  showCoordinates    Boolean  @default(true)
+  animationMs        Int      @default(180)
+  premovesEnabled    Boolean  @default(true)
+  defaultPromotion   String   @default("q")
+  confirmResign      Boolean  @default(true)
+  soundEnabled       Boolean  @default(true)
+  soundVolume        Int      @default(80)
+  showOpponentRating Boolean  @default(true)
+  theme              String   @default("system")
+  reducedMotion      Boolean  @default(false)
+  arrowColor         String   @default("#f59e0b")
+  chatEnabled        Boolean  @default(true)
+  allowFriendRequests Boolean @default(true)
+  /// everyone | friends | nobody
+  allowChallenges    String   @default("everyone")
+  updatedAt          DateTime @updatedAt
+}
+
+// ─────────────────────────── Analysis ───────────────────────────
+
+model GameAnalysis {
+  id             String         @id @default(cuid())
+  gameId         String         @unique
+  game           Game           @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  engine         String         @default("stockfish")
+  engineVersion  String?
+  config         Json
+  status         AnalysisStatus @default(QUEUED)
+  progress       Int            @default(0)
+  whiteAccuracy  Float?
+  blackAccuracy  Float?
+  whiteAcpl      Float?
+  blackAcpl      Float?
+  /// Classification counts, best-move percentages, turning point, etc.
+  summary        Json?
+  coaching       Json?
+  coachingSource String?
+  error          String?
+  attempts       Int            @default(0)
+  requestedById  String?
+  createdAt      DateTime       @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  updatedAt      DateTime       @updatedAt
+
+  moves MoveAnalysis[]
+
+  @@index([status, createdAt])
+}
+
+model MoveAnalysis {
+  id               String             @id @default(cuid())
+  analysisId       String
+  analysis         GameAnalysis       @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  ply              Int
+  color            Color
+  fenBefore        String
+  playedUci        String
+  playedSan        String
+  bestUci          String?
+  bestSan          String?
+  /// Centipawns from White's point of view (null when a mate score applies).
+  evalBefore       Int?
+  mateBefore       Int?
+  evalAfter        Int?
+  mateAfter        Int?
+  /// Principal variation (UCI moves) from the position before the move.
+  pv               Json?
+  /// Second-best line, for "only move" / brilliancy detection.
+  altLines         Json?
+  cpLoss           Int?
+  winChanceBefore  Float
+  winChanceAfter   Float
+  classification   MoveClassification
+  explanation      String?
+  isBook           Boolean            @default(false)
+  depth            Int?
+
+  @@unique([analysisId, ply])
+}
+
+model TrainingPosition {
+  id              String             @id @default(cuid())
+  userId          String
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId          String
+  game            Game               @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  ply             Int
+  fen             String
+  sideToMove      Color
+  playedUci       String
+  bestUci         String
+  /// [{ uci, san, evalCp, mate }] — moves accepted as solutions.
+  acceptableMoves Json
+  cpLoss          Int
+  classification  MoveClassification
+  theme           String?
+  explanation     String?
+  status          TrainingStatus     @default(NEW)
+  attempts        Int                @default(0)
+  hintsUsed       Int                @default(0)
+  solvedAt        DateTime?
+  lastAttemptAt   DateTime?
+  createdAt       DateTime           @default(now())
+
+  attemptsLog TrainingAttempt[]
+
+  @@unique([userId, gameId, ply])
+  @@index([userId, status, createdAt(sort: Desc)])
+}
+
+model TrainingAttempt {
+  id         String           @id @default(cuid())
+  positionId String
+  position   TrainingPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  uci        String
+  correct    Boolean
+  createdAt  DateTime         @default(now())
+
+  @@index([positionId])
+}
+
+// ─────────────────────────── Moderation / audit ───────────────────────────
+
+model FairPlayFlag {
+  id        String   @id @default(cuid())
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  score     Float
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String?
+  targetId   String?
+  meta       Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+}

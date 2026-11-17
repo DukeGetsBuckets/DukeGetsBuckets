@@ -1,0 +1,203 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ───────── Design tokens ───────── */
+:root {
+  --bg: #f4f1ea;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #ece7dc;
+  --surface-3: #e2dccd;
+  --border: #d8d1c2;
+  --border-strong: #bfb6a3;
+  --fg: #171512;
+  --fg-muted: #5f584c;
+  --fg-faint: #948b7b;
+  --accent: #d4891b;
+  --accent-strong: #b8720f;
+  --accent-fg: #1a1203;
+  --accent-soft: rgba(212, 137, 27, 0.14);
+  --success: #2f9e62;
+  --success-soft: rgba(47, 158, 98, 0.14);
+  --danger: #d2463f;
+  --danger-soft: rgba(210, 70, 63, 0.14);
+  --info: #3b7dd8;
+  --info-soft: rgba(59, 125, 216, 0.14);
+  --clock-active: #171512;
+  --clock-inactive: #8a8272;
+  --ring: rgba(212, 137, 27, 0.5);
+  --shadow: 0 1px 2px rgba(23, 21, 18, 0.06), 0 8px 24px rgba(23, 21, 18, 0.08);
+  --radius: 14px;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #0f1216;
+  --bg-elevated: #161a20;
+  --surface: #171c23;
+  --surface-2: #1e242d;
+  --surface-3: #262d38;
+  --border: #2a313c;
+  --border-strong: #3a4350;
+  --fg: #eef0f3;
+  --fg-muted: #9aa3b0;
+  --fg-faint: #6b7482;
+  --accent: #f0a53a;
+  --accent-strong: #ffb956;
+  --accent-fg: #1a1203;
+  --accent-soft: rgba(240, 165, 58, 0.16);
+  --success: #3fcf7f;
+  --success-soft: rgba(63, 207, 127, 0.16);
+  --danger: #ef5f57;
+  --danger-soft: rgba(239, 95, 87, 0.16);
+  --info: #5b9bff;
+  --info-soft: rgba(91, 155, 255, 0.16);
+  --clock-active: #ffffff;
+  --clock-inactive: #6b7482;
+  --ring: rgba(240, 165, 58, 0.55);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius-card: var(--radius);
+  --shadow-card: var(--shadow);
+}
+
+/* ───────── Base ───────── */
+html,
+body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  overscroll-behavior-y: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* ───────── Utilities ───────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.touch-none-select {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+
+.safe-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+[data-reduced-motion="true"] *,
+[data-reduced-motion="true"] *::before,
+[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-fade-in {
+  animation: fade-in 180ms ease-out both;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 var(--ring);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+.animate-pulse-ring {
+  animation: pulse-ring 1.4s ease-out infinite;
+}
+
+/* Chess clock digits */
+.clock-digits {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
