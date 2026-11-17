@@ -24,7 +24,7 @@ export function SocketProvider({ authenticated, children }: { authenticated: boo
   const [pendingChallenges, setPending] = React.useState<ChallengeDTO[]>([]);
   const router = useRouter();
   const pathname = usePathname();
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
   const pathRef = React.useRef(pathname);
   pathRef.current = pathname;
 
@@ -71,9 +71,13 @@ export function SocketProvider({ authenticated, children }: { authenticated: boo
             ],
           });
         };
-        const onChallengeGone = ({ challengeId }: { challengeId: string }) => setPending((list) => list.filter((x) => x.id !== challengeId));
+        const onChallengeGone = ({ challengeId }: { challengeId: string }) => {
+          setPending((list) => list.filter((x) => x.id !== challengeId));
+          dismiss(`challenge-${challengeId}`);
+        };
         const onFriendRequest: ServerToClientEvents["friend:request:received"] = ({ from, requestId }) => {
           toast({
+            id: `friend-${requestId}`,
             title: `${from.username} wants to be friends`,
             tone: "accent",
             durationMs: 20_000,
@@ -84,6 +88,7 @@ export function SocketProvider({ authenticated, children }: { authenticated: boo
           });
         };
         const onFriendAccepted: ServerToClientEvents["friend:accepted"] = ({ friend }) => toast({ title: `${friend.username} accepted your friend request`, tone: "success" });
+        const onFriendResolved: ServerToClientEvents["friend:request:resolved"] = ({ requestId }) => dismiss(`friend-${requestId}`);
         const onServerError: ServerToClientEvents["server:error"] = (e) => toast({ title: "Error", description: e.message, tone: "danger" });
         s.on("connect", onConnect);
         s.on("disconnect", onDisconnect);
@@ -96,13 +101,14 @@ export function SocketProvider({ authenticated, children }: { authenticated: boo
         s.on("challenge:expired", onChallengeGone);
         s.on("friend:request:received", onFriendRequest);
         s.on("friend:accepted", onFriendAccepted);
+        s.on("friend:request:resolved", onFriendResolved);
         s.on("server:error", onServerError);
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [authenticated, router, toast]);
+  }, [authenticated, router, toast, dismiss]);
 
   const dismissChallenge = React.useCallback((id: string) => setPending((l) => l.filter((c) => c.id !== id)), []);
   const value = React.useMemo(() => ({ socket, connected, unread, setUnread, pendingChallenges, dismissChallenge }), [socket, connected, unread, pendingChallenges, dismissChallenge]);

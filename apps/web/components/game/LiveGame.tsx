@@ -179,8 +179,7 @@ export function LiveGame({ gameId, meId }: { gameId: string; meId: string | null
         <div className="w-full lg:hidden">
           <PlayerPanel player={top} color={topColor} clock={state.clock} chess={chess.current} pieceSet={settings.pieceSet} isYou={top.id === meId} connected={top.id === meId ? connected : state.opponentConnected} soundsEnabled={soundsOn} showRating={settings.showOpponentRating || top.id === meId} finished={!active} compact />
         </div>
-        <div className="w-full" style={{ maxWidth: "min(100vw - 1rem, calc(100dvh - 15rem))" }}>
-          <div className="lg:hidden" />
+        <div className="w-full max-w-[min(100vw-1rem,calc(100dvh-15rem))] lg:max-w-[min(100vw-26rem,calc(100dvh-2rem))]">
           <Chessboard
             fen={displayFen}
             orientation={orientation}
