@@ -43,6 +43,8 @@
     "@tempo/shared": "workspace:*",
     "@tempo/database": "workspace:*",
     "@tempo/chess-core": "workspace:*",
-    "chess.js": "^1.4.0"
+    "chess.js": "^1.4.0",
+    "bullmq": "^6.7.0",
+    "ioredis": "^5.11.0"
   }
 }
