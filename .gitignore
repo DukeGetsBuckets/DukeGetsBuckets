@@ -16,3 +16,4 @@ blob-report/
 .DS_Store
 tmp/
 .local/
+dump.rdb
