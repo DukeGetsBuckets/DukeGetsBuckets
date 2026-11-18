@@ -16,7 +16,9 @@ COPY --from=build /app/packages ./packages
 COPY --from=build /app/apps/realtime/package.json ./apps/realtime/package.json
 COPY --from=build /app/apps/realtime/node_modules ./apps/realtime/node_modules
 COPY --from=build /app/apps/realtime/dist ./apps/realtime/dist
+COPY --from=build /app/apps/realtime/start.sh ./apps/realtime/start.sh
 WORKDIR /app/apps/realtime
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://localhost:'+(process.env.REALTIME_PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node", "dist/index.js"]
+# Runs `prisma migrate deploy` before starting, so a fresh database is initialised automatically.
+CMD ["sh", "start.sh"]
