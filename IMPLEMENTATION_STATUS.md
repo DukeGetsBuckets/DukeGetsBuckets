@@ -1,14 +1,19 @@
 # Implementation status — Tempo
 
-Last updated: 2026-11-17 (end of initial build session). Branch: `claude/trusting-volta-ikeo2c`.
+Last updated: 2026-11-18 (deployed demo on Cloudflare). Branch: `claude/trusting-volta-ikeo2c`.
 
 ## Summary
 
 All ten milestones are implemented and exercised end to end on this machine against real
 PostgreSQL 16, Redis 7 and Stockfish 16. The product acceptance scenarios A (random multiplayer),
-B (friends), C (Stockfish review) and D (iPad gestures) pass as automated Playwright tests. The
-app is **not deployed** to a public URL: no hosting credentials were available, so the work ends
-at verified local production builds, container images, CI and deployment documentation.
+B (friends), C (Stockfish review) and D (iPad gestures) pass as automated Playwright tests.
+
+**Live demo: https://tempo-chess.launch2.workers.dev** (Cloudflare Worker + one always-on Cloudflare
+Container running web, realtime, worker, PostgreSQL, Redis, Stockfish and nginx together). The
+Playwright suite was run against that URL (7 passed, 5 skipped by design). This is a **demo-grade**
+deployment, not the production topology: see "Known bugs and limitations" and `deploy/cloudflare/README.md`.
+The production-grade path (managed Postgres/Redis, separate services) is still documented in
+`docs/DEPLOYMENT.md`.
 
 ## Completed features
 
@@ -46,7 +51,17 @@ result modal, friends/challenges, review page, coach tab, analysis board with en
 
 ## Known bugs and limitations
 
-- Not deployed; no public URL. See `docs/DEPLOYMENT.md`.
+- The live demo keeps PostgreSQL **inside the container's ephemeral disk**. A supervisor uploads gzip'd `pg_dump` snapshots
+  (at most once a minute, only when data changed, plus on graceful shutdown) to the Worker's Durable Object storage and
+  restores them on boot. A hard crash can lose up to about a minute of data; the snapshot is capped at 24 MB. Restore across a
+  redeploy was verified. This is not a substitute for managed Postgres.
+- The demo runs one `standard-1` instance (½ vCPU, 4 GiB). It is kept awake by a Worker cron plus an activity-timer override, so it
+  bills continuously. Cold starts after a deploy or crash take roughly 10–60 s (visitors see a self-refreshing "waking up" page).
+- Container stdout is not exposed by Cloudflare's tooling, so the supervisor ships its own logs to the Worker
+  (`/__tempo/logs`, token protected). Outbound email (SMTP) is not configured on the demo, so password-reset and verification
+  emails are only logged, and email verification is not enforced. `ANTHROPIC_API_KEY` is not set either, so the coaching tab
+  uses the built-in rule-based explanations rather than Claude-written ones (set it with `wrangler secret put ANTHROPIC_API_KEY`).
+- Live data was reset after the end-to-end run, so the demo starts empty.
 - Realtime is single-instance by design (in-memory game state + presence). Multi-instance needs sticky routing and the
   Redis adapter (`REALTIME_REDIS_ADAPTER=true`); matchmaking already locks through Redis.
 - Server restarts refund up to one 5-second checkpoint of thinking time; abort timers restart from the restart moment.
@@ -67,7 +82,7 @@ Secrets: `BETTER_AUTH_SECRET`, `REALTIME_JWT_SECRET` (shared by web and realtime
 
 ## Remaining work / next steps
 
-1. Deploy: web → Vercel/Railway, realtime + worker → Railway/Fly/Render with the provided Dockerfiles, managed Postgres and Redis; set env from `.env.example`; run `pnpm db:deploy`.
-2. Run `pnpm test:e2e` against the deployed URL (`WEB_URL`, `REALTIME_URL`) and test on a physical iPad in Safari (touch, rotation, viewport behaviour).
+1. Production deployment: move off the all-in-one demo container to separate web / realtime / worker services with managed Postgres and Redis (Vercel/Railway/Fly/Render with the provided Dockerfiles); set env from `.env.example`; run `pnpm db:deploy`. Add an email provider (SMTP) at the same time.
+2. Test on a physical iPad in Safari against the live URL (touch, rotation, viewport behaviour); the automated iPad scenario only emulates it.
 3. Optional hardening: Redis-backed presence for horizontal scaling; profanity filtering; service worker; email provider; SSO providers via Better Auth.
 4. Optional product work: additional time controls (engine already supports increments), tournaments, puzzle packs, spectator lists.

@@ -7,7 +7,8 @@ import { prisma } from "./db";
 import { emailLayout, sendMail } from "./mailer";
 
 const isProd = process.env.NODE_ENV === "production";
-const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3000";
+// Read at runtime (BETTER_AUTH_URL is not inlined at build time, unlike NEXT_PUBLIC_* values).
+const webUrl = process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3000";
 const trusted = [webUrl, ...(process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean)];
 
 export const auth = betterAuth({
@@ -62,6 +63,8 @@ export const auth = betterAuth({
   },
   advanced: {
     cookiePrefix: "tempo",
+    // Behind a proxy/CDN the client IP arrives in a header; rate limits are keyed on it.
+    ipAddress: { ipAddressHeaders: (process.env.AUTH_IP_HEADERS ?? "x-forwarded-for").split(",").map((h) => h.trim()).filter(Boolean) },
     useSecureCookies: isProd,
     defaultCookieAttributes: { sameSite: "lax", httpOnly: true },
   },

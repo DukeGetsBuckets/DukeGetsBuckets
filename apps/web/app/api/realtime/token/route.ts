@@ -21,5 +21,5 @@ export async function GET(): Promise<NextResponse> {
     .setIssuedAt()
     .setExpirationTime(Math.floor(expiresAt / 1000))
     .sign(new TextEncoder().encode(secret));
-  return NextResponse.json({ token, expiresAt, realtimeUrl: process.env.NEXT_PUBLIC_REALTIME_URL ?? "http://localhost:4000" }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ token, expiresAt, realtimeUrl: process.env.REALTIME_PUBLIC_URL ?? process.env.NEXT_PUBLIC_REALTIME_URL ?? "http://localhost:4000" }, { headers: { "Cache-Control": "no-store" } });
 }

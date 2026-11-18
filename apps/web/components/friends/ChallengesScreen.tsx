@@ -21,8 +21,22 @@ export function ChallengesScreen({ initialIncoming, initialOutgoing, meId }: { i
   const [outgoing, setOutgoing] = React.useState(initialOutgoing);
   const [busy, setBusy] = React.useState<string | null>(null);
 
+  const refresh = React.useCallback(async () => {
+    const res = await fetch("/api/challenges", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = (await res.json()) as { incoming: ChallengeDTO[]; outgoing: ChallengeDTO[] };
+    setIncoming(data.incoming);
+    setOutgoing(data.outgoing);
+  }, []);
+
   React.useEffect(() => {
-    if (!socket) return;
+    if (!socket || !connected) return;
+    // Pushes can arrive before this page's listeners exist; re-read the server's list on connect.
+    void refresh();
+    const onNotification = (n: { type: string }) => {
+      if (n.type.startsWith("CHALLENGE")) void refresh();
+    };
+    socket.on("notification:new", onNotification);
     const onReceived = (c: ChallengeDTO) => setIncoming((list) => [c, ...list.filter((x) => x.id !== c.id)]);
     const gone = ({ challengeId }: { challengeId: string }) => {
       setIncoming((list) => list.filter((c) => c.id !== challengeId));
@@ -34,13 +48,14 @@ export function ChallengesScreen({ initialIncoming, initialOutgoing, meId }: { i
     socket.on("challenge:canceled", gone);
     socket.on("challenge:expired", gone);
     return () => {
+      socket.off("notification:new", onNotification);
       socket.off("challenge:received", onReceived);
       socket.off("challenge:accepted", gone);
       socket.off("challenge:declined", gone);
       socket.off("challenge:canceled", gone);
       socket.off("challenge:expired", gone);
     };
-  }, [socket]);
+  }, [socket, connected, refresh]);
 
   const accept = async (c: ChallengeDTO) => {
     if (!socket) return;

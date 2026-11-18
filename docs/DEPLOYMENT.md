@@ -1,5 +1,9 @@
 # Deployment
 
+> **Quick demo on Cloudflare:** a single-container, always-on deployment (everything in one image, snapshot-based
+> persistence) is described in [`deploy/cloudflare/README.md`](../deploy/cloudflare/README.md). It is a demo topology.
+> The rest of this document describes the production topology.
+
 Tempo is four deployable units plus two managed services:
 
 | Unit | Runtime | Notes |

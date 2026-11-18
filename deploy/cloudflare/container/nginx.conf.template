@@ -1,0 +1,51 @@
+# Single entry point for the container: /socket.io -> realtime (4000), everything else -> Next.js (3000).
+# __PUBLIC_HOST__ is replaced at boot by the supervisor.
+worker_processes 1;
+pid /tmp/nginx.pid;
+error_log stderr warn;
+
+events {
+  worker_connections 4096;
+}
+
+http {
+  access_log off;
+  client_body_temp_path /tmp/nginx-body;
+  proxy_temp_path /tmp/nginx-proxy;
+  fastcgi_temp_path /tmp/nginx-fastcgi;
+  uwsgi_temp_path /tmp/nginx-uwsgi;
+  scgi_temp_path /tmp/nginx-scgi;
+  client_max_body_size 2m;
+
+  map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+  }
+
+  server {
+    listen 8080 default_server;
+
+    location /socket.io/ {
+      proxy_pass http://127.0.0.1:4000;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+      proxy_set_header Host __PUBLIC_HOST__;
+      proxy_set_header X-Forwarded-Proto https;
+      proxy_read_timeout 3600s;
+      proxy_send_timeout 3600s;
+      proxy_buffering off;
+    }
+
+    location / {
+      proxy_pass http://127.0.0.1:3000;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+      proxy_set_header Host __PUBLIC_HOST__;
+      proxy_set_header X-Forwarded-Proto https;
+      proxy_read_timeout 120s;
+      proxy_buffering off;
+    }
+  }
+}

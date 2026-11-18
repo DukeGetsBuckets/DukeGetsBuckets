@@ -39,9 +39,20 @@ export function FriendsScreen({ initialIncoming, initialOutgoing, meId }: { init
     if (r.ok) setFriends(r.friends);
   }, [socket]);
 
+  // Realtime pushes can arrive before this page's listeners exist (slow connections), so the server's
+  // pending lists are re-read on every connect and whenever a related notification arrives.
+  const refreshRequests = React.useCallback(async () => {
+    const res = await fetch("/api/friends/requests", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = (await res.json()) as { incoming: PendingRequest[]; outgoing: PendingRequest[] };
+    setIncoming(data.incoming);
+    setOutgoing(data.outgoing);
+  }, []);
+
   React.useEffect(() => {
     if (!socket || !connected) return;
     void loadFriends();
+    void refreshRequests();
     const onPresence = ({ userId, status, gameId }: { userId: string; status: FriendSummary["status"]; gameId: string | null }) =>
       setFriends((list) => list?.map((f) => (f.id === userId ? { ...f, status, gameId } : f)) ?? null);
     const onRequest = ({ requestId, from }: { requestId: string; from: { id: string; username: string; image: string | null } }) =>
@@ -56,19 +67,27 @@ export function FriendsScreen({ initialIncoming, initialOutgoing, meId }: { init
       setFriends((list) => [friend, ...(list ?? []).filter((f) => f.id !== friend.id)]);
     };
     const onRemoved = ({ userId }: { userId: string }) => setFriends((list) => list?.filter((f) => f.id !== userId) ?? null);
+    const onNotification = (n: { type: string }) => {
+      if (n.type === "FRIEND_REQUEST" || n.type === "FRIEND_ACCEPTED") {
+        void refreshRequests();
+        void loadFriends();
+      }
+    };
+    socket.on("notification:new", onNotification);
     socket.on("friend:presence", onPresence);
     socket.on("friend:request:received", onRequest);
     socket.on("friend:request:resolved", onResolved);
     socket.on("friend:accepted", onAccepted);
     socket.on("friend:removed", onRemoved);
     return () => {
+      socket.off("notification:new", onNotification);
       socket.off("friend:presence", onPresence);
       socket.off("friend:request:received", onRequest);
       socket.off("friend:request:resolved", onResolved);
       socket.off("friend:accepted", onAccepted);
       socket.off("friend:removed", onRemoved);
     };
-  }, [socket, connected, loadFriends]);
+  }, [socket, connected, loadFriends, refreshRequests]);
 
   // Live search as you type (debounced).
   React.useEffect(() => {

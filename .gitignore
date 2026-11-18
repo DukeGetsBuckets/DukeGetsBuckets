@@ -17,3 +17,8 @@ blob-report/
 tmp/
 .local/
 dump.rdb
+
+# Cloudflare deployment build output
+deploy/cloudflare/.stage/
+.wrangler/
+*.tsbuildinfo
