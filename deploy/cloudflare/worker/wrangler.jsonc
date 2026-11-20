@@ -13,7 +13,7 @@
   "containers": [
     {
       "class_name": "TempoContainer",
-      "image": "registry.cloudflare.com/e582742f900c2b989588db680ae68940/tempo-chess:v3",
+      "image": "registry.cloudflare.com/e582742f900c2b989588db680ae68940/tempo-chess:v5",
       "instance_type": "standard-1",
       "max_instances": 1
     }

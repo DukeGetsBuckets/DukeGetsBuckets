@@ -26,6 +26,31 @@ interface SnapshotMeta extends SnapshotInfo {
   prev: SnapshotInfo | null;
 }
 
+/** Markers every complete pg_dump of the app database contains (schema + pg_dump's completion footer). */
+const DUMP_MARKERS = ['CREATE TABLE public."User"', "-- PostgreSQL database dump complete"];
+
+/**
+ * Streams through the gzip'd dump and checks for the markers, so an empty or truncated dump (for example
+ * one taken while PostgreSQL was shutting down) can never replace a good snapshot.
+ */
+export async function isCompleteDump(gz: ArrayBuffer): Promise<boolean> {
+  try {
+    const reader = new Blob([gz]).stream().pipeThrough(new DecompressionStream("gzip")).pipeThrough(new TextDecoderStream()).getReader();
+    const found = new Set<string>();
+    let tail = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const window = tail + value;
+      for (const m of DUMP_MARKERS) if (window.includes(m)) found.add(m);
+      tail = window.slice(-64);
+    }
+    return found.size === DUMP_MARKERS.length;
+  } catch {
+    return false;
+  }
+}
+
 const toHex = (buf: ArrayBuffer): string => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 function safeEqual(a: string, b: string): boolean {
@@ -58,7 +83,7 @@ export class TempoContainer extends Container<Env> {
   private readonly appEnv: Env;
   private warming: Promise<void> | null = null;
 
-  constructor(ctx: DurableObjectState<{}>, env: Env) {
+  constructor(ctx: DurableObjectState<Record<string, never>>, env: Env) {
     super(ctx, env);
     this.appEnv = env;
     this.envVars = {
@@ -90,6 +115,7 @@ export class TempoContainer extends Container<Env> {
     if (url.pathname === "/__tempo/snapshot") return this.snapshotEndpoint(request, url);
     if (url.pathname === "/__tempo/logs") return this.logsEndpoint(request);
     if (url.pathname === "/__tempo/reset") return this.resetEndpoint(request);
+    if (url.pathname === "/__tempo/restart") return this.restartEndpoint(request);
     if (url.pathname === "/__tempo/status") return this.statusEndpoint();
     if (url.pathname === "/__tempo/keepalive") {
       const up = await this.isUp();
@@ -158,6 +184,18 @@ export class TempoContainer extends Container<Env> {
     return Response.json({ ok: true });
   }
 
+  /**
+   * Restart the container without touching the stored snapshots: it is killed immediately (no final
+   * snapshot) and the cron heartbeat starts it again within a minute, restoring the latest snapshot.
+   */
+  private async restartEndpoint(request: Request): Promise<Response> {
+    const token = request.headers.get("x-tempo-snapshot-token") ?? "";
+    if (!this.appEnv.SNAPSHOT_TOKEN || !safeEqual(token, this.appEnv.SNAPSHOT_TOKEN)) return new Response("forbidden", { status: 403 });
+    if (request.method !== "POST") return new Response("method not allowed", { status: 405 });
+    await this.destroy();
+    return Response.json({ ok: true });
+  }
+
   // ───────────── container logs (shipped by the supervisor; the platform does not expose them) ─────────────
 
   private async logsEndpoint(request: Request): Promise<Response> {
@@ -192,6 +230,7 @@ export class TempoContainer extends Container<Env> {
     if (bytes.byteLength === 0 || bytes.byteLength > MAX_SNAPSHOT_BYTES) return new Response("invalid snapshot size", { status: 400 });
     const sha256 = toHex(await crypto.subtle.digest("SHA-256", bytes));
     if (sha256 !== request.headers.get("x-snapshot-sha256")) return new Response("checksum mismatch", { status: 400 });
+    if (!(await isCompleteDump(bytes))) return new Response("not a complete database dump; keeping the stored snapshots", { status: 422 });
 
     const storage = this.ctx.storage;
     const current = await storage.get<SnapshotMeta>("snap:meta");

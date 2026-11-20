@@ -3,7 +3,7 @@ import tseslint from "typescript-eslint";
 import globals from "globals";
 
 export default tseslint.config(
-  { ignores: ["**/node_modules/**", "**/.next/**", "**/dist/**", "packages/database/generated/**", "**/*.config.*", "apps/web/next-env.d.ts", "tools/**", "tests/load/**"] },
+  { ignores: ["**/node_modules/**", "**/.next/**", "**/dist/**", "packages/database/generated/**", "**/*.config.*", "apps/web/next-env.d.ts", "tools/**", "tests/load/**", "apps/web/public/engine/**", "deploy/cloudflare/.stage/**", "**/.wrangler/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

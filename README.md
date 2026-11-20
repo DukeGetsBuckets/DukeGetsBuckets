@@ -10,6 +10,8 @@ mistake training.
 - **Web**: Next.js 16 (App Router), React 19, Tailwind 4, Better Auth, Recharts
 - **Realtime**: Node 22, Express 5, Socket.IO 4, Redis (matchmaking, presence, event bus)
 - **Worker**: BullMQ + Stockfish 16 over UCI, optional Claude coaching prose
+- **Play the bot**: Stockfish 19 (WebAssembly, on the player's device) at an adjustable Elo, showing its candidate
+  moves, evaluations, expected line and reasoning on every move
 - **Data**: PostgreSQL 16 + Prisma 7
 - **Shared**: `packages/chess-core` (rules adjudication, Glicko-2, openings, accuracy model),
   `packages/shared` (zod event contracts), `packages/database`

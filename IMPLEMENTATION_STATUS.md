@@ -1,6 +1,6 @@
 # Implementation status — Tempo
 
-Last updated: 2026-11-18 (deployed demo on Cloudflare). Branch: `claude/trusting-volta-ikeo2c`.
+Last updated: 2026-11-20 (Play the bot; snapshot safety fix). Branch: `claude/trusting-volta-ikeo2c`.
 
 ## Summary
 
@@ -33,6 +33,7 @@ The production-grade path (managed Postgres/Redis, separate services) is still d
 | Game Review | BullMQ worker with a bounded Stockfish pool, every position evaluated (MultiPV 2, depth 16 default, Redis-cached), per-move classification (Brilliant/Great/Best/Excellent/Good/Book/Inaccuracy/Mistake/Blunder/Forced), engine-grounded explanations, accuracy + ACPL, eval graph and eval bar, analysis board with variations, coaching report per side, retry-safe jobs, progress over socket + polling | `apps/worker/src/*`, `apps/web/components/review/*`, `docs/ANALYSIS.md` |
 | Coaching & training | Deterministic coach (strengths, biggest mistakes, practice items, turning point, opening insight, lesson); optional Claude rewrite with strict move verification; training positions from mistakes with engine-verified attempts, hints, reveal, skip, progress; Improve dashboard (accuracy trend, mistake themes, openings with win rates, rating development, training progress); standalone analysis board with PGN/FEN import and server-side engine lines (blocked during active games) | `apps/worker/src/coaching`, `training`, `app/(app)/improve*`, `app/(app)/analysis` |
 | Openings | ECO recognition by position (handles transpositions), book-move detection, per-family performance | `packages/chess-core/src/openings.ts` |
+| Play the bot | Unrated games against Stockfish 19 (lite, single-threaded WebAssembly, ≈1.8 MB, runs in the browser, including iPad Safari, with no server round-trips). Strength via Stockfish's `UCI_Elo` limiter (1400–2600, default 2000), ≈1.5 s per move. Shows its thinking live: up to four candidate moves with evaluations and expected lines, drawn as arrows; after each move a thought card with the ideas behind the move (captures, threats, forks, rescuing attacked pieces, development, castling, centre), the candidates it weighed, whether the Elo limiter made it deviate from its top choice, its expected line, and a verdict on the player's previous move on the same scale as Game Review. Eval bar and plain-English standing from the player's side, hint, take back, resign, flip, choice of colour; game resumes after a reload; unavailable while a live game is in progress | `apps/web/components/bot`, `lib/bot`, `lib/engine`, `app/(app)/play/bot` |
 | Infra | Prisma 7 schema + migration, Docker Compose, Dockerfiles (web standalone, realtime, worker+Stockfish), GitHub Actions CI (typecheck, lint, unit, integration, e2e, builds), `.env.example`, deployment and event docs, licence attributions | repo root, `docs/`, `.github/workflows/ci.yml` |
 
 ## Verification performed (this machine)
@@ -42,6 +43,7 @@ The production-grade path (managed Postgres/Redis, separate services) is still d
 | Unit (chess rules, endings, timeouts/material, Glicko-2, openings, PGN, accuracy/classification, board geometry, UCI parsing) | `pnpm test:unit` | 49 passed |
 | Integration (two-client multiplayer, premoves, duplicates, draw/resign/rating settlement, rematch, reconnect; matchmaking cancel/replace/range expansion/self-match/one game; bullet timeout; realtime restart recovery; Stockfish pipeline, blunder & mate classification, training positions, safe retry, engine refused for active games) | `pnpm test:integration` | 22 passed |
 | End-to-end Playwright (desktop, iPad Pro 11 landscape, iPad Pro 11 portrait): Scenario A on all three, Scenarios B and C on desktop, Scenario D on both iPad projects | `pnpm test:e2e` | 7 passed, 5 skipped (project-scoped) |
+| Play the bot: unit tests for UCI parsing, candidate ranking, move ideas, verdicts and thought cards; Scenario E e2e on all three projects (reply < 5 s, thinking panel, thought card, reload resume, take back, resign, playing Black) | `pnpm test:unit`, `pnpm test:e2e` | 28 web unit tests pass; Scenario E 4 passed (2026-11-20, local production build); live engine checked in a browser on the deployed URL (loads in ≈2.8 s once, moves in 1.5 s at depth ≈17) |
 | Load (30 simulated players, 40 s, random legal moves, 4-core shared box with dev servers running) | `pnpm test:load` | 30 matched, 2034 moves accepted, ack p50 138 ms / p95 589 ms |
 | Typecheck / lint | `pnpm typecheck`, `pnpm lint` | clean |
 | Production builds | `NODE_ENV=production pnpm build` | Next standalone + tsup bundles build; `dist` bundles boot and serve health |
@@ -61,7 +63,16 @@ result modal, friends/challenges, review page, coach tab, analysis board with en
   (`/__tempo/logs`, token protected). Outbound email (SMTP) is not configured on the demo, so password-reset and verification
   emails are only logged, and email verification is not enforced. `ANTHROPIC_API_KEY` is not set either, so the coaching tab
   uses the built-in rule-based explanations rather than Claude-written ones (set it with `wrangler secret put ANTHROPIC_API_KEY`).
-- Live data was reset after the end-to-end run, so the demo starts empty.
+- Live data was reset after the 2026-11-18 end-to-end run. Since then the demo holds real accounts, so the reset endpoint
+  must not be used for test clean-up any more, and the app has no account deletion.
+- Incident 2026-11-20: during the v4 rollout the platform stopped PostgreSQL before the supervisor's final snapshot, and a
+  race in the dump pipeline uploaded an empty dump as "latest"; the new container restored it and ran without tables for
+  ≈16 minutes. The previous snapshot generation was intact and was restored by v5 with no data loss (nothing had changed
+  since it was taken). Fixed in v5: the supervisor waits for pg_dump's own exit status and checks for a complete dump
+  before uploading, validates snapshots before restoring (falling back to the previous generation), runs PostgreSQL in
+  its own session, and the Worker rejects any upload that is not a complete dump of the app schema.
+- Deploying a new image takes the site offline while the platform pulls it: ≈7 minutes when the app layers change,
+  ≈2 minutes when only the supervisor changes.
 - Realtime is single-instance by design (in-memory game state + presence). Multi-instance needs sticky routing and the
   Redis adapter (`REALTIME_REDIS_ADAPTER=true`); matchmaking already locks through Redis.
 - Server restarts refund up to one 5-second checkpoint of thinking time; abort timers restart from the restart moment.

@@ -9,6 +9,11 @@ Tempo's own code is released under the GNU AGPL-3.0-or-later (see `LICENSE`).
   over the UCI protocol. It is not linked into Tempo. If you distribute a Stockfish binary with
   your deployment (for example inside the worker container image), you must make the corresponding
   source available under the GPL: https://github.com/official-stockfish/Stockfish.
+- **Stockfish.js 19.0.1** (https://github.com/nmrugg/stockfish.js) — GPL-3.0 (engine), by Nathan Rugg et al.
+  The "Play the bot" mode runs the unmodified `stockfish-19-lite-single` WebAssembly build in the player's
+  browser. It is installed from npm (`stockfish@19.0.1`), copied to `apps/web/public/engine/` at build time
+  together with its licence (`COPYING.txt`), and served as separate files; the corresponding source is at
+  https://github.com/nmrugg/stockfish.js/tree/v19.0.1 and https://github.com/official-stockfish/Stockfish.
 
 ## Chess rules
 

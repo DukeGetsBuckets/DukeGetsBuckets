@@ -35,7 +35,11 @@ The container disk is ephemeral. To make accounts, games and ratings survive res
 - every 60 s (only if data changed) and on graceful shutdown the supervisor uploads a gzip'd `pg_dump` to the Worker,
   which keeps the **latest and previous** generation in Durable Object storage;
 - on boot the supervisor restores the latest snapshot (falling back to the previous one) before starting the apps;
-- if a stored snapshot cannot be restored, the container starts empty and **stops uploading** so the stored copy is never overwritten.
+- if a stored snapshot cannot be restored, the container starts empty and **stops uploading** so the stored copy is never overwritten;
+- a snapshot is only uploaded, stored (the Worker checks it too) or restored if it is a *complete* dump of the app
+  schema (`CREATE TABLE public."User"` plus pg_dump's completion footer). The platform's stop signal can reach
+  PostgreSQL before the supervisor's final snapshot; that dump then fails and nothing is uploaded, so the last
+  periodic snapshot (at most a minute old) stands.
 
 Limits: a hard crash can lose up to about a minute of data; snapshots are capped at 24 MB; schema changes need a migration
 strategy for restored snapshots (the supervisor applies migrations only to a fresh database). This is a demo-grade
@@ -61,6 +65,10 @@ npx wrangler secret bulk secrets.json   # {"BETTER_AUTH_SECRET": "...", "REALTIM
 
 Optional secret: `ANTHROPIC_API_KEY` enables AI-written coaching text.
 
+A new image means downtime while the platform pulls it (≈7 minutes when the app layers change). For a supervisor-only
+change, rebuild from the existing stage so every other layer is reused: `cp container/supervisor.mjs .stage/ && docker build
+--network host -t tempo-chess:vN .stage` (≈2 minutes of downtime).
+
 `PUBLIC_URL` must match the Worker's real URL: it is baked into the build (`NEXT_PUBLIC_*`) and passed to the container
 as the allowed origin for authentication and sockets.
 
@@ -72,7 +80,8 @@ All endpoints below need the header `x-tempo-snapshot-token: <SNAPSHOT_TOKEN>` u
 |---|---|
 | `GET /__tempo/status` (no token) | Container state and last snapshot time |
 | `GET /__tempo/logs` | Recent stdout/stderr of every process, per boot (the platform does not expose container logs to the CLI) |
-| `POST /__tempo/reset` | **Erases all data**: kills the container and deletes stored snapshots |
+| `POST /__tempo/restart` | Kills the container (no final snapshot) without touching snapshots; the cron restarts it and it restores the latest valid snapshot |
+| `POST /__tempo/reset` | **Erases all data**: kills the container and deletes stored snapshots. Never use it once real people have accounts |
 | `GET/POST /__tempo/snapshot` | Used by the container itself |
 
 ## Known limitations

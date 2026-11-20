@@ -22,3 +22,4 @@ dump.rdb
 deploy/cloudflare/.stage/
 .wrangler/
 *.tsbuildinfo
+apps/web/public/engine/

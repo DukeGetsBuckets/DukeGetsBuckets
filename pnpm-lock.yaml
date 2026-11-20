@@ -189,6 +189,9 @@ importers:
       socket.io-client:
         specifier: ^4.8.4
         version: 4.8.4
+      stockfish:
+        specifier: 19.0.1
+        version: 19.0.1
       zod:
         specifier: ^4.1.0
         version: 4.6.7
@@ -3175,6 +3178,10 @@ packages:
 
   std-env@4.3.0:
     resolution: {integrity: sha512-OtU/EgQ1kIm5KwqQpBC6ZEMXrZRui11w8zgfTWp8cdO9B8OaPsbA8bTHO2P+HNo1VlUTGMVBwPhydu6poeXiag==}
+
+  stockfish@19.0.1:
+    resolution: {integrity: sha512-bTwsO4e9HAwPBKls1+szcfibmaWRNzTF20rQE/XPdB3LOSoT6XTZDr1zYwriwSRRFT5MkvqrglPmJrKEVXGnyQ==}
+    hasBin: true
 
   strip-json-comments@3.1.1:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
@@ -6193,6 +6200,8 @@ snapshots:
   std-env@3.10.0: {}
 
   std-env@4.3.0: {}
+
+  stockfish@19.0.1: {}
 
   strip-json-comments@3.1.1: {}
 

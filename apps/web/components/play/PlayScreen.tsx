@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Link2, Loader2, Swords, Users, X, Zap } from "lucide-react";
+import { Bot, Link2, Loader2, Swords, Users, X, Zap } from "lucide-react";
 import { TIME_CONTROLS, type QueueStatus, type RatingCategory } from "@tempo/shared";
 import { emitWithAck } from "@/lib/socket";
 import { useSocket } from "@/components/providers/SocketProvider";
@@ -203,6 +203,16 @@ export function PlayScreen({ ratings, activeGameId, initialMode, autoQuick }: { 
               );
             })}
           </div>
+
+          <Link href="/play/bot" className="card flex items-center gap-4 p-5 transition hover:border-accent/60">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface-2 text-accent">
+              <Bot className="h-5 w-5" />
+            </span>
+            <span>
+              <span className="block font-semibold">Play the bot</span>
+              <span className="block text-sm text-fg-muted">A 2000-rated Stockfish bot that shows its thinking on every move (unrated)</span>
+            </span>
+          </Link>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <Link href="/friends" className="card flex items-center gap-4 p-5 transition hover:border-accent/60">

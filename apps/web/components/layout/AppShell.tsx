@@ -113,7 +113,7 @@ export function AppShell({ user, children, fullBleed }: { user: ShellUser | null
           </div>
         </header>
 
-        <main className={cn("flex-1", fullBleed || inGame ? "" : "mx-auto w-full max-w-6xl px-3 py-4 sm:px-5 sm:py-6", !inGame && "pb-24 lg:pb-6")}>{children}</main>
+        <main className={cn("flex-1", fullBleed || inGame ? "" : "mx-auto w-full max-w-6xl px-3 py-4 sm:px-5 sm:pt-6", !inGame && "pb-24 lg:pb-6")}>{children}</main>
 
         {/* Bottom tab bar (phone / iPad portrait) */}
         {!inGame && (

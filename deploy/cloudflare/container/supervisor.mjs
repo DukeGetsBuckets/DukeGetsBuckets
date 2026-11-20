@@ -9,6 +9,7 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 // Recent output of every process is kept in memory and shipped to the Worker (see shipLogs) so
 // failures inside the container can be diagnosed; the platform exposes no container logs to the CLI.
@@ -43,6 +44,11 @@ const PUBLIC_HOST = new URL(PUBLIC_URL).host;
 const SNAPSHOT_TOKEN = process.env.SNAPSHOT_TOKEN ?? "";
 const SNAPSHOT_INTERVAL_MS = Number(process.env.SNAPSHOT_INTERVAL_MS ?? 60_000);
 const MAX_SNAPSHOT_BYTES = 24 * 1024 * 1024;
+
+// A snapshot is only valid if it is a complete pg_dump of the app database: the schema is present and
+// pg_dump wrote its completion footer. (A dump taken while PostgreSQL is going down can be empty.)
+const DUMP_MARKERS = ['CREATE TABLE public."User"', "-- PostgreSQL database dump complete"];
+const isCompleteDump = (sql) => DUMP_MARKERS.every((m) => sql.includes(m));
 
 const PGBIN = "/usr/lib/postgresql/16/bin";
 const PGDATA = "/var/lib/tempo/pg";
@@ -105,6 +111,9 @@ function launch(entry) {
     env: entry.opts.env ?? process.env,
     uid: entry.opts.uid,
     gid: entry.opts.gid,
+    // Own session for PostgreSQL: a stop signal sent to the whole container's process group must not
+    // shut it down before the supervisor has taken its final snapshot.
+    detached: entry.opts.detached === true,
   });
   entry.proc = proc;
   for (const [stream, sink] of [[proc.stdout, process.stdout], [proc.stderr, process.stderr]]) {
@@ -213,13 +222,23 @@ function recreateDatabase() {
 }
 
 function restoreFrom(buffer) {
-  fs.writeFileSync("/tmp/snapshot.sql.gz", buffer);
-  const res = spawnSync(
-    "sh",
-    ["-c", `gunzip -c /tmp/snapshot.sql.gz | ${PGBIN}/psql ${PSQL.join(" ")} -d tempo -v ON_ERROR_STOP=1 --single-transaction -q -f -`],
-    { stdio: ["ignore", "inherit", "inherit"] },
-  );
-  return res.status === 0;
+  let sql;
+  try {
+    sql = gunzipSync(buffer);
+  } catch {
+    log("snapshot is not valid gzip");
+    return false;
+  }
+  if (!isCompleteDump(sql.toString("utf8"))) {
+    log(`snapshot is not a complete database dump (${sql.length} bytes uncompressed); skipping it`);
+    return false;
+  }
+  fs.writeFileSync("/tmp/snapshot.sql", sql);
+  const res = spawnSync(`${PGBIN}/psql`, [...PSQL, "-d", "tempo", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-q", "-f", "/tmp/snapshot.sql"], {
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  fs.rmSync("/tmp/snapshot.sql", { force: true });
+  return res.status === 0 && psqlScalar(`SELECT to_regclass('public."User"') IS NOT NULL`) === "t";
 }
 
 async function initialiseDatabase() {
@@ -249,20 +268,26 @@ async function initialiseDatabase() {
   applyMigrations();
 }
 
+/**
+ * Dumps the database and gzips it in-process. Success requires pg_dump's own exit status (its "close"
+ * event fires after all output has been read) *and* a complete dump; an earlier version judged success by
+ * the gzip process alone and once uploaded an empty dump taken while PostgreSQL was shutting down.
+ */
 function dumpToBuffer() {
   return new Promise((resolve, reject) => {
-    const dump = spawn(`${PGBIN}/pg_dump`, [...PSQL, "-d", "tempo", "--no-owner", "--no-privileges", "--no-comments"], { stdio: ["ignore", "pipe", "inherit"] });
-    const gzip = spawn("gzip", ["-n", "-6"], { stdio: ["pipe", "pipe", "inherit"] });
+    const dump = spawn(`${PGBIN}/pg_dump`, [...PSQL, "-d", "tempo", "--no-owner", "--no-privileges", "--no-comments"], { stdio: ["ignore", "pipe", "pipe"] });
     const chunks = [];
-    let dumpFailed = false;
-    dump.stdout.pipe(gzip.stdin);
-    gzip.stdout.on("data", (chunk) => chunks.push(chunk));
-    dump.on("close", (code) => {
-      if (code !== 0) dumpFailed = true;
+    let stderr = "";
+    dump.stdout.on("data", (chunk) => chunks.push(chunk));
+    dump.stderr.on("data", (chunk) => {
+      stderr += chunk.toString("utf8");
     });
-    gzip.on("close", (code) => {
-      if (dumpFailed || code !== 0) reject(new Error("pg_dump pipeline failed"));
-      else resolve(Buffer.concat(chunks));
+    dump.on("error", reject);
+    dump.on("close", (code, signal) => {
+      if (code !== 0) return reject(new Error(`pg_dump failed (${code ?? signal}): ${stderr.trim().slice(0, 300)}`));
+      const sql = Buffer.concat(chunks);
+      if (!isCompleteDump(sql.toString("utf8"))) return reject(new Error(`pg_dump output is incomplete (${sql.length} bytes); not uploading`));
+      resolve(gzipSync(sql, { level: 6 }));
     });
   });
 }
@@ -327,7 +352,7 @@ async function main() {
     "postgres",
     `${PGBIN}/postgres`,
     ["-D", PGDATA, "-c", "listen_addresses=127.0.0.1", "-c", "port=5432", "-c", "unix_socket_directories=/tmp", "-c", "max_connections=80", "-c", "shared_buffers=192MB", "-c", "log_min_messages=warning"],
-    { uid: pgUid, gid: pgGid, critical: true },
+    { uid: pgUid, gid: pgGid, critical: true, detached: true },
   );
   manage(
     "redis",
